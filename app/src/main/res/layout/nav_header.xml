@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="176dp"
+              android:background="?attr/colorPrimaryContainer"
+              android:gravity="bottom"
+              android:orientation="vertical"
+              android:padding="16dp"
+              android:theme="@style/ThemeOverlay.Material3.Dark">
+
+    <com.google.android.material.imageview.ShapeableImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/person_24px"
+            app:shapeAppearance="@style/RoundedStyle"
+            app:strokeColor="?attr/colorPrimary"
+            app:strokeWidth="1dp"
+            android:layout_marginBottom="8dp"
+            android:padding="2dp"/>
+
+    <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="UserName"
+            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+            android:textColor="?attr/colorPrimary"/>
+
+    <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="EmailOrOthers"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="?attr/colorSecondary"/>
+
+</LinearLayout>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:title="All features">
+        <menu>
+            <item android:title="Add a playlist"
+                  android:icon="@drawable/playlist_add_24px"/>
+        </menu>
+    </item>
+
+    <item android:title="Settings"
+          android:icon="@drawable/settings_24px"/>
+    <item android:title="Support me"
+          android:icon="@drawable/volunteer_activism_24px"/>
+    <item android:title="Log out"
+          android:icon="@drawable/logout_24px"/>
+</menu>
