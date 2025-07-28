@@ -17,7 +17,7 @@
 
         <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
+                android:layout_height="48dp"
                 android:orientation="horizontal"
                 android:paddingHorizontal="8dp"
                 android:gravity="center_vertical">
@@ -25,41 +25,34 @@
             <!-- 导航菜单按钮 -->
             <com.google.android.material.button.MaterialButton
                     android:id="@+id/navButton"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    style="style=?attr/materialIconButtonStyle"
+                    style="?attr/materialIconButtonStyle"
                     app:icon="@drawable/menu_24px"
                     app:iconGravity="textEnd"
                     app:iconSize="26dp"
                     app:iconTint="?attr/colorOnSurface"
                     app:backgroundTint="@android:color/transparent"/>
 
-            <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/searchContainer"
+            <EditText
+                    android:id="@+id/searchInput"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="38dp"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
-                    style="@style/Widget.Material3.TextInputLayout.FilledBox"
-                    app:boxBackgroundMode="filled"
-                    app:endIconMode="clear_text"
-                    app:endIconDrawable="@drawable/close_24px"
-                    app:startIconDrawable="@drawable/search_24px"
-                    app:boxStrokeWidth="0dp"
-                    app:boxStrokeWidthFocused="0dp"
-                    app:shapeAppearanceOverlay="@style/RoundedStyle">
-
-                <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/searchInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Search..."
-                        android:imeOptions="actionSearch"
-                        android:inputType="text"
-                        android:textSize="16sp"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:background="@drawable/rounded_bg"
+                    android:hint="Search..."
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:textSize="16sp"
+                    android:drawableStart="@drawable/search_24px"
+                    android:drawableEnd="@drawable/close_24px"
+                    android:hapticFeedbackEnabled="false"
+                    android:drawablePadding="8dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"/>
         </LinearLayout>
 
         <!-- 下拉刷新区域 -->
@@ -71,7 +64,7 @@
                 app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
             <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recyclerView"
+                    android:id="@+id/mainRecyclerView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clipToPadding="false"
@@ -90,16 +83,12 @@
             android:fitsSystemWindows="false"
             style="@style/Widget.Material3.NavigationView"/>
 
-    <LinearLayout
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
             android:id="@+id/bottomSheet"
             style="@style/Widget.Material3.BottomSheet"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
-
-        <com.google.android.material.bottomsheet.BottomSheetDragHandleView
-                android:id="@+id/dragHandle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"/>
-    </LinearLayout>
+        <include layout="@layout/bottom_sheet_layout"/>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </androidx.drawerlayout.widget.DrawerLayout>

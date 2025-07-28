@@ -2,6 +2,7 @@ package com.guang.cloudx.logic.utils
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.util.Log
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import java.util.Base64
@@ -36,7 +37,7 @@ class AESECBHelper {
                 Format.BASE64 -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     Base64.getDecoder().decode(input)
                 } else {
-                    TODO("VERSION.SDK_INT < O")
+                    throw RuntimeException("VERSION.SDK_INT < O")
                 }
             }
 
@@ -66,7 +67,7 @@ class AESECBHelper {
                 Format.BASE64 -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     Base64.getDecoder().decode(input)
                 } else {
-                    TODO("VERSION.SDK_INT < O")
+                    throw RuntimeException("VERSION.SDK_INT < O")
                 }
             }
 
@@ -92,7 +93,9 @@ class AESECBHelper {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val keySpec = SecretKeySpec(SECRET_KEY, ALGORITHM)
             cipher.init(Cipher.DECRYPT_MODE, keySpec)
-            return cipher.doFinal(input)
+//            Log.d("TAG", byteArrayToHexString(input))
+            val doFinal = cipher.doFinal(input)
+            return doFinal
         }
 
         private fun byteArrayToHexString(bytes: ByteArray): String {

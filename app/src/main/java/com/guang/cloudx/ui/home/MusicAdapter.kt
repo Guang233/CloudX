@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.google.android.material.imageview.ShapeableImageView
 import com.guang.cloudx.logic.model.Music
 
@@ -25,11 +26,12 @@ class MusicAdapter(val musicList: List<Music>): RecyclerView.Adapter<MusicAdapte
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val music = musicList[position]
+        Glide.with(holder.itemView.context).load(music.album.picUrl).into(holder.musicIcon)
         holder.musicName.text = music.name
         val authors = music.artists.joinToString("/") { it.name }
         val album =  music.album.name
         holder.musicAuthor.text = "$authors - $album"
-        holder.download.setOnClickListener {}
+        holder.download.setOnClickListener {TODO("download music")}
     }
 
     override fun getItemCount(): Int = musicList.size

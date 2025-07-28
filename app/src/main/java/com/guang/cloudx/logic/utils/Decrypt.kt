@@ -1,6 +1,7 @@
 package com.guang.cloudx.logic.utils
 
 import android.annotation.SuppressLint
+import android.util.Log
 import com.guang.cloudx.logic.model.Album
 import com.guang.cloudx.logic.model.Artist
 import com.guang.cloudx.logic.model.Lyric
@@ -13,6 +14,7 @@ class Decrypt {
     companion object {
         fun decryptSearch(encryptedBody: String): List<Music> {
             val decryptedJson = AESECBHelper.decrypt(encryptedBody)
+            Log.d("text", "decryptSearch: $encryptedBody")
             val data = JSONObject(decryptedJson)
 
             if (data.optInt("code") != 200) {

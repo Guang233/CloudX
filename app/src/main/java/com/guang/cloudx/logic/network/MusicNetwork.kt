@@ -1,5 +1,6 @@
 package com.guang.cloudx.logic.network
 
+import android.util.Log
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.MusicUrl
 import com.guang.cloudx.logic.model.PlayList
@@ -17,13 +18,13 @@ import kotlin.coroutines.suspendCoroutine
 object MusicNetwork {
     private val musicService = ServiceCreator.createService<MusicService>()
 
-    suspend fun searchMusics(keyword: String, offset: Int, limit: Int, cookie: String): List<Music> {
+    suspend fun searchMusic(keyword: String, offset: Int, limit: Int, cookie: String): List<Music> {
         val bodyJson = "{\"keyword\":\"$keyword\",\"scene\":\"NORMAL\",\"limit\":\"$limit\",\"offset\":\"$offset\",\"needCorrect\":\"true\",\"e_r\":true,\"checkToken\":\"\",\"header\":\"\"}"
         val query = "/api/search/song/list/page-36cd479b6b5-$bodyJson-36cd479b6b5-${MD5Helper.md5("nobody/api/search/song/list/pageuse${bodyJson}md5forencrypt")}"
+        val encryptedBody = musicService.searchMusic(AESECBHelper.encrypt(query), cookie)
+            .await()
         return Decrypt.decryptSearch(
-            musicService
-                .searchMusic("params=${AESECBHelper.encrypt(query)}", cookie)
-                .await()
+            encryptedBody
         )
     }
 
@@ -32,17 +33,17 @@ object MusicNetwork {
         val  query = "/api/song/lyric/v1-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/song/lyric/v1use${bodyJSON}md5forencrypt")}"
         return Decrypt.decryptLytic(
             musicService
-                .getLyric("params=${AESECBHelper.encrypt(query)}", cookie)
+                .getLyric(AESECBHelper.encrypt(query), cookie)
                 .await()
         )
     }
 
-    suspend fun getMusicUrl(id: String, cookie: String): MusicUrl {
-        val bodyJSON = "{\"ids\":\"[\\\"$id\\\"]\",\"level\":\"exhigh\",\"immerseType\":\"c51\",\"encodeType\":\"aac\",\"trialMode\":\"-1\",\"e_r\":true,\"header\":\"\"}"
+    suspend fun getMusicUrl(id: String, level: String, cookie: String): MusicUrl {
+        val bodyJSON = "{\"ids\":\"[\\\"$id\\\"]\",\"level\":\"$level\",\"immerseType\":\"c51\",\"encodeType\":\"aac\",\"trialMode\":\"-1\",\"e_r\":true,\"header\":\"\"}"
         val query = "/api/song/enhance/player/url/v1-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/song/enhance/player/url/v1use${bodyJSON}md5forencrypt")}"
         return Decrypt.decryptMusicUrl(
             musicService
-                .getMusic("params=${AESECBHelper.encrypt(query)}", cookie)
+                .getMusic(AESECBHelper.encrypt(query), cookie)
                 .await()
         )
     }
@@ -52,7 +53,7 @@ object MusicNetwork {
         val query = "/api/v6/playlist/detail-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/song/playlist/detailuse${bodyJSON}md5forencrypt")}"
         return Decrypt.decryptPlayList(
             musicService
-                .getPlayList("params=${AESECBHelper.encrypt(query)}", cookie)
+                .getPlayList(AESECBHelper.encrypt(query), cookie)
                 .await()
         )
     }
