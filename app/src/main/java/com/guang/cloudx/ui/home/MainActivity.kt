@@ -23,6 +23,7 @@ import com.google.android.material.imageview.ShapeableImageView
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.util.ext.d
 
 class MainActivity : BaseActivity() {
     private val searchMusicList = mutableListOf<Music>()
@@ -56,11 +57,6 @@ class MainActivity : BaseActivity() {
 
         swipeRefresh.setOnRefreshListener {
             if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
-            else if (!TextUtils.isEmpty(searchInput.text)) viewModel.searchMusic(
-                viewModel.searchText,
-                0,
-                20
-            )
         }
 
         onBackPressedDispatcher.addCallback(this) {
@@ -74,6 +70,7 @@ class MainActivity : BaseActivity() {
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
         searchInput.addTextChangedListener { editable ->
             viewModel.searchText = editable.toString()
+            searchMusicList.clear()
         }
         searchInput.setText(viewModel.searchText)
 
@@ -88,16 +85,15 @@ class MainActivity : BaseActivity() {
         viewModel.searchResults.observe(this) { result ->
             swipeRefresh.isRefreshing = false
             // 清空数据并通知Adapter
-            searchMusicList.clear()
-            adapter.notifyDataSetChanged()
 
             val musicList = result.getOrNull()
             if (musicList != null) {
                 searchMusicList.addAll(musicList)
-                adapter.notifyItemInserted(searchMusicList.size - musicList.size)
+                // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
             } else {
                 TODO("searchMusicList is null")
             }
+            adapter.notifyDataSetChanged()
         }
     }
 
@@ -123,15 +119,17 @@ class MainActivity : BaseActivity() {
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
-                val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-                if (layoutManager.findFirstVisibleItemPosition() >= layoutManager.itemCount / 3 && !TextUtils.isEmpty(searchInput.text)) {
-
-                        swipeRefresh.isRefreshing = true
-                        viewModel.searchMusic(
-                            searchInput.text.toString(),
-                            0,
-                            layoutManager.itemCount + 20
-                        )
+                if (layoutManager.findFirstVisibleItemPosition() >= layoutManager.itemCount / 3 && !TextUtils.isEmpty(
+                        searchInput.text
+                    ) && !swipeRefresh.isRefreshing
+                ) {
+                    "musicList size = ${layoutManager.itemCount}".d()
+                    swipeRefresh.isRefreshing = true
+                    viewModel.searchMusic(
+                        searchInput.text.toString(),
+                        layoutManager.itemCount,
+                        20
+                    )
 
                 }
 

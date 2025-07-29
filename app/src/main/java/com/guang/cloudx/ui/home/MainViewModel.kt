@@ -1,13 +1,10 @@
 package com.guang.cloudx.ui.home
 
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.switchMap
 import com.guang.cloudx.logic.Repository
-import com.guang.cloudx.logic.model.Music
-import com.guang.cloudx.logic.network.MusicNetwork.searchMusic
-import kotlin.concurrent.thread
+
 
 class MainViewModel: ViewModel() {
 
