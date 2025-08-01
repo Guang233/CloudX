@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.imageview.ShapeableImageView
 import com.guang.cloudx.logic.model.Music
 
@@ -15,7 +16,7 @@ class MusicAdapter(val musicList: List<Music>): RecyclerView.Adapter<MusicAdapte
         val musicIcon: ShapeableImageView = view.findViewById(R.id.musicIcon)
         val musicName: TextView = view.findViewById(R.id.musicName)
         val musicAuthor: TextView = view.findViewById(R.id.musicAuthor)
-        val download: ShapeableImageView = view.findViewById(R.id.downloadMusicIcon)
+        val download: MaterialButton = view.findViewById(R.id.downloadMusicIcon)
     }
 
     override fun onCreateViewHolder(p0: ViewGroup, p1: Int): ViewHolder {
