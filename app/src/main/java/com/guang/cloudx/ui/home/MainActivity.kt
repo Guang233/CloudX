@@ -3,7 +3,9 @@ package com.guang.cloudx.ui.home
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.text.TextUtils
+import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -20,12 +22,13 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.imageview.ShapeableImageView
+import com.google.android.material.snackbar.Snackbar
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
-import com.guang.cloudx.util.ext.d
 
-class MainActivity : BaseActivity() {
+
+class MainActivity : BaseActivity(), View.OnClickListener, SwipeRefreshLayout.OnRefreshListener, View.OnTouchListener, TextView.OnEditorActionListener {
     private val searchMusicList = mutableListOf<Music>()
     private val adapter by lazy { MusicAdapter(searchMusicList) }
 
@@ -46,18 +49,14 @@ class MainActivity : BaseActivity() {
 
     lateinit var viewModel: MainViewModel
 
-    @SuppressLint("NotifyDataSetChanged")
+    @SuppressLint("ClickableViewAccessibility", "NotifyDataSetChanged")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        navButton.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
-
-        swipeRefresh.setOnRefreshListener {
-            if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
-        }
+        navButton.setOnClickListener(this)
+        swipeRefresh.setOnRefreshListener(this)
+        searchInput.setOnTouchListener(this) // 清除图标点击事件
 
         onBackPressedDispatcher.addCallback(this) {
             if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.close()
@@ -74,13 +73,7 @@ class MainActivity : BaseActivity() {
         }
         searchInput.setText(viewModel.searchText)
 
-        searchInput.setOnEditorActionListener { _, _, _ ->
-            if (!TextUtils.isEmpty(searchInput.text)) {
-                swipeRefresh.isRefreshing = true
-                viewModel.searchMusic(searchInput.text.toString(), 0, 20)
-            }
-            true
-        }
+        searchInput.setOnEditorActionListener(this)
 
         viewModel.searchResults.observe(this) { result ->
             swipeRefresh.isRefreshing = false
@@ -89,9 +82,8 @@ class MainActivity : BaseActivity() {
             val musicList = result.getOrNull()
             if (musicList != null) {
                 searchMusicList.addAll(musicList)
-                // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
             } else {
-                TODO("searchMusicList is null")
+                Snackbar.make(recyclerView, "网络未连接或未找到匹配的歌曲", Snackbar.LENGTH_SHORT).show()
             }
             adapter.notifyDataSetChanged()
         }
@@ -123,7 +115,6 @@ class MainActivity : BaseActivity() {
                         searchInput.text
                     ) && !swipeRefresh.isRefreshing
                 ) {
-                    "musicList size = ${layoutManager.itemCount}".d()
                     swipeRefresh.isRefreshing = true
                     viewModel.searchMusic(
                         searchInput.text.toString(),
@@ -161,9 +152,23 @@ class MainActivity : BaseActivity() {
             )
         }
 
-        // 清除图标点击事件
-        searchInput.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_UP) {
+
+
+    }
+
+    override fun onClick(v: View) {
+        when(v.id) {
+            navButton.id -> drawerLayout.openDrawer(GravityCompat.START)
+        }
+    }
+
+    override fun onRefresh() {
+        if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
+    }
+
+    override fun onTouch(v: View, event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_UP) {
+            if (v.id == searchInput.id) {
                 val drawables = searchInput.compoundDrawables
                 val clearDrawable = drawables[2] // 右侧drawable
 
@@ -175,11 +180,31 @@ class MainActivity : BaseActivity() {
 
                     if (touchX > clearIconStart) {
                         searchInput.text.clear()
-                        return@setOnTouchListener true
+                        return true
                     }
                 }
             }
-            false
+            v.performClick()
         }
+       return false
     }
+
+    override fun onEditorAction(
+        v: TextView,
+        actionId: Int,
+        event: KeyEvent
+    ): Boolean {
+        when(v.id) {
+            searchInput.id -> {
+                if (!TextUtils.isEmpty(searchInput.text)) {
+                    swipeRefresh.isRefreshing = true
+                    viewModel.searchMusic(searchInput.text.toString(), 0, 20)
+                }
+                return true
+            }
+        }
+        return true
+    }
+
+
 }
