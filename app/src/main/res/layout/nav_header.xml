@@ -6,8 +6,7 @@
               android:background="?attr/colorPrimaryContainer"
               android:gravity="bottom"
               android:orientation="vertical"
-              android:padding="16dp"
-              android:theme="@style/ThemeOverlay.Material3.Dark">
+              android:padding="16dp">
 
     <com.google.android.material.imageview.ShapeableImageView
             android:layout_width="64dp"

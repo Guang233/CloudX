@@ -2,40 +2,63 @@ package com.guang.cloudx.ui.home
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.Environment
 import android.text.TextUtils
-import android.view.MotionEvent
+import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.addCallback
-import androidx.core.content.ContextCompat
+import androidx.activity.viewModels
 import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
-import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
-import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.bumptech.glide.Glide
+import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonGroup
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.imageview.ShapeableImageView
+import com.google.android.material.navigation.NavigationView
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.utils.SharedPreferencesUtils
+import com.guang.cloudx.logic.utils.applicationViewModels
+import com.guang.cloudx.logic.utils.showSnackBar
+import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
+import com.guang.cloudx.ui.downloadManager.DownloadViewModel
 import com.guang.cloudx.util.ext.d
 
 class MainActivity : BaseActivity() {
+    private lateinit var prefs: SharedPreferencesUtils
     private val searchMusicList = mutableListOf<Music>()
-    private val adapter by lazy { MusicAdapter(searchMusicList) }
+    private var isLastPage = false
+    private var lastSearchText: String = ""
+    private val adapter by lazy { MusicAdapter(searchMusicList,
+        {music -> startDownloadMusic(music = music)},
+        {music -> showBottomSheet(music = music)}) }
 
-    private val navButton by lazy { findViewById<MaterialButton>(R.id.navButton) }
+    private val appBarLayout by lazy { findViewById<AppBarLayout>(R.id.appBarLayout) }
+    private val toolbar by lazy { findViewById<MaterialToolbar>(R.id.topAppBar) }
     private val drawerLayout by lazy { findViewById<DrawerLayout>(R.id.drawer_layout) }
+    private val navigationView by lazy { findViewById<NavigationView>(R.id.navigation_view) }
     private val recyclerView by lazy { findViewById<RecyclerView>(R.id.mainRecyclerView) }
 
-    private val searchInput by lazy { findViewById<EditText>(R.id.searchInput) }
+    private val searchToolbar by lazy { findViewById<MaterialToolbar>(R.id.searchToolbar) }
+    private val searchEditText by lazy { findViewById<EditText>(R.id.searchEditText) }
 
-    private val bottomSheet by lazy { findViewById<FrameLayout>(R.id.bottomSheet) }
+    private val bottomSheet by lazy { findViewById<LinearLayout>(R.id.bottomSheet) }
     private val bsMusicName by lazy { findViewById<TextView>(R.id.musicNameDetail) }
     private val bsMusicAuthor by lazy { findViewById<TextView>(R.id.musicAuthorDetail) }
     private val bsMusicAlbum by lazy { findViewById<TextView>(R.id.musicAlbumDetail) }
@@ -44,71 +67,66 @@ class MainActivity : BaseActivity() {
     private val bsCancelButton by lazy { findViewById<MaterialButton>(R.id.btnCancelDownload) }
     private val swipeRefresh by lazy { findViewById<SwipeRefreshLayout>(R.id.swipeRefresh) }
 
-    lateinit var viewModel: MainViewModel
+    val viewModel: MainViewModel by viewModels()
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        applyTopInsets(appBarLayout)
+        applyTopInsets(navigationView)
 
-        navButton.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
-        }
+        prefs = SharedPreferencesUtils(this)
 
         swipeRefresh.setOnRefreshListener {
             if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
+            if (!TextUtils.isEmpty(viewModel.searchText)) {
+                searchMusicList.clear()
+                viewModel.isSearchMode = false
+                viewModel.searchMusic(viewModel.searchText, 0, 20)
+            }
         }
 
         onBackPressedDispatcher.addCallback(this) {
             if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.close()
-            else finish()
+            else if (viewModel.isSearchMode) exitSearchMode()
+                else moveTaskToBack(true)
         }
 
+        setupToolbar()
         initRecyclerView()
-        initEditText()
+        initNavigationView()
+        setupSearchToolbar()
 
-        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
-        searchInput.addTextChangedListener { editable ->
-            viewModel.searchText = editable.toString()
-            searchMusicList.clear()
-        }
-        searchInput.setText(viewModel.searchText)
-
-        searchInput.setOnEditorActionListener { _, _, _ ->
-            if (!TextUtils.isEmpty(searchInput.text)) {
-                swipeRefresh.isRefreshing = true
-                viewModel.searchMusic(searchInput.text.toString(), 0, 20)
-            }
-            true
+        if (viewModel.isSearchMode) {
+            toolbar.visibility = View.GONE
+            searchToolbar.visibility = View.VISIBLE
         }
 
         viewModel.searchResults.observe(this) { result ->
             swipeRefresh.isRefreshing = false
-            // 清空数据并通知Adapter
 
-            val musicList = result.getOrNull()
-            if (musicList != null) {
-                searchMusicList.addAll(musicList)
-                // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
-            } else {
-                TODO("searchMusicList is null")
-            }
-            adapter.notifyDataSetChanged()
+                val musicList = result.getOrNull()
+                if (musicList != null) {
+                    searchMusicList.addAll(musicList)
+                    // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
+                } else {
+                    if (searchMusicList.isEmpty()) {
+                        searchMusicList.clear()
+                        recyclerView.showSnackBar("未搜到")
+                    } else {
+                        recyclerView.showSnackBar("没有更多了")
+                        isLastPage = true
+                    }
+                }
+                adapter.notifyDataSetChanged()
         }
     }
 
-    private fun showBottomSheet(position: Int) {
-        val bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet)
+    private fun showBottomSheet(music: Music) {
+        val bottomSheet = MusicBottomSheet(music) { startDownloadMusic(music = music) }
+        bottomSheet.show(supportFragmentManager, "MusicBottomSheet")
 
-        bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
-
-        bsCancelButton.setOnClickListener {
-            bottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
-        }
-        bsDownloadButton.setOnClickListener {
-            bottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
-            TODO("download")
-        }
     }
 
     private fun initRecyclerView() {
@@ -119,14 +137,15 @@ class MainActivity : BaseActivity() {
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
-                if (layoutManager.findFirstVisibleItemPosition() >= layoutManager.itemCount / 3 && !TextUtils.isEmpty(
-                        searchInput.text
+                if (!isLastPage
+                    && layoutManager.findFirstVisibleItemPosition() >= layoutManager.itemCount / 3 && !TextUtils.isEmpty(
+                        searchEditText.text
                     ) && !swipeRefresh.isRefreshing
                 ) {
                     "musicList size = ${layoutManager.itemCount}".d()
                     swipeRefresh.isRefreshing = true
                     viewModel.searchMusic(
-                        searchInput.text.toString(),
+                        searchEditText.text.toString(),
                         layoutManager.itemCount,
                         20
                     )
@@ -137,49 +156,151 @@ class MainActivity : BaseActivity() {
         })
     }
 
-
-    @SuppressLint("ClickableViewAccessibility")
-    private fun initEditText() {
-        // 初始隐藏清除图标
-        searchInput.setCompoundDrawablesWithIntrinsicBounds(
-            searchInput.compoundDrawables[0],
-            null,
-            null, // 右侧图标初始为 null
-            null
-        )
-
-        // 文本变化监听器
-        searchInput.doAfterTextChanged { s ->
-            val clearIcon = if (s.isNullOrEmpty()) null
-            else ContextCompat.getDrawable(this@MainActivity, R.drawable.close_24px)
-
-            searchInput.setCompoundDrawablesWithIntrinsicBounds(
-                ContextCompat.getDrawable(this@MainActivity, R.drawable.search_24px),
-                null,
-                clearIcon,
-                null
-            )
-        }
-
-        // 清除图标点击事件
-        searchInput.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_UP) {
-                val drawables = searchInput.compoundDrawables
-                val clearDrawable = drawables[2] // 右侧drawable
-
-                if (clearDrawable != null) {
-                    // 计算点击位置是否在清除图标区域内
-                    val touchX = event.x
-                    val clearIconStart =
-                        searchInput.width - searchInput.paddingEnd - clearDrawable.intrinsicWidth
-
-                    if (touchX > clearIconStart) {
-                        searchInput.text.clear()
-                        return@setOnTouchListener true
-                    }
+    private fun initNavigationView(){
+        navigationView.setNavigationItemSelectedListener { menuItem ->
+             when(menuItem.itemId) {
+                R.id.nav_download_manager -> {
+                    startActivity<DownloadManagerActivity>{}
+                    true
                 }
+                else -> false
             }
-            false
         }
+    }
+
+    private fun setupToolbar() {
+        setSupportActionBar(toolbar)
+
+        // 导航图标点击事件（打开侧边栏）
+        toolbar.setNavigationOnClickListener {
+            if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                drawerLayout.closeDrawer(GravityCompat.START)
+            } else {
+                drawerLayout.openDrawer(GravityCompat.START)
+            }
+        }
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    private fun setupSearchToolbar() {
+
+        searchEditText.setText(viewModel.searchText)
+        // 搜索Toolbar的返回按钮
+        searchToolbar.setNavigationOnClickListener {
+            exitSearchMode()
+        }
+
+        searchEditText.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                if (!TextUtils.isEmpty(searchEditText.text)) {
+                    if (lastSearchText != searchEditText.text.toString()) {
+                        swipeRefresh.isRefreshing = true
+                        searchMusicList.clear()
+                        isLastPage = false
+                        viewModel.searchMusic(searchEditText.text.toString(), 0, 20)
+                        lastSearchText = searchEditText.text.toString()
+                        recyclerView.scrollToPosition(0)
+                    }
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.hideSoftInputFromWindow(searchEditText.windowToken, 0)
+                } else {
+                    exitSearchMode()
+                    searchMusicList.clear()
+                    adapter.notifyDataSetChanged()
+                }
+                true
+            } else {
+                false
+            }
+        }
+
+        searchEditText.addTextChangedListener { editable ->
+            viewModel.searchText = editable.toString()
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.top_app_bar, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_search -> {
+                enterSearchMode()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun enterSearchMode() {
+        if (!viewModel.isSearchMode) {
+            viewModel.isSearchMode = true
+
+            searchEditText.setText(viewModel.searchText)
+            // 使用淡入淡出动画切换Toolbar
+            toolbar.animate()
+                .alpha(0f)
+                .setDuration(150)
+                .withEndAction {
+                    toolbar.visibility = View.GONE
+                    searchToolbar.visibility = View.VISIBLE
+                    searchToolbar.alpha = 0f
+                    searchToolbar.animate()
+                        .alpha(1f)
+                        .setDuration(150)
+                        .start()
+
+                    // 自动聚焦并显示键盘
+                    searchEditText.requestFocus()
+                    searchEditText.setSelection(searchEditText.text?.length ?: 0)
+                    searchEditText.postDelayed({
+                        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                        imm.showSoftInput(searchEditText, InputMethodManager.SHOW_IMPLICIT)
+                    }, 200)
+                }
+                .start()
+        }
+    }
+
+    private fun exitSearchMode() {
+        if (viewModel.isSearchMode) {
+            viewModel.isSearchMode = false
+
+            // 隐藏键盘
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(searchEditText.windowToken, 0)
+
+            // 使用淡入淡出动画切换回正常Toolbar
+            searchToolbar.animate()
+                .alpha(0f)
+                .setDuration(150)
+                .withEndAction {
+                    searchToolbar.visibility = View.GONE
+                    toolbar.visibility = View.VISIBLE
+                    toolbar.alpha = 0f
+                    toolbar.animate()
+                        .alpha(1f)
+                        .setDuration(150)
+                        .start()
+                }
+                .start()
+        }
+    }
+
+    private fun startDownloadMusic(musics: List<Music> = listOf(), music: Music? = null) {
+        val musicList = if (music != null) listOf(music)
+            else musics
+
+        val targetDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)!!
+        val downloadViewModel: DownloadViewModel by applicationViewModels(application)
+
+        downloadViewModel.startDownloads(musicList,
+            prefs.getMusicLevel(),
+            prefs.getMusicLevel(),
+            targetDir)
+
+        recyclerView.showSnackBar("已加入下载队列")
     }
 }

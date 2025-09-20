@@ -5,13 +5,19 @@
         <menu>
             <item android:title="Add a playlist"
                   android:icon="@drawable/playlist_add_24px"/>
+            <item android:id="@+id/nav_download_manager"
+                  android:title="Download Manager"
+                  android:icon="@drawable/download_2_24px"/>
         </menu>
     </item>
 
-    <item android:title="Settings"
+    <item android:id="@+id/nav_settings"
+          android:title="Settings"
           android:icon="@drawable/settings_24px"/>
-    <item android:title="Support me"
+    <item android:id="@+id/nav_support"
+          android:title="Support me"
           android:icon="@drawable/volunteer_activism_24px"/>
-    <item android:title="Log out"
+    <item android:id="@+id/nav_log_out"
+          android:title="Log out"
           android:icon="@drawable/logout_24px"/>
 </menu>

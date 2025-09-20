@@ -14,7 +14,6 @@ class Decrypt {
     companion object {
         fun decryptSearch(encryptedBody: String): List<Music> {
             val decryptedJson = AESECBHelper.decrypt(encryptedBody)
-            Log.d("text", "decryptSearch: $encryptedBody")
             val data = JSONObject(decryptedJson)
 
             if (data.optInt("code") != 200) {

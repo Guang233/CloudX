@@ -11,11 +11,16 @@
             android:fullBackupContent="@xml/backup_rules"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name"
+            android:networkSecurityConfig="@xml/network_config"
             android:roundIcon="@mipmap/ic_launcher_round"
             android:supportsRtl="true"
             android:theme="@style/Theme.CloudX"
-            android:networkSecurityConfig="@xml/network_config"
             tools:targetApi="31">
+        <activity
+                android:name=".ui.downloadManager.DownloadManagerActivity"
+                android:exported="false"
+                android:label="@string/title_activity_download_manager"
+                android:theme="@style/Theme.CloudX"/>
         <activity
                 android:name=".ui.home.MainActivity"
                 android:exported="true"

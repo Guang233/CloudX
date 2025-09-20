@@ -1,37 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <LinearLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
+        style="@style/Widget.Material3.BottomSheet"
+        android:id="@+id/bottomSheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="?attr/colorSurfaceContainerHigh"
-        android:paddingTop="24dp"
-        android:paddingBottom="16dp">
+        android:paddingBottom="20dp"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+            android:id="@+id/drag_handle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
     <TextView
             android:id="@+id/itemTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="歌曲信息"
             android:layout_gravity="center"
-            android:textSize="22sp"
+            android:textSize="24sp"
             android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"/>
 
     <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="horizontal"
+            android:layout_gravity="center"
             android:paddingStart="24dp"
             android:paddingEnd="24dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="8dp">
+            android:layout_marginTop="16dp">
 
         <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/musicIconDetail"
-                android:layout_width="96dp"
-                android:layout_height="96dp"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
                 android:src="@mipmap/ic_launcher"
                 app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Large"
                 android:layout_marginEnd="20dp"/>
@@ -40,29 +46,30 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:padding="8dp">
+                android:layout_marginVertical="2dp"
+                android:paddingHorizontal="8dp">
 
             <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="曲名"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"/>
+                    android:textColor="?attr/colorOnSurface"/>
             <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="作者"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"/>
+                    android:textColor="?attr/colorOnSurface"/>
             <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:text="专辑"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"/>
+                    android:textColor="?attr/colorOnSurface"/>
 
         </LinearLayout>
 
@@ -71,69 +78,112 @@
                 android:layout_weight="5"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:padding="8dp">
+                android:layout_marginVertical="2dp"
+                android:paddingHorizontal="8dp">
 
             <TextView
                     android:id="@+id/musicNameDetail"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
-                    android:textSize="16sp"/>
+                    android:background="?android:attr/selectableItemBackground"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"/>
             <TextView
                     android:id="@+id/musicAuthorDetail"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
-                    android:textSize="16sp"/>
+                    android:background="?android:attr/selectableItemBackground"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"/>
             <TextView
                     android:id="@+id/musicAlbumDetail"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
-                    android:textSize="16sp"/>
+                    android:background="?android:attr/selectableItemBackground"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"/>
         </LinearLayout>
     </LinearLayout>
-
-    <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/toggleButtonMusicLevel"
+    <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="8dp"
-            android:gravity="center">
-        <Button
-                style="?attr/materialButtonOutlinedStyle"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Small"
-                android:id="@+id/btnStandardQuality"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="标准"
-        />
-        <Button
-                style="?attr/materialButtonOutlinedStyle"
-                android:id="@+id/btnHQ"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="极高"
-        />
-        <Button
-                style="?attr/materialButtonOutlinedStyle"
-                android:id="@+id/btnSQ"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="无损"
-        />
-        <Button
-                style="?attr/materialButtonOutlinedStyle"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Small"
-                android:id="@+id/btnHiRes"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hi-Res"
-        />
-    </com.google.android.material.button.MaterialButtonToggleGroup>
+            android:scrollbars="none"
+            android:fadingEdge="horizontal"
+            android:fadingEdgeLength="32dp"
+            android:requiresFadingEdge="horizontal"
+            android:clipToPadding="false"
+            android:isScrollContainer="false"
+            android:fillViewport="true">
+
+<!--        这里套一层 FrameLayout 是为了可以居中显示-->
+        <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/buttonGroupMusicLevel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginEnd="24dp"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+
+                <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStandardQuality"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="22dp"
+                        android:minWidth="0dp"
+                        android:minHeight="45dp"
+                        android:checkable="true"
+                        android:text="标准" />
+
+                <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHQ"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="22dp"
+                        android:minWidth="0dp"
+                        android:minHeight="45dp"
+                        android:checkable="true"
+                        android:text="极高" />
+
+                <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSQ"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="22dp"
+                        android:minWidth="0dp"
+                        android:minHeight="45dp"
+                        android:checkable="true"
+                        android:text="无损" />
+
+                <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHiRes"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="22dp"
+                        android:minWidth="0dp"
+                        android:minHeight="45dp"
+                        android:checkable="true"
+                        android:text="Hi-Res" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+        </FrameLayout>
+    </HorizontalScrollView>
 
     <LinearLayout
             android:layout_width="match_parent"
