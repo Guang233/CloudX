@@ -46,8 +46,10 @@ class MainActivity : BaseActivity() {
     private var isLastPage = false
     private var lastSearchText: String = ""
     private val adapter by lazy { MusicAdapter(searchMusicList,
-        {music -> startDownloadMusic(music = music)},
-        {music -> showBottomSheet(music = music)}) }
+        { music -> startDownloadMusic(music = music) },
+        { music -> showBottomSheet(music = music) },
+        { num ->  multiSelectToolbar.title = "已选 $num 项" },
+        { enterMultiSelectMode() }) }
 
     private val appBarLayout by lazy { findViewById<AppBarLayout>(R.id.appBarLayout) }
     private val toolbar by lazy { findViewById<MaterialToolbar>(R.id.topAppBar) }
@@ -58,13 +60,8 @@ class MainActivity : BaseActivity() {
     private val searchToolbar by lazy { findViewById<MaterialToolbar>(R.id.searchToolbar) }
     private val searchEditText by lazy { findViewById<EditText>(R.id.searchEditText) }
 
-    private val bottomSheet by lazy { findViewById<LinearLayout>(R.id.bottomSheet) }
-    private val bsMusicName by lazy { findViewById<TextView>(R.id.musicNameDetail) }
-    private val bsMusicAuthor by lazy { findViewById<TextView>(R.id.musicAuthorDetail) }
-    private val bsMusicAlbum by lazy { findViewById<TextView>(R.id.musicAlbumDetail) }
-    private val bsMusicIcon by lazy { findViewById<ShapeableImageView>(R.id.musicIconDetail) }
-    private val bsDownloadButton by lazy { findViewById<MaterialButton>(R.id.btnDownload) }
-    private val bsCancelButton by lazy { findViewById<MaterialButton>(R.id.btnCancelDownload) }
+    private val multiSelectToolbar by lazy { findViewById<MaterialToolbar>(R.id.selectToolbar) }
+
     private val swipeRefresh by lazy { findViewById<SwipeRefreshLayout>(R.id.swipeRefresh) }
 
     val viewModel: MainViewModel by viewModels()
@@ -80,7 +77,8 @@ class MainActivity : BaseActivity() {
 
         swipeRefresh.setOnRefreshListener {
             if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
-            if (!TextUtils.isEmpty(viewModel.searchText)) {
+            if (viewModel.isMultiSelectionMode) swipeRefresh.isRefreshing = false
+            else if (!TextUtils.isEmpty(viewModel.searchText)) {
                 searchMusicList.clear()
                 viewModel.isSearchMode = false
                 viewModel.searchMusic(viewModel.searchText, 0, 20)
@@ -89,6 +87,7 @@ class MainActivity : BaseActivity() {
 
         onBackPressedDispatcher.addCallback(this) {
             if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.close()
+            else if (viewModel.isMultiSelectionMode) exitMultiSelectMode()
             else if (viewModel.isSearchMode) exitSearchMode()
                 else moveTaskToBack(true)
         }
@@ -98,7 +97,11 @@ class MainActivity : BaseActivity() {
         initNavigationView()
         setupSearchToolbar()
 
-        if (viewModel.isSearchMode) {
+        if (viewModel.isMultiSelectionMode) {
+            toolbar.visibility = View.GONE
+            searchToolbar.visibility = View.GONE
+            multiSelectToolbar.visibility = View.VISIBLE
+        } else if (viewModel.isSearchMode) {
             toolbar.visibility = View.GONE
             searchToolbar.visibility = View.VISIBLE
         }
@@ -142,6 +145,7 @@ class MainActivity : BaseActivity() {
                     && layoutManager.findFirstVisibleItemPosition() >= layoutManager.itemCount / 3 && !TextUtils.isEmpty(
                         searchEditText.text
                     ) && !swipeRefresh.isRefreshing
+                    && !viewModel.isMultiSelectionMode
                 ) {
                     "musicList size = ${layoutManager.itemCount}".d()
                     swipeRefresh.isRefreshing = true
@@ -169,7 +173,7 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    private fun setupToolbar() {
+    private fun setupToolbar()  {
         setSupportActionBar(toolbar)
 
         // 导航图标点击事件（打开侧边栏）
@@ -178,6 +182,31 @@ class MainActivity : BaseActivity() {
                 drawerLayout.closeDrawer(GravityCompat.START)
             } else {
                 drawerLayout.openDrawer(GravityCompat.START)
+            }
+        }
+
+        multiSelectToolbar.setNavigationOnClickListener {
+            exitMultiSelectMode()
+        }
+
+        multiSelectToolbar.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.action_select_all -> {
+                    adapter.selectAll()
+                    true
+                }
+                R.id.action_invert_selection -> {
+                    adapter.invertSelection()
+                    true
+                }
+                R.id.action_download -> {
+                    if (adapter.getSelectedMusic().isNotEmpty()) {
+                        startDownloadMusic(musics = adapter.getSelectedMusic())
+                        exitMultiSelectMode()
+                    }
+                    true
+                }
+                else -> false
             }
         }
     }
@@ -288,6 +317,64 @@ class MainActivity : BaseActivity() {
                 }
                 .start()
         }
+    }
+
+    private fun enterMultiSelectMode() {
+        if (viewModel.isSearchMode) {
+            searchToolbar.animate()
+                .alpha(0f)
+                .setDuration(100)
+                .withEndAction {
+                    searchToolbar.visibility = View.GONE
+                    multiSelectToolbar.visibility = View.VISIBLE
+                    multiSelectToolbar.alpha = 0f
+                    multiSelectToolbar.animate()
+                        .alpha(1f)
+                        .setDuration(100)
+                        .start()
+                }.start()
+        } else {
+            toolbar.animate()
+                .alpha(0f)
+                .setDuration(100)
+                .withEndAction {
+                    toolbar.visibility = View.GONE
+                    multiSelectToolbar.visibility = View.VISIBLE
+                    multiSelectToolbar.alpha = 0f
+                    multiSelectToolbar.animate()
+                        .alpha(1f)
+                        .setDuration(100)
+                        .start()
+                }.start()
+        }
+        adapter.enterMultiSelectMode()
+        viewModel.isMultiSelectionMode = true
+    }
+
+    private fun exitMultiSelectMode() {
+        adapter.exitMultiSelectMode()
+        multiSelectToolbar.animate()
+            .alpha(0f)
+            .setDuration(100)
+            .withEndAction {
+                multiSelectToolbar.visibility = View.GONE
+                if (viewModel.isSearchMode) {
+                    searchToolbar.visibility = View.VISIBLE
+                    searchToolbar.alpha = 0f
+                    searchToolbar.animate()
+                        .alpha(1f)
+                        .setDuration(100)
+                        .start()
+                } else {
+                    toolbar.visibility = View.VISIBLE
+                    toolbar.alpha = 0f
+                    toolbar.animate()
+                        .alpha(1f)
+                        .setDuration(100)
+                        .start()
+                }
+            }.start()
+        viewModel.isMultiSelectionMode = false
     }
 
     private fun startDownloadMusic(level: String = prefs.getMusicLevel(), musics: List<Music> = listOf(), music: Music? = null) {

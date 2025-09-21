@@ -38,8 +38,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:maxLines="1"
-                    android:ellipsize="end"
-                    android:text="Name"/>
+                    android:ellipsize="end"/>
 
             <TextView
                     android:id="@+id/tvArtist"
@@ -49,8 +48,7 @@
                     android:layout_marginTop="2dp"
                     android:alpha="0.8"
                     android:maxLines="1"
-                    android:ellipsize="end"
-                    android:text="Author"/>
+                    android:ellipsize="end"/>
 
             <View
                     android:layout_width="match_parent"

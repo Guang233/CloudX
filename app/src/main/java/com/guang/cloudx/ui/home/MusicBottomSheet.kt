@@ -23,12 +23,12 @@ class MusicBottomSheet(
         val view =  inflater.inflate(R.layout.bottom_sheet_layout, container, false)
 
         val buttonGroup = view.findViewById<MaterialButtonToggleGroup>(R.id.buttonGroupMusicLevel)
-        val bsMusicName =  view.findViewById<TextView>(R.id.musicNameDetail)
-        val bsMusicAuthor =  view.findViewById<TextView>(R.id.musicAuthorDetail)
-        val bsMusicAlbum =  view.findViewById<TextView>(R.id.musicAlbumDetail)
-        val bsMusicIcon =  view.findViewById<ShapeableImageView>(R.id.musicIconDetail)
-        val bsDownloadButton =  view.findViewById<MaterialButton>(R.id.btnDownload)
-        val bsCancelButton =  view.findViewById<MaterialButton>(R.id.btnCancelDownload)
+        val bsMusicName = view.findViewById<TextView>(R.id.musicNameDetail)
+        val bsMusicAuthor = view.findViewById<TextView>(R.id.musicAuthorDetail)
+        val bsMusicAlbum = view.findViewById<TextView>(R.id.musicAlbumDetail)
+        val bsMusicIcon = view.findViewById<ShapeableImageView>(R.id.musicIconDetail)
+        val bsDownloadButton = view.findViewById<MaterialButton>(R.id.btnDownload)
+        val bsCancelButton = view.findViewById<MaterialButton>(R.id.btnCancelDownload)
 
         bsMusicName.text = music.name
         Glide.with(this).load(music.album.picUrl).into(bsMusicIcon)

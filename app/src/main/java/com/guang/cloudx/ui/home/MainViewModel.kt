@@ -12,6 +12,7 @@ class MainViewModel: ViewModel() {
 
     var searchText = ""
     var isSearchMode = false
+    var isMultiSelectionMode = false
     private val searchKeyword = MutableLiveData<SearchInfo>()
     val searchResults = searchKeyword.switchMap { info ->
         Repository.searchMusic(info.keyword, info.offset, info.limit)

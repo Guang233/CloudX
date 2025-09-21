@@ -45,7 +45,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_gravity="center"
-                            android:layout_marginEnd="16dp"
+                            android:layout_marginEnd="24dp"
                             app:endIconDrawable="@drawable/close_24px"
                             app:endIconMode="clear_text"
                             app:startIconDrawable="@drawable/search_24px">
@@ -63,6 +63,14 @@
                     </com.google.android.material.textfield.TextInputLayout>
 
                 </com.google.android.material.appbar.MaterialToolbar>
+
+                <com.google.android.material.appbar.MaterialToolbar
+                        android:id="@+id/selectToolbar"
+                        android:layout_width="match_parent"
+                        android:layout_height="?attr/actionBarSize"
+                        android:visibility="gone"
+                        app:menu="@menu/select_menu"
+                        app:navigationIcon="@drawable/close_24px"/>
 
             </FrameLayout>
 
@@ -95,13 +103,5 @@
             app:headerLayout="@layout/nav_header"
             android:fitsSystemWindows="false"
             style="@style/Widget.Material3.NavigationView"/>
-
-        <include layout="@layout/bottom_sheet_layout"/>
-
-    <FrameLayout
-            android:id="@+id/fragment_container"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
