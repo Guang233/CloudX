@@ -17,7 +17,7 @@ import com.guang.cloudx.logic.utils.SystemUtils
 
 class MusicBottomSheet(
     private val music: Music,
-    private val onDownload: (Music) -> Unit
+    private val onDownload: (Music, String) -> Unit
     ): BottomSheetDialogFragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view =  inflater.inflate(R.layout.bottom_sheet_layout, container, false)
@@ -55,7 +55,14 @@ class MusicBottomSheet(
         }
         bsDownloadButton.setOnClickListener {
             dismiss()
-            onDownload(music)
+            val level = when (buttonGroup.checkedButtonId) {
+                R.id.btnStandardQuality -> "standard"
+                R.id.btnHQ -> "exhigh"
+                R.id.btnSQ -> "lossless"
+                R.id.btnHiRes -> "hires"
+                else -> "standard"
+            }
+            onDownload(music, level)
         }
         return view
     }

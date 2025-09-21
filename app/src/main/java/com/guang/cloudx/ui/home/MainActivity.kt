@@ -124,7 +124,8 @@ class MainActivity : BaseActivity() {
     }
 
     private fun showBottomSheet(music: Music) {
-        val bottomSheet = MusicBottomSheet(music) { startDownloadMusic(music = music) }
+        val bottomSheet = MusicBottomSheet(music) { music, level ->
+            startDownloadMusic(level= level, music = music) }
         bottomSheet.show(supportFragmentManager, "MusicBottomSheet")
 
     }
@@ -289,7 +290,7 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    private fun startDownloadMusic(musics: List<Music> = listOf(), music: Music? = null) {
+    private fun startDownloadMusic(level: String = prefs.getMusicLevel(), musics: List<Music> = listOf(), music: Music? = null) {
         val musicList = if (music != null) listOf(music)
             else musics
 
@@ -297,7 +298,7 @@ class MainActivity : BaseActivity() {
         val downloadViewModel: DownloadViewModel by applicationViewModels(application)
 
         downloadViewModel.startDownloads(musicList,
-            prefs.getMusicLevel(),
+            level,
             prefs.getMusicLevel(),
             targetDir)
 

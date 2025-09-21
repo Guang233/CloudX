@@ -25,9 +25,10 @@
 
         <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:orientation="vertical"
+                android:paddingVertical="2dp"
                 android:paddingStart="12dp"
                 android:paddingEnd="8dp">
 
@@ -45,16 +46,22 @@
                     style="?attr/textAppearanceBodyMedium"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:alpha="0.8"
                     android:maxLines="1"
                     android:ellipsize="end"
                     android:text="Author"/>
 
+            <View
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
             <com.google.android.material.progressindicator.LinearProgressIndicator
                     android:id="@+id/progress"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="4dp"
                     app:trackCornerRadius="4dp"
                     app:trackThickness="6dp"
                     app:showAnimationBehavior="inward"/>
@@ -65,8 +72,7 @@
                     style="?attr/textAppearanceBodySmall"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="下载失败，点按重试"
+                    android:text="下载失败"
                     android:textColor="?attr/colorError"
                     android:visibility="gone"/>
         </LinearLayout>

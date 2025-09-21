@@ -95,8 +95,6 @@ class MusicDownloadRepository(
                 }
             }
 
-            // 如果 total 无效 (-1)，下载完成时强制回调 100%
-            progressCallback(100)
         } finally {
             conn.disconnect()
         }
