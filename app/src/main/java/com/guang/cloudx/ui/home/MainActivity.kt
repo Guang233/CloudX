@@ -225,6 +225,7 @@ class MainActivity : BaseActivity() {
                     }
                     val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                     imm.hideSoftInputFromWindow(searchEditText.windowToken, 0)
+                    searchEditText.clearFocus()
                 } else {
                     exitSearchMode()
                     searchMusicList.clear()
@@ -379,7 +380,7 @@ class MainActivity : BaseActivity() {
 
         downloadViewModel.startDownloads(musicList,
             level,
-            prefs.getMusicLevel(),
+            prefs.getCookie(),
             targetDir)
 
         recyclerView.showSnackBar("已加入下载队列")
