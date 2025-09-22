@@ -4,15 +4,12 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Environment
 import android.text.TextUtils
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.core.view.GravityCompat
@@ -21,14 +18,8 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.bumptech.glide.Glide
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.button.MaterialButtonGroup
-import com.google.android.material.button.MaterialButtonToggleGroup
-import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.navigation.NavigationView
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
@@ -80,7 +71,7 @@ class MainActivity : BaseActivity() {
             if (viewModel.isMultiSelectionMode) swipeRefresh.isRefreshing = false
             else if (!TextUtils.isEmpty(viewModel.searchText)) {
                 searchMusicList.clear()
-                viewModel.isSearchMode = false
+                isLastPage = false
                 viewModel.searchMusic(viewModel.searchText, 0, 20)
             }
         }
@@ -214,7 +205,7 @@ class MainActivity : BaseActivity() {
     @SuppressLint("NotifyDataSetChanged")
     private fun setupSearchToolbar() {
 
-        searchEditText.setText(viewModel.searchText)
+        searchEditText.setText(viewModel.inputText)
         // 搜索Toolbar的返回按钮
         searchToolbar.setNavigationOnClickListener {
             exitSearchMode()
@@ -224,6 +215,7 @@ class MainActivity : BaseActivity() {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 if (!TextUtils.isEmpty(searchEditText.text)) {
                     if (lastSearchText != searchEditText.text.toString()) {
+                        viewModel.searchText = searchEditText.text.toString()
                         swipeRefresh.isRefreshing = true
                         searchMusicList.clear()
                         isLastPage = false
@@ -236,6 +228,7 @@ class MainActivity : BaseActivity() {
                 } else {
                     exitSearchMode()
                     searchMusicList.clear()
+                    viewModel.searchText = ""
                     adapter.notifyDataSetChanged()
                 }
                 true
@@ -245,7 +238,7 @@ class MainActivity : BaseActivity() {
         }
 
         searchEditText.addTextChangedListener { editable ->
-            viewModel.searchText = editable.toString()
+            viewModel.inputText = editable.toString()
         }
     }
 
@@ -268,7 +261,7 @@ class MainActivity : BaseActivity() {
         if (!viewModel.isSearchMode) {
             viewModel.isSearchMode = true
 
-            searchEditText.setText(viewModel.searchText)
+            searchEditText.setText(viewModel.inputText)
             // 使用淡入淡出动画切换Toolbar
             toolbar.animate()
                 .alpha(0f)

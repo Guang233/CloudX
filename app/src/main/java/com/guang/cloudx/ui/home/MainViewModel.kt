@@ -10,6 +10,7 @@ class MainViewModel: ViewModel() {
 
     data class SearchInfo(val keyword: String, val offset: Int, val limit: Int)
 
+    var inputText = ""
     var searchText = ""
     var isSearchMode = false
     var isMultiSelectionMode = false
