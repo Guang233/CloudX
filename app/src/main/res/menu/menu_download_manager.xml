@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
-    <!-- 仅在“已完成”页启用；在“正在下载”页应禁用/隐藏 -->
     <item
             android:id="@+id/action_delete_all"
             android:icon="@drawable/delete_forever_24px"

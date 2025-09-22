@@ -46,7 +46,6 @@ class DownloadManagerActivity : BaseActivity() {
         setContentView(R.layout.activity_download_manager)
 
         toolbar = findViewById(R.id.downloadTopAppBar)
-        setSupportActionBar(toolbar)
         applyTopInsets(toolbar)
 
         viewPager = findViewById(R.id.viewPager)
@@ -58,6 +57,8 @@ class DownloadManagerActivity : BaseActivity() {
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = if (position == 0) "正在下载" else "已完成"
         }.attach()
+
+        toolbar.setNavigationOnClickListener { finish() }
 
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
