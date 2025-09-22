@@ -39,7 +39,12 @@ class MainActivity : BaseActivity() {
     private val adapter by lazy { MusicAdapter(searchMusicList,
         { music -> startDownloadMusic(music = music) },
         { music -> showBottomSheet(music = music) },
-        { num ->  multiSelectToolbar.title = "已选 $num 项" },
+        { num ->
+            multiSelectToolbar.title = "已选 $num 项"
+            if ( num == 0 && multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled == true)
+                multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled = false
+            else multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled = true
+            },
         { enterMultiSelectMode() }) }
 
     private val appBarLayout by lazy { findViewById<AppBarLayout>(R.id.appBarLayout) }
@@ -230,6 +235,7 @@ class MainActivity : BaseActivity() {
                     exitSearchMode()
                     searchMusicList.clear()
                     viewModel.searchText = ""
+                    lastSearchText = ""
                     adapter.notifyDataSetChanged()
                 }
                 true
