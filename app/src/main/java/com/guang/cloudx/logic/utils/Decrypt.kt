@@ -8,6 +8,7 @@ import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.MusicUrl
 import com.guang.cloudx.logic.model.PlayList
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.util.ext.d
 import org.json.JSONObject
 
 class Decrypt {
@@ -134,6 +135,7 @@ class Decrypt {
             val id = data.getLong("id")
 
             val tracks = data.getJSONArray("tracks")
+            tracks.length().d()
             val music = with(ArrayList<Music>()) {
                 for (i in 0 until tracks.length()) {
                     val track = tracks.getJSONObject(i)

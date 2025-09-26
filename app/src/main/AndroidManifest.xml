@@ -17,6 +17,11 @@
             android:theme="@style/Theme.CloudX"
             tools:targetApi="31">
         <activity
+                android:name=".ui.playList.PlayListActivity"
+                android:exported="false"
+                android:label="@string/title_activity_play_list"
+                android:theme="@style/Theme.CloudX"/>
+        <activity
                 android:name=".ui.downloadManager.DownloadManagerActivity"
                 android:exported="false"
                 android:label="@string/title_activity_download_manager"

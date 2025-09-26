@@ -62,6 +62,7 @@ class MusicBottomSheet(
                 R.id.btnHiRes -> "hires"
                 else -> "standard"
             }
+            SharedPreferencesUtils(requireContext()).putMusicLevel(level)
             onDownload(music, level)
         }
         return view

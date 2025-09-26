@@ -3,7 +3,8 @@
 
     <item android:title="All features">
         <menu>
-            <item android:title="Add a playlist"
+            <item android:id="@+id/nav_add_playlist"
+                  android:title="Add a playlist"
                   android:icon="@drawable/playlist_add_24px"/>
             <item android:id="@+id/nav_download_manager"
                   android:title="Download Manager"

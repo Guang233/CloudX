@@ -2,7 +2,6 @@ package com.guang.cloudx.ui.home
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.os.Environment
 import android.text.TextUtils
 import android.view.Menu
 import android.view.MenuItem
@@ -12,6 +11,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.drawerlayout.widget.DrawerLayout
@@ -20,30 +20,27 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
-import com.guang.cloudx.logic.utils.SharedPreferencesUtils
-import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.logic.utils.showSnackBar
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
-import com.guang.cloudx.ui.downloadManager.DownloadViewModel
+import com.guang.cloudx.ui.playList.PlayListActivity
 import com.guang.cloudx.util.ext.d
 
 class MainActivity : BaseActivity() {
-    private lateinit var prefs: SharedPreferencesUtils
     private val searchMusicList = mutableListOf<Music>()
     private var isLastPage = false
     private var lastSearchText: String = ""
     private val adapter by lazy { MusicAdapter(searchMusicList,
-        { music -> startDownloadMusic(music = music) },
+        { music -> startDownloadMusic(music = music, view = recyclerView) },
         { music -> showBottomSheet(music = music) },
         { num ->
             multiSelectToolbar.title = "已选 $num 项"
-            if ( num == 0 && multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled == true)
-                multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled = false
-            else multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled = true
+            multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled =
+                !(num == 0 && multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled == true)
             },
         { enterMultiSelectMode() }) }
 
@@ -60,7 +57,7 @@ class MainActivity : BaseActivity() {
 
     private val swipeRefresh by lazy { findViewById<SwipeRefreshLayout>(R.id.swipeRefresh) }
 
-    val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels()
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,15 +66,13 @@ class MainActivity : BaseActivity() {
         applyTopInsets(appBarLayout)
         applyTopInsets(navigationView)
 
-        prefs = SharedPreferencesUtils(this)
-
         swipeRefresh.setOnRefreshListener {
             if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
             if (viewModel.isMultiSelectionMode) swipeRefresh.isRefreshing = false
             else if (!TextUtils.isEmpty(viewModel.searchText)) {
                 searchMusicList.clear()
                 isLastPage = false
-                viewModel.searchMusic(viewModel.searchText, 0, 20)
+                viewModel.searchMusic(viewModel.searchText, 0, 20, prefs.getCookie())
             }
         }
 
@@ -97,6 +92,7 @@ class MainActivity : BaseActivity() {
             toolbar.visibility = View.GONE
             searchToolbar.visibility = View.GONE
             multiSelectToolbar.visibility = View.VISIBLE
+            adapter.enterMultiSelectMode()
         } else if (viewModel.isSearchMode) {
             toolbar.visibility = View.GONE
             searchToolbar.visibility = View.VISIBLE
@@ -124,7 +120,7 @@ class MainActivity : BaseActivity() {
 
     private fun showBottomSheet(music: Music) {
         val bottomSheet = MusicBottomSheet(music) { music, level ->
-            startDownloadMusic(level= level, music = music) }
+            startDownloadMusic(level= level, music = music, view = recyclerView) }
         bottomSheet.show(supportFragmentManager, "MusicBottomSheet")
 
     }
@@ -148,7 +144,8 @@ class MainActivity : BaseActivity() {
                     viewModel.searchMusic(
                         searchEditText.text.toString(),
                         layoutManager.itemCount,
-                        20
+                        20,
+                        prefs.getCookie()
                     )
 
                 }
@@ -164,6 +161,20 @@ class MainActivity : BaseActivity() {
                     startActivity<DownloadManagerActivity>{}
                     true
                 }
+                 R.id.nav_add_playlist -> {
+                     val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
+                     MaterialAlertDialogBuilder(this)
+                         .setTitle("解析歌单")
+                         .setView(view)
+                         .setNegativeButton("取消", null)
+                         .setPositiveButton("确定") { _, _ ->
+                             val editText = view.findViewById<EditText>(R.id.playListIdEditText)
+                             if(!editText.text.isEmpty())
+                                startActivity<PlayListActivity> { putExtra("id", editText.text.toString()) }
+                         }
+                         .show()
+                     true
+                 }
                 else -> false
             }
         }
@@ -197,7 +208,7 @@ class MainActivity : BaseActivity() {
                 }
                 R.id.action_download -> {
                     if (adapter.getSelectedMusic().isNotEmpty()) {
-                        startDownloadMusic(musics = adapter.getSelectedMusic())
+                        startDownloadMusic(musics = adapter.getSelectedMusic(), view = recyclerView)
                         exitMultiSelectMode()
                     }
                     true
@@ -224,7 +235,7 @@ class MainActivity : BaseActivity() {
                         swipeRefresh.isRefreshing = true
                         searchMusicList.clear()
                         isLastPage = false
-                        viewModel.searchMusic(searchEditText.text.toString(), 0, 20)
+                        viewModel.searchMusic(searchEditText.text.toString(), 0, 20, prefs.getCookie())
                         lastSearchText = searchEditText.text.toString()
                         recyclerView.scrollToPosition(0)
                     }
@@ -375,20 +386,5 @@ class MainActivity : BaseActivity() {
                 }
             }.start()
         viewModel.isMultiSelectionMode = false
-    }
-
-    private fun startDownloadMusic(level: String = prefs.getMusicLevel(), musics: List<Music> = listOf(), music: Music? = null) {
-        val musicList = if (music != null) listOf(music)
-            else musics
-
-        val targetDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)!!
-        val downloadViewModel: DownloadViewModel by applicationViewModels(application)
-
-        downloadViewModel.startDownloads(musicList,
-            level,
-            prefs.getCookie(),
-            targetDir)
-
-        recyclerView.showSnackBar("已加入下载队列")
     }
 }

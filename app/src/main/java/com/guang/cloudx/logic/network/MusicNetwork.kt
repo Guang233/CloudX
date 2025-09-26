@@ -48,9 +48,10 @@ object MusicNetwork {
         )
     }
 
+    // 后经过测试发现，如要获取完整歌单，必须传 cookie
     suspend fun getPlayList(id: String, cookie: String): PlayList {
         val bodyJSON = "{\"id\":\"$id\",\"n\":\"10000\",\"s\":\"0\",\"newStyle\":\"true\",\"e_r\":true,\"checkToken\":\"\",\"header\":\"\"}"
-        val query = "/api/v6/playlist/detail-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/song/playlist/detailuse${bodyJSON}md5forencrypt")}"
+        val query = "/api/v6/playlist/detail-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/v6/playlist/detailuse${bodyJSON}md5forencrypt")}"
         return Decrypt.decryptPlayList(
             musicService
                 .getPlayList(AESECBHelper.encrypt(query), cookie)
