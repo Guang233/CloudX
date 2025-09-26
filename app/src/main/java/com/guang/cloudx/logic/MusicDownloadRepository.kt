@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -34,12 +35,17 @@ class MusicDownloadRepository(
                     semaphore.withPermit {
                         try {
                             val musicUrl = MusicNetwork.getMusicUrl(music.id.toString(), level, cookie)
-                            val fileName = "${music.name}-${music.artists.joinToString("_") { it.name }}.mp3"
+                            val fileName = "${music.name}-${music.artists.joinToString("_") { it.name }}"
                             val file = File(targetDir, fileName)
 
                             downloadFile(musicUrl.url, file) { progress ->
                                 onProgress(music, progress)
                             }
+
+                            val ext = detectFileType(file)
+                            val finalFile = File(file.parent, "$fileName.$ext")
+                            if (finalFile.exists()) finalFile.delete()
+                            file.renameTo(finalFile)
                         } catch (e: Exception) {
                             throw e
                         }
@@ -97,6 +103,25 @@ class MusicDownloadRepository(
 
         } finally {
             conn.disconnect()
+        }
+    }
+
+    private fun detectFileType(file: File): String {
+        val buffer = ByteArray(12)
+        FileInputStream(file).use { it.read(buffer) }
+
+        val hex = buffer.joinToString(" ") { String.format("%02X", it) }
+
+        return when {
+            hex.startsWith("49 44 33") || hex.startsWith("FF FB") -> "mp3"
+            hex.startsWith("FF F1") || hex.startsWith("FF F9") -> "aac"
+            hex.startsWith("52 49 46 46") && String(buffer.copyOfRange(8, 12)) == "WAVE" -> "wav"
+            hex.startsWith("66 4C 61 43") -> "flac"
+            hex.startsWith("4F 67 67 53") -> "ogg"
+            hex.startsWith("00 00 00") && hex.contains("66 74 79 70") -> "m4a"
+            hex.startsWith("FF D8 FF") -> "jpg"
+            hex.startsWith("89 50 4E 47") -> "png"
+            else -> "unknown"
         }
     }
 }
