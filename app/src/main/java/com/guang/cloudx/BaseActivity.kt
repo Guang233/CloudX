@@ -52,7 +52,7 @@ open class BaseActivity: AppCompatActivity() {
         controller.isAppearanceLightStatusBars = !isDarkMode
     }
 
-    inline fun <reified T> startActivity(block: Intent.() -> Unit) {
+    inline fun <reified T> startActivity(block: Intent.() -> Unit = {}) {
         val intent = Intent(this, T::class.java)
         intent.block()
         startActivity(intent)

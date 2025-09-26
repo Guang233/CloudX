@@ -9,6 +9,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.coordinatorlayout.widget.CoordinatorLayout
@@ -21,12 +22,14 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.navigation.NavigationView
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.utils.showSnackBar
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
+import com.guang.cloudx.ui.login.LoginActivity
 import com.guang.cloudx.ui.playList.PlayListActivity
 import com.guang.cloudx.util.ext.d
 
@@ -56,6 +59,7 @@ class MainActivity : BaseActivity() {
     private val multiSelectToolbar by lazy { findViewById<MaterialToolbar>(R.id.selectToolbar) }
 
     private val swipeRefresh by lazy { findViewById<SwipeRefreshLayout>(R.id.swipeRefresh) }
+    private val tipText by lazy { findViewById<TextView>(R.id.searchTipText) }
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -104,6 +108,7 @@ class MainActivity : BaseActivity() {
                 val musicList = result.getOrNull()
                 if (musicList != null) {
                     searchMusicList.addAll(musicList)
+                    tipText.visibility = View.GONE
                     // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
                 } else {
                     if (searchMusicList.isEmpty()) {
@@ -158,7 +163,7 @@ class MainActivity : BaseActivity() {
         navigationView.setNavigationItemSelectedListener { menuItem ->
              when(menuItem.itemId) {
                 R.id.nav_download_manager -> {
-                    startActivity<DownloadManagerActivity>{}
+                    startActivity<DownloadManagerActivity>()
                     true
                 }
                  R.id.nav_add_playlist -> {
@@ -178,6 +183,10 @@ class MainActivity : BaseActivity() {
                 else -> false
             }
         }
+
+        val view = navigationView.getHeaderView(0)
+        val headImage: ShapeableImageView = view.findViewById(R.id.headImage)
+        headImage.setOnClickListener { startActivity<LoginActivity>() }
     }
 
     private fun setupToolbar()  {
@@ -248,6 +257,7 @@ class MainActivity : BaseActivity() {
                     viewModel.searchText = ""
                     lastSearchText = ""
                     adapter.notifyDataSetChanged()
+                    tipText.visibility = View.VISIBLE
                 }
                 true
             } else {

@@ -9,6 +9,7 @@
               android:padding="16dp">
 
     <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/headImage"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:src="@drawable/person_24px"
@@ -16,9 +17,13 @@
             app:strokeColor="?attr/colorPrimary"
             app:strokeWidth="1dp"
             android:layout_marginBottom="8dp"
-            android:padding="2dp"/>
+            android:padding="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:checkable="true"/>
 
     <TextView
+            android:id="@+id/nicknameText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="UserName"
@@ -26,6 +31,7 @@
             android:textColor="?attr/colorPrimary"/>
 
     <TextView
+            android:id="@+id/emailText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="EmailOrOthers"
