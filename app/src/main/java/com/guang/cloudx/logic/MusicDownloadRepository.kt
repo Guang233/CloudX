@@ -1,8 +1,12 @@
 package com.guang.cloudx.logic
 
 import androidx.lifecycle.ViewModelProvider
+import com.guang.cloudx.R
+import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.network.MusicNetwork
+import com.guang.cloudx.logic.utils.AudioTagWriter
+import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
@@ -35,7 +39,14 @@ class MusicDownloadRepository(
                     semaphore.withPermit {
                         try {
                             val musicUrl = MusicNetwork.getMusicUrl(music.id.toString(), level, cookie)
-                            val fileName = "${music.name}-${music.artists.joinToString("_") { it.name }}"
+                            val quality = when(musicUrl.level) {
+                                "standard" -> ""
+                                "exhigh" -> "[HQ]"
+                                "lossless" -> "[SQ]"
+                                "hires" -> "[HR]"
+                                else -> ""
+                            }
+                            val fileName = "$quality${music.name}-${music.artists.joinToString("_") { it.name }}"
                             val file = File(targetDir, fileName)
 
                             downloadFile(musicUrl.url, file) { progress ->
@@ -46,6 +57,20 @@ class MusicDownloadRepository(
                             val finalFile = File(file.parent, "$fileName.$ext")
                             if (finalFile.exists()) finalFile.delete()
                             file.renameTo(finalFile)
+
+                            val coverFile = File(targetDir, "${music.id}.jpg")
+                            downloadFile(music.album.picUrl, coverFile)
+                            val lrc = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music)
+                            AudioTagWriter.writeTags(finalFile,
+                                AudioTagWriter.TagInfo(
+                                    title = music.name,
+                                    artist = music.artists.joinToString("、") { it.name },
+                                    album = music.album.name,
+                                    lyrics = lrc,
+                                    coverFile = coverFile
+                                )
+                            )
+                            coverFile.delete()
                         } catch (e: Exception) {
                             throw e
                         }
@@ -66,7 +91,7 @@ class MusicDownloadRepository(
     private suspend fun downloadFile(
         url: String,
         file: File,
-        progressCallback: (Int) -> Unit
+        progressCallback: (Int) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
@@ -124,6 +149,18 @@ class MusicDownloadRepository(
             else -> "unknown"
         }
     }
+
+    private fun createLyrics(lrc: Lyric, music: Music): String = """
+        [ti:${music.name}]
+        [ar:${music.artists.joinToString("、") { it.name }}]
+        [al:${music.album.name}]
+        
+        ${lrc.lrc}
+        
+        ${lrc.tlyric}
+        
+        ${lrc.romalrc}
+        """.trimIndent()
 }
 
 
