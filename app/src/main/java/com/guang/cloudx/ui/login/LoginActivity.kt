@@ -14,7 +14,7 @@ import com.guang.cloudx.R
 import com.guang.cloudx.logic.utils.showSnackBar
 import kotlin.getValue
 
-class LoginActivity : BaseActivity(), View.OnClickListener {
+class LoginActivity : BaseActivity() {
     private val textInput by lazy { findViewById<EditText>(R.id.cookieEditText) }
     private val button by lazy { findViewById<MaterialButton>(R.id.saveButton) }
 
@@ -32,17 +32,10 @@ class LoginActivity : BaseActivity(), View.OnClickListener {
 
         textInput.setText(prefs.getCookie())
 
-        topAppBar.setNavigationOnClickListener(this)
-        button.setOnClickListener(this)
-    }
-
-    override fun onClick(v: View) {
-        when (v.id) {
-            R.id.saveButton -> {
-                prefs.putCookie(textInput.text.toString())
-                button.showSnackBar("已保存")
-            }
-            R.id.topAppBar -> finish()
+        topAppBar.setNavigationOnClickListener { finish() }
+        button.setOnClickListener { v ->
+            prefs.putCookie(textInput.text.toString())
+            button.showSnackBar("已保存")
         }
     }
 
