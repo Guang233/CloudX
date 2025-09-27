@@ -8,83 +8,104 @@
         android:layout_height="match_parent"
         tools:context=".ui.home.MainActivity">
 
-    <LinearLayout
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_height="match_parent">
 
-        <com.google.android.material.appbar.AppBarLayout
-                android:id="@+id/appBarLayout"
+        <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:liftOnScroll="true">
+                android:layout_height="match_parent"
+                android:orientation="vertical">
 
-            <FrameLayout
+            <com.google.android.material.appbar.AppBarLayout
+                    android:id="@+id/appBarLayout"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    app:liftOnScroll="true">
 
-                <!-- 默认的 Toolbar -->
-                <com.google.android.material.appbar.MaterialToolbar
-                        android:id="@+id/topAppBar"
+                <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="?attr/actionBarSize"
-                        app:navigationContentDescription="打开侧边栏"
-                        app:navigationIcon="@drawable/menu_24px"
-                        app:title="@string/app_name"
-                        app:menu="@menu/top_app_bar" />
+                        android:layout_height="wrap_content">
 
-                <!-- 搜索模式的 Toolbar（初始隐藏） -->
-                <com.google.android.material.appbar.MaterialToolbar
-                        android:id="@+id/searchToolbar"
-                        android:layout_width="match_parent"
-                        android:layout_height="?attr/actionBarSize"
-                        android:visibility="gone"
-                        app:navigationIcon="@drawable/arrow_back_24px">
-
-                    <com.google.android.material.textfield.TextInputLayout
+                    <!-- 默认的 Toolbar -->
+                    <com.google.android.material.appbar.MaterialToolbar
+                            android:id="@+id/topAppBar"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center"
-                            android:layout_marginEnd="16dp"
-                            app:endIconDrawable="@drawable/close_24px"
-                            app:endIconMode="clear_text"
-                            app:startIconDrawable="@drawable/search_24px">
+                            android:layout_height="?attr/actionBarSize"
+                            app:navigationContentDescription="打开侧边栏"
+                            app:navigationIcon="@drawable/menu_24px"
+                            app:title="@string/app_name"
+                            app:menu="@menu/top_app_bar" />
 
-                        <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/searchEditText"
+                    <!-- 搜索模式的 Toolbar（初始隐藏） -->
+                    <com.google.android.material.appbar.MaterialToolbar
+                            android:id="@+id/searchToolbar"
+                            android:layout_width="match_parent"
+                            android:layout_height="?attr/actionBarSize"
+                            android:visibility="gone"
+                            app:navigationIcon="@drawable/arrow_back_24px">
+
+                        <com.google.android.material.textfield.TextInputLayout
                                 android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:imeOptions="actionSearch"
-                                android:inputType="text"
-                                android:textSize="16sp"
-                                android:paddingStart="16dp"
-                                android:paddingEnd="8dp" />
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:layout_marginEnd="24dp"
+                                app:endIconDrawable="@drawable/close_24px"
+                                app:endIconMode="clear_text"
+                                app:startIconDrawable="@drawable/search_24px">
 
-                    </com.google.android.material.textfield.TextInputLayout>
+                            <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/searchEditText"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:imeOptions="actionSearch"
+                                    android:inputType="text"
+                                    android:textSize="16sp"
+                                    android:paddingStart="16dp"
+                                    android:paddingEnd="8dp" />
 
-                </com.google.android.material.appbar.MaterialToolbar>
+                        </com.google.android.material.textfield.TextInputLayout>
 
-            </FrameLayout>
+                    </com.google.android.material.appbar.MaterialToolbar>
 
-        </com.google.android.material.appbar.AppBarLayout>
+                    <com.google.android.material.appbar.MaterialToolbar
+                            android:id="@+id/selectToolbar"
+                            android:layout_width="match_parent"
+                            android:layout_height="?attr/actionBarSize"
+                            android:visibility="gone"
+                            app:menu="@menu/select_menu"
+                            app:navigationIcon="@drawable/close_24px"/>
 
-        <!-- 下拉刷新区域 -->
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-                android:id="@+id/swipeRefresh"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                app:layout_behavior="@string/appbar_scrolling_view_behavior">
+                </FrameLayout>
 
-            <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/mainRecyclerView"
+            </com.google.android.material.appbar.AppBarLayout>
+
+            <!-- 下拉刷新区域 -->
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                    android:id="@+id/swipeRefresh"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:clipToPadding="false"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="16dp"/>
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-    </LinearLayout>
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+                <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/mainRecyclerView"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="16dp"/>
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        </LinearLayout>
+
+        <TextView
+                android:id="@+id/searchTipText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="搜点什么吧 ο(=•ω＜=)ρ⌒☆"/>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <com.google.android.material.navigation.NavigationView
             android:id="@+id/navigation_view"
@@ -95,13 +116,5 @@
             app:headerLayout="@layout/nav_header"
             android:fitsSystemWindows="false"
             style="@style/Widget.Material3.NavigationView"/>
-
-        <include layout="@layout/bottom_sheet_layout"/>
-
-    <FrameLayout
-            android:id="@+id/fragment_container"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
 
 </androidx.drawerlayout.widget.DrawerLayout>

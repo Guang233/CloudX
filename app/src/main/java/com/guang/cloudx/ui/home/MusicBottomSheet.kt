@@ -17,18 +17,18 @@ import com.guang.cloudx.logic.utils.SystemUtils
 
 class MusicBottomSheet(
     private val music: Music,
-    private val onDownload: (Music) -> Unit
+    private val onDownload: (Music, String) -> Unit
     ): BottomSheetDialogFragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view =  inflater.inflate(R.layout.bottom_sheet_layout, container, false)
 
         val buttonGroup = view.findViewById<MaterialButtonToggleGroup>(R.id.buttonGroupMusicLevel)
-        val bsMusicName =  view.findViewById<TextView>(R.id.musicNameDetail)
-        val bsMusicAuthor =  view.findViewById<TextView>(R.id.musicAuthorDetail)
-        val bsMusicAlbum =  view.findViewById<TextView>(R.id.musicAlbumDetail)
-        val bsMusicIcon =  view.findViewById<ShapeableImageView>(R.id.musicIconDetail)
-        val bsDownloadButton =  view.findViewById<MaterialButton>(R.id.btnDownload)
-        val bsCancelButton =  view.findViewById<MaterialButton>(R.id.btnCancelDownload)
+        val bsMusicName = view.findViewById<TextView>(R.id.musicNameDetail)
+        val bsMusicAuthor = view.findViewById<TextView>(R.id.musicAuthorDetail)
+        val bsMusicAlbum = view.findViewById<TextView>(R.id.musicAlbumDetail)
+        val bsMusicIcon = view.findViewById<ShapeableImageView>(R.id.musicIconDetail)
+        val bsDownloadButton = view.findViewById<MaterialButton>(R.id.btnDownload)
+        val bsCancelButton = view.findViewById<MaterialButton>(R.id.btnCancelDownload)
 
         bsMusicName.text = music.name
         Glide.with(this).load(music.album.picUrl).into(bsMusicIcon)
@@ -55,7 +55,15 @@ class MusicBottomSheet(
         }
         bsDownloadButton.setOnClickListener {
             dismiss()
-            onDownload(music)
+            val level = when (buttonGroup.checkedButtonId) {
+                R.id.btnStandardQuality -> "standard"
+                R.id.btnHQ -> "exhigh"
+                R.id.btnSQ -> "lossless"
+                R.id.btnHiRes -> "hires"
+                else -> "standard"
+            }
+            SharedPreferencesUtils(requireContext()).putMusicLevel(level)
+            onDownload(music, level)
         }
         return view
     }

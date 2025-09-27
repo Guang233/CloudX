@@ -62,9 +62,8 @@
 
         <com.google.android.material.button.MaterialButton
                 android:id="@+id/downloadMusicIcon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="12dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center"
                 android:contentDescription="下载"
                 style="?attr/materialIconButtonStyle"
@@ -72,5 +71,12 @@
                 app:iconSize="26dp"
                 app:iconGravity="textEnd"
                 app:iconTint="?attr/colorOnSurfaceVariant"/>
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/musicCheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone"/>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

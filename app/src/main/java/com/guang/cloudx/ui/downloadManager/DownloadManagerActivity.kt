@@ -1,39 +1,21 @@
 package com.guang.cloudx.ui.downloadManager
 
-import android.content.Context.MODE_PRIVATE
-import android.content.SharedPreferences
-import com.guang.cloudx.R
 import android.os.Bundle
 import android.view.View
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
-import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.internal.EdgeToEdgeUtils.applyEdgeToEdge
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.guang.cloudx.BaseActivity
-import com.guang.cloudx.logic.MusicDownloadRepository
+import com.guang.cloudx.R
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
-import com.guang.cloudx.ui.downloadManager.ui.theme.CloudXTheme
 
 class DownloadManagerActivity : BaseActivity() {
 
@@ -46,7 +28,6 @@ class DownloadManagerActivity : BaseActivity() {
         setContentView(R.layout.activity_download_manager)
 
         toolbar = findViewById(R.id.downloadTopAppBar)
-        setSupportActionBar(toolbar)
         applyTopInsets(toolbar)
 
         viewPager = findViewById(R.id.viewPager)
@@ -58,6 +39,8 @@ class DownloadManagerActivity : BaseActivity() {
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = if (position == 0) "正在下载" else "已完成"
         }.attach()
+
+        toolbar.setNavigationOnClickListener { finish() }
 
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
