@@ -1,10 +1,8 @@
 package com.guang.cloudx.ui.login
 
 import android.os.Bundle
-import android.view.View
 import android.widget.EditText
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.appbar.MaterialToolbar
@@ -12,7 +10,6 @@ import com.google.android.material.button.MaterialButton
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.utils.showSnackBar
-import kotlin.getValue
 
 class LoginActivity : BaseActivity() {
     private val textInput by lazy { findViewById<EditText>(R.id.cookieEditText) }
@@ -33,7 +30,7 @@ class LoginActivity : BaseActivity() {
         textInput.setText(prefs.getCookie())
 
         topAppBar.setNavigationOnClickListener { finish() }
-        button.setOnClickListener { v ->
+        button.setOnClickListener { _ ->
             prefs.putCookie(textInput.text.toString())
             button.showSnackBar("已保存")
         }
