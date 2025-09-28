@@ -20,6 +20,12 @@ object ServiceCreator {
     val fuckNeteaseMusicClient = OkHttpClient.Builder()
         .addInterceptor(BrotliInterceptor) // 这个 Brotli 卡了我很长时间，网易云你为什么不用gzip
         .addInterceptor(HexResponseInterceptor())
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.11.203994")
+                .build()
+            chain.proceed(request)
+        }
         .build()
     private val retrofit: Retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
