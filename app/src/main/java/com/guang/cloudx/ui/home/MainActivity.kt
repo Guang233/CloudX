@@ -138,11 +138,16 @@ class MainActivity : BaseActivity() {
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
-                if (!isLastPage
-                    && layoutManager.findFirstVisibleItemPosition() >= layoutManager.itemCount / 3 && !TextUtils.isEmpty(
-                        searchEditText.text
-                    ) && !swipeRefresh.isRefreshing
+
+                val visibleItemCount = layoutManager.childCount              // 屏幕上可见的 item 数
+                val totalItemCount = layoutManager.itemCount                 // 总的 item 数
+                val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition() // 第一个可见 item 的位置
+
+                if ( !isLastPage
+                    && !TextUtils.isEmpty(searchEditText.text)
+                    && !swipeRefresh.isRefreshing
                     && !viewModel.isMultiSelectionMode
+                    && (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5
                 ) {
                     "musicList size = ${layoutManager.itemCount}".d()
                     swipeRefresh.isRefreshing = true
