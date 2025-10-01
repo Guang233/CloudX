@@ -21,7 +21,8 @@
                 app:contentScrim="?attr/colorSurface"
                 app:expandedTitleTextColor="@color/white"
                 app:expandedSubtitleTextColor="@color/white"
-                app:expandedSubtitleTextAppearance="?attr/textAppearanceTitleSmall">
+                app:expandedTitleTextAppearance="@style/TextAppearance.CollapsingToolbar.ExpandedTitle"
+                app:expandedSubtitleTextAppearance="@style/TextAppearance.CollapsingToolbar.ExpandedSubtitle">
 
             <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/playListCoverImageView"

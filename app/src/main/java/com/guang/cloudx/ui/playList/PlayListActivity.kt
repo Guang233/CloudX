@@ -1,6 +1,7 @@
 package com.guang.cloudx.ui.playList
 
 import android.annotation.SuppressLint
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.util.TypedValue
@@ -130,18 +131,23 @@ class PlayListActivity : BaseActivity() {
         appBarLayout.addOnOffsetChangedListener { layout, verticalOffset ->
             swipeRefresh.isEnabled = verticalOffset == 0
 
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+            val isDarkMode = nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+
             val total = layout.totalScrollRange
             val fraction = if (total != 0) kotlin.math.abs(verticalOffset).toFloat() / total else 0f
             // 计算一个背景透明度（0 -> transparent, 1 -> opaque）
-            val surfaceColor = fetchColorAttr(android.R.attr.colorBackground) // fallback to theme background
+            val surfaceColor = fetchColorAttr(android.R.attr.colorBackground) // fallback to the theme background
             val bg = ColorUtils.setAlphaComponent(surfaceColor, (fraction * 255).toInt())
             toolbar.setBackgroundColor(bg)
             multiSelectToolbar.setBackgroundColor(bg)
 
             // 文字/图标切换阈值
-            val threshold = 0.6f
+            val threshold = 0.7f
             if (fraction > threshold) {
                 // 显示标题（深色，用主题 onSurface）
+                if (!isDarkMode) controller.isAppearanceLightStatusBars = true
                 collapsingToolbar.isTitleEnabled = false
                 try { toolbar.title = playList.name } catch (e: Exception) { "歌单获取失败：$e".e() }
                 toolbar.setTitleTextColor(fetchColorAttr(android.R.attr.textColorPrimary))
@@ -150,6 +156,7 @@ class PlayListActivity : BaseActivity() {
                 multiSelectToolbar.navigationIcon?.setTint(fetchColorAttr(android.R.attr.textColorSecondary))
                 multiSelectToolbar.menu.forEach { it.icon?.setTint(fetchColorAttr(android.R.attr.textColorPrimary)) }
             } else {
+                controller.isAppearanceLightStatusBars = false
                 toolbar.title = ""
                 collapsingToolbar.isTitleEnabled = true
                 toolbar.navigationIcon?.setTint(Color.WHITE)
