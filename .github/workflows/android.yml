@@ -30,5 +30,5 @@ jobs:
     - name: Upload APK 
       uses: actions/upload-artifact@v4
       with:
-        path: app/build/outputs/apk/release/*.APK
+        path: app/build/outputs/apk/release/*.apk
         Name: "CloudX"
