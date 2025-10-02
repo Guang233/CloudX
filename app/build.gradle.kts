@@ -1,9 +1,18 @@
+import com.android.build.api.variant.BuildConfigField
+import java.io.ByteArrayOutputStream
+import java.util.UUID
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("kotlin-parcelize")
 }
+
+val appVersion = "1.0.0"
+val currentBuildUuid = UUID.randomUUID().toString()
+val currentBuildTimestamp = System.currentTimeMillis()
+
 
 android {
     namespace = "com.guang.cloudx"
@@ -13,10 +22,13 @@ android {
         applicationId = "com.guang.cloudx"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = getGitCommitCount()
+        versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        BuildConfigField("String", "BUILD_UUID", "\"$currentBuildUuid\"")
+        BuildConfigField("long", "BUILD_TIMESTAMP", "$currentBuildTimestamp")
     }
 
     buildTypes {
@@ -34,6 +46,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -73,3 +86,19 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+
+fun getGitCommitCount(): Int {
+    return try {
+        val stdout = ByteArrayOutputStream()
+        @Suppress("DEPRECATION") exec {
+            commandLine("git", "rev-list", "--count", "main")
+            standardOutput = stdout
+        }
+        stdout.toString().trim().toInt()
+    } catch (e: Exception) {
+        1
+    }
+}
+
+val adb: String = androidComponents.sdkComponents.adb.get().asFile.absolutePath
