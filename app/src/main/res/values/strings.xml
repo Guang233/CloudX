@@ -3,4 +3,5 @@
     <string name="title_activity_main">MainActivity</string>
     <string name="title_activity_download_manager">DownloadManagerActivity</string>
     <string name="title_activity_play_list">PlayListActivity</string>
+    <string name="title_activity_settings">SettingsActivity</string>
 </resources>

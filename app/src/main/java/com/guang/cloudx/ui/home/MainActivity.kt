@@ -12,7 +12,6 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.viewModels
-import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.drawerlayout.widget.DrawerLayout
@@ -31,6 +30,7 @@ import com.guang.cloudx.logic.utils.showSnackBar
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
 import com.guang.cloudx.ui.login.LoginActivity
 import com.guang.cloudx.ui.playList.PlayListActivity
+import com.guang.cloudx.ui.settings.SettingsActivity
 import com.guang.cloudx.util.ext.d
 
 class MainActivity : BaseActivity() {
@@ -149,7 +149,7 @@ class MainActivity : BaseActivity() {
                     && !viewModel.isMultiSelectionMode
                     && (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5
                 ) {
-                    "musicList size = ${layoutManager.itemCount}".d()
+                    "musicList size = $totalItemCount".d()
                     swipeRefresh.isRefreshing = true
                     viewModel.searchMusic(
                         searchEditText.text.toString(),
@@ -183,6 +183,10 @@ class MainActivity : BaseActivity() {
                                 startActivity<PlayListActivity> { putExtra("id", editText.text.toString()) }
                          }
                          .show()
+                     true
+                 }
+                 R.id.nav_settings -> {
+                     startActivity<SettingsActivity>()
                      true
                  }
                 else -> false

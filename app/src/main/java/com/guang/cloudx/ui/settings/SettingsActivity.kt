@@ -1,0 +1,235 @@
+package com.guang.cloudx.ui.settings
+
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Equalizer
+import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.guang.cloudx.BaseActivity
+
+class SettingsActivity : BaseActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MyAppTheme {
+                SettingsScreen()
+            }
+        }
+    }
+
+    @Composable
+    fun MyAppTheme(
+        dynamicColor: Boolean = true,
+        darkTheme: Boolean = isSystemInDarkTheme(),
+        content: @Composable () -> Unit
+    ) {
+        val colorScheme = when {
+            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                val context = LocalContext.current
+                if (darkTheme) dynamicDarkColorScheme(context)
+                else dynamicLightColorScheme(context)
+            }
+
+            darkTheme -> darkColorScheme()
+            else -> lightColorScheme()
+        }
+
+        MaterialTheme(
+            colorScheme = colorScheme,
+//            typography = Typography,
+//            shapes = Shapes,
+            content = content
+        )
+    }
+
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun SettingsScreen() {
+        var lrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveLrc()) }
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("设置") },
+                    navigationIcon = {
+                        IconButton(onClick = { finish() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+            ) {
+                item {
+                    Text(
+                        "下载",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    SwitchListItem(
+                        icon = Icons.Filled.Lyrics,
+                        title = "额外导出歌词",
+                        checked = lrcEnabled,
+                        description = "在下载目录额外导出.lrc文件",
+                        onCheckedChange = { checked ->
+                            lrcEnabled = checked
+                            prefs.putIsSaveLrc(checked)
+                        }
+                    )
+                }
+
+                item {
+                    MenuListItem(
+                        icon = Icons.Default.Equalizer,
+                        title = "默认下载音质",
+                        options = listOf("标准", "极高", "无损", "Hi-res", "上次选择"),
+                        selectedOption = if (prefs.getIsAutoLevel())
+                            "上次选择"
+                        else when (prefs.getMusicLevel()) {
+                            "standard" -> "标准"
+                            "exhigh" -> "极高"
+                            "lossless" -> "无损"
+                            "hires" -> "标准"
+                            else -> "标准"
+                        },
+                        onOptionSelected = { selectedOption ->
+                            if (selectedOption != "上次选择") {
+                                val level = when (selectedOption) {
+                                    "标准" -> "standard"
+                                    "极高" -> "exhigh"
+                                    "无损" -> "lossless"
+                                    "Hi-res" -> "hires"
+                                    else -> "exhigh"
+                                }
+                                prefs.putIsAutoLevel(false)
+                                prefs.putMusicLevel(level)
+                            } else
+                                prefs.putIsAutoLevel(true)
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun SwitchListItem(
+        icon: ImageVector,
+        title: String,
+        description: String? = null,
+        checked: Boolean,
+        onCheckedChange: (Boolean) -> Unit
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+
+        ListItem(
+            leadingContent = {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .wrapContentSize(align = Alignment.Center)
+                )
+            },
+            headlineContent = { Text(title) },
+            supportingContent = description?.let { { Text(it) } },
+            trailingContent = {
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                    interactionSource = interactionSource
+                )
+            },
+            modifier = Modifier
+                .clickable(
+                    interactionSource = interactionSource
+                ) {
+                    onCheckedChange(!checked)
+                }
+        )
+    }
+
+    @Composable
+    fun MenuListItem(
+        icon: ImageVector,
+        title: String,
+        options: List<String>,
+        selectedOption: String,
+        onOptionSelected: (String) -> Unit
+    ) {
+        var expanded by remember { mutableStateOf(false) }
+        var currentOption by remember { mutableStateOf(selectedOption) }
+
+        ListItem(
+            modifier = Modifier.clickable { expanded = true },
+            leadingContent = {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .wrapContentSize(align = Alignment.Center)
+                )
+            },
+            headlineContent = { Text(title) },
+            supportingContent = { Text(currentOption) },
+            trailingContent = {
+                Box {
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        options.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    onOptionSelected(option)
+                                    currentOption = option
+                                    expanded = false
+                                },
+                                modifier = Modifier.background(
+                                    if (option == currentOption)
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                    else
+                                        Color.Transparent
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+}
