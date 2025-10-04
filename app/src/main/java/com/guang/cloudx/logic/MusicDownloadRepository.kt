@@ -1,19 +1,13 @@
 package com.guang.cloudx.logic
 
 import androidx.lifecycle.ViewModelProvider
-import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.network.MusicNetwork
 import com.guang.cloudx.logic.utils.AudioTagWriter
-import com.guang.cloudx.logic.utils.SharedPreferencesUtils
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -22,11 +16,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class MusicDownloadRepository(
-    private val maxParallel: Int
+    maxParallel: Int
 ) : ViewModelProvider.Factory {
     private val semaphore = Semaphore(maxParallel)
 
     suspend fun downloadMusicList(
+        isSaveLrc: Boolean,
         musics: List<Music>,
         level: String,
         cookie: String,
@@ -71,6 +66,11 @@ class MusicDownloadRepository(
                                 )
                             )
                             coverFile.delete()
+
+                            if (isSaveLrc) {
+                                val lrcFile = File(targetDir, "${fileName}.lrc")
+                                lrcFile.writeText(lrc)
+                            }
                         } catch (e: Exception) {
                             throw e
                         }
@@ -81,12 +81,13 @@ class MusicDownloadRepository(
     }
 
     suspend fun downloadMusic(
+        isSaveLrc: Boolean,
         music: Music,
         level: String,
         cookie: String,
         targetDir: File,
         onProgress: (Music, Int) -> Unit
-    ) = downloadMusicList(listOf(music), level, cookie, targetDir, onProgress)
+    ) = downloadMusicList(isSaveLrc, listOf(music), level, cookie, targetDir, onProgress)
 
     private suspend fun downloadFile(
         url: String,
@@ -151,16 +152,16 @@ class MusicDownloadRepository(
     }
 
     private fun createLyrics(lrc: Lyric, music: Music): String = """
-        [ti:${music.name}]
-        [ar:${music.artists.joinToString("、") { it.name }}]
-        [al:${music.album.name}]
-        
-        ${lrc.lrc}
-        
-        ${lrc.tlyric}
-        
-        ${lrc.romalrc}
-        """.trimIndent()
+[ti:${music.name}]
+[ar:${music.artists.joinToString("、") { it.name }}]
+[al:${music.album.name}]
+
+${lrc.lrc}
+
+${lrc.tlyric}
+
+${lrc.romalrc}
+""".trimIndent()
 }
 
 

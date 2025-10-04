@@ -1,13 +1,11 @@
 package com.guang.cloudx
 
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Environment
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -18,7 +16,6 @@ import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.logic.utils.showSnackBar
 import com.guang.cloudx.ui.downloadManager.DownloadViewModel
-import kotlin.getValue
 
 open class BaseActivity: AppCompatActivity() {
     protected lateinit var prefs: SharedPreferencesUtils
@@ -70,7 +67,8 @@ open class BaseActivity: AppCompatActivity() {
         downloadViewModel.startDownloads(musicList,
             level,
             prefs.getCookie(),
-            targetDir)
+            targetDir,
+            prefs.getIsSaveLrc())
 
         view.showSnackBar("已加入下载队列")
     }

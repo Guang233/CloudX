@@ -5,14 +5,14 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,8 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.guang.cloudx.BaseActivity
+import com.guang.cloudx.BuildConfig
+import com.guang.cloudx.logic.utils.SystemUtils
+import kotlinx.coroutines.launch
 
 class SettingsActivity : BaseActivity() {
 
@@ -65,8 +69,14 @@ class SettingsActivity : BaseActivity() {
     @Composable
     fun SettingsScreen() {
         var lrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveLrc()) }
+        val snackbarHostState = remember { SnackbarHostState() }
+        val scope = rememberCoroutineScope()
+        val context = LocalContext.current
 
         Scaffold(
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState)
+            },
             topBar = {
                 TopAppBar(
                     title = { Text("设置") },
@@ -88,6 +98,43 @@ class SettingsActivity : BaseActivity() {
             ) {
                 item {
                     Text(
+                        "应用",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
+                    color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    MenuListItem(
+                        icon = Icons.Outlined.Palette,
+                        title = "主题颜色",
+                        options = listOf("跟随系统", "青色", "粉色"),
+                        selectedOption = "跟随系统",
+                        onOptionSelected = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
+                            }
+                        }
+                    )
+                }
+
+                item {
+                    MenuListItem(
+                        icon = Icons.Outlined.DarkMode,
+                        title = "深色模式",
+                        options = listOf("跟随系统", "启用", "关闭"),
+                        selectedOption = "跟随系统",
+                        onOptionSelected = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
+                            }
+                        }
+                    )
+                }
+
+                item {
+                    Text(
                         "下载",
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
@@ -96,11 +143,33 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    ActionListItem(
+                        icon = Icons.Outlined.Folder,
+                        title = "音乐文件保存路径",
+                        description = "/storage/emulated/0/Android/data/com.guang.cloudx/files/Download/",
+                        onClick = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
+                            }
+                        },
+                        onLongClick = {
+                            scope.launch {
+                                SystemUtils.copyToClipboard(
+                                    context,
+                                    "downloadPath",
+                                    "/storage/emulated/0/Android/data/com.guang.cloudx/files/Download/"
+                                )
+                            }
+                        }
+                    )
+                }
+
+                item {
                     SwitchListItem(
-                        icon = Icons.Filled.Lyrics,
+                        icon = Icons.Outlined.Lyrics,
                         title = "额外导出歌词",
                         checked = lrcEnabled,
-                        description = "在下载目录额外导出.lrc文件",
+                        description = "在下载目录额外导出.lrc歌词文件",
                         onCheckedChange = { checked ->
                             lrcEnabled = checked
                             prefs.putIsSaveLrc(checked)
@@ -110,7 +179,7 @@ class SettingsActivity : BaseActivity() {
 
                 item {
                     MenuListItem(
-                        icon = Icons.Default.Equalizer,
+                        icon = Icons.Outlined.Equalizer,
                         title = "默认下载音质",
                         options = listOf("标准", "极高", "无损", "Hi-res", "上次选择"),
                         selectedOption = if (prefs.getIsAutoLevel())
@@ -135,6 +204,55 @@ class SettingsActivity : BaseActivity() {
                                 prefs.putMusicLevel(level)
                             } else
                                 prefs.putIsAutoLevel(true)
+                        }
+                    )
+                }
+
+                item {
+                    ActionListItem(
+                        icon = Icons.Outlined.Edit,
+                        title = "文件命名规则",
+                        description = "修改下载的歌曲文件名命名规则",
+                        onClick = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
+                            }
+                        }
+                    )
+                }
+
+                item {
+                    Text(
+                        "关于",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    ActionListItem(
+                        icon = Icons.Outlined.Apps,
+                        title = "应用版本",
+                        description = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        onClick = {
+                            scope.launch {
+                                SystemUtils.copyToClipboard(context, "version", BuildConfig.VERSION_NAME)
+                            }
+                        }
+                    )
+                }
+
+                item {
+                    ActionListItem(
+                        icon = Icons.Outlined.Link,
+                        title = "GitHub",
+                        description = "https://github.com/Guang233/CloudX",
+                        onClick = {}, // TODO: 跳转浏览器
+                        onLongClick = {
+                            scope.launch {
+                                SystemUtils.copyToClipboard(context, "github", "https://github.com/Guang233/CloudX")
+                            }
                         }
                     )
                 }
@@ -229,6 +347,31 @@ class SettingsActivity : BaseActivity() {
                     }
                 }
             }
+        )
+    }
+
+    @Composable
+    fun ActionListItem(
+        icon: ImageVector,
+        title: String,
+        description: String? = null,
+        onClick: () -> Unit,
+        onLongClick: (() -> Unit)? = null
+    ) {
+        ListItem(
+            leadingContent = {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .wrapContentSize(align = Alignment.Center)
+                )
+            },
+            headlineContent = { Text(title) },
+            supportingContent = description?.let { { Text(it, maxLines = 1,  overflow = TextOverflow.Ellipsis) } },
+            modifier = Modifier
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
         )
     }
 
