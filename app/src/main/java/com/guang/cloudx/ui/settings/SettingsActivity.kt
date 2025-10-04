@@ -23,10 +23,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bumptech.glide.Glide
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.BuildConfig
 import com.guang.cloudx.logic.utils.SystemUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsActivity : BaseActivity() {
 
@@ -252,6 +255,22 @@ class SettingsActivity : BaseActivity() {
                         onLongClick = {
                             scope.launch {
                                 SystemUtils.copyToClipboard(context, "github", "https://github.com/Guang233/CloudX")
+                            }
+                        }
+                    )
+                }
+                
+                item { 
+                    ActionListItem(
+                        icon = Icons.Outlined.CleaningServices,
+                        title = "清除缓存",
+                        description = "清除歌曲封面缓存",
+                        onClick = {
+                            scope.launch(Dispatchers.IO) {
+                                Glide.get(context).clearDiskCache()
+                                withContext(Dispatchers.Main) {
+                                    snackbarHostState.showSnackbar("已清理")
+                                }
                             }
                         }
                     )
