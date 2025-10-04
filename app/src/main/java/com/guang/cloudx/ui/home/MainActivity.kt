@@ -221,6 +221,7 @@ class MainActivity : BaseActivity() {
                      prefs.putCookie("")
                      prefs.putUserId("")
                      navigationView.showSnackBar("已退出登录")
+                     userId = ""
                      initNavHeader()
                      true
                  }
