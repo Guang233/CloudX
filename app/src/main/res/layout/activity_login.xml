@@ -25,28 +25,51 @@
             android:layout_margin="12dp"
             android:layout_gravity="bottom|center"/>
 
-    <com.google.android.material.textfield.TextInputLayout
+    <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            style="?attr/textInputFilledStyle"
-            android:layout_marginHorizontal="24dp"
-            android:layout_marginTop="12dp"
-            android:hint="Cookies..."
+            android:layout_height="match_parent"
+            android:orientation="vertical"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/cookieEditText"
+        <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:imeOptions="actionDone"
-                android:maxLines="10"/>
+                android:layout_height="wrap_content"
+                style="?attr/textInputOutlinedStyle"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="12dp"
+                android:hint="用户ID(用于获取头像和昵称)">
+
+            <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/userIdEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:inputType="number"
+                    android:imeOptions="actionDone"
+                    android:maxLines="1"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                style="?attr/textInputFilledStyle"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="12dp"
+                android:hint="Cookies...">
+
+            <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/cookieEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:imeOptions="actionDone"
+                    android:maxLines="10"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.button.MaterialButton
                 android:id="@+id/saveButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="12dp"
+                android:layout_margin="32dp"
                 android:text="保存"/>
-    </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

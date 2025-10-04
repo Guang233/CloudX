@@ -12,7 +12,8 @@ import com.guang.cloudx.R
 import com.guang.cloudx.logic.utils.showSnackBar
 
 class LoginActivity : BaseActivity() {
-    private val textInput by lazy { findViewById<EditText>(R.id.cookieEditText) }
+    private val cookieEditText by lazy { findViewById<EditText>(R.id.cookieEditText) }
+    private val userIdEditText by lazy { findViewById<EditText>(R.id.userIdEditText) }
     private val button by lazy { findViewById<MaterialButton>(R.id.saveButton) }
 
     private val topAppBar by lazy { findViewById<MaterialToolbar>(R.id.topAppBar) }
@@ -27,11 +28,13 @@ class LoginActivity : BaseActivity() {
             insets
         }
 
-        textInput.setText(prefs.getCookie())
+        userIdEditText.setText(prefs.getUserId())
+        cookieEditText.setText(prefs.getCookie())
 
         topAppBar.setNavigationOnClickListener { finish() }
         button.setOnClickListener { _ ->
-            prefs.putCookie(textInput.text.toString())
+            prefs.putUserId(userIdEditText.text.toString())
+            prefs.putCookie(cookieEditText.text.toString())
             button.showSnackBar("已保存")
         }
     }

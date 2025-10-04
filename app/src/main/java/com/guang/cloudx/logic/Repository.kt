@@ -24,4 +24,13 @@ object Repository {
             emit(Result.failure<PlayList>(e))
         }
     }
+
+    fun getUserDetail(id: String, cookie: String) = liveData {
+        try {
+            val userDetail = MusicNetwork.getUserDetail(id, cookie)
+            emit(Result.success(userDetail))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
 }

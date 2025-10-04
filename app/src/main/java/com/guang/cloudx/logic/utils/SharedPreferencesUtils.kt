@@ -11,9 +11,11 @@ class SharedPreferencesUtils(context: Context) {
     fun getIsAutoLevel() = sharedPreferences.getBoolean("auto_level", false)
     fun getCookie() =  sharedPreferences.getString("cookie", "").toString()
     fun getIsSaveLrc() = sharedPreferences.getBoolean("is_save_lrc", false)
+    fun getUserId(): String = sharedPreferences.getString("user_id", "").toString()
 
     fun putMusicLevel(musicLevel: String) = sharedPreferences.edit { putString("music_level", musicLevel) }
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }
     fun putCookie(cookie: String) = sharedPreferences.edit { putString("cookie", cookie) }
     fun putIsSaveLrc(value: Boolean) = sharedPreferences.edit { putBoolean("is_save_lrc", value) }
+    fun putUserId(userId: String) = sharedPreferences.edit { putString("user_id", userId) }
 }

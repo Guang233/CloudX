@@ -18,6 +18,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.bumptech.glide.Glide
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -37,6 +38,7 @@ class MainActivity : BaseActivity() {
     private val searchMusicList = mutableListOf<Music>()
     private var isLastPage = false
     private var lastSearchText: String = ""
+    private lateinit var userId: String
     private val adapter by lazy { MusicAdapter(searchMusicList,
         { music -> startDownloadMusic(music = music, view = recyclerView) },
         { music -> showBottomSheet(music = music) },
@@ -60,6 +62,11 @@ class MainActivity : BaseActivity() {
 
     private val swipeRefresh by lazy { findViewById<SwipeRefreshLayout>(R.id.swipeRefresh) }
     private val tipText by lazy { findViewById<TextView>(R.id.searchTipText) }
+
+    val navView by lazy { navigationView.getHeaderView(0) }
+    val headImage: ShapeableImageView by lazy { navView.findViewById(R.id.headImage) }
+    val nicknameText: TextView by lazy { navView.findViewById(R.id.nicknameText) }
+    val userIdText: TextView by lazy { navView.findViewById(R.id.emailText) }
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -86,6 +93,8 @@ class MainActivity : BaseActivity() {
             else if (viewModel.isSearchMode) exitSearchMode()
                 else moveTaskToBack(true)
         }
+
+        userId = prefs.getUserId()
 
         setupToolbar()
         initRecyclerView()
@@ -120,6 +129,25 @@ class MainActivity : BaseActivity() {
                     }
                 }
                 adapter.notifyDataSetChanged()
+        }
+
+        viewModel.userDetail.observe(this) { result ->
+            val user = result.getOrNull()
+            if (user != null) {
+                nicknameText.text = user.name
+                Glide.with(this).load(user.avatarUrl).into(headImage)
+            } else {
+                nicknameText.text = "获取失败"
+                Glide.with(this).load(R.drawable.person_48px).into(headImage)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (prefs.getUserId() != userId) {
+            initNavHeader()
+            userId =  prefs.getUserId()
         }
     }
 
@@ -189,6 +217,13 @@ class MainActivity : BaseActivity() {
                      startActivity<SettingsActivity>()
                      true
                  }
+                 R.id.nav_log_out -> {
+                     prefs.putCookie("")
+                     prefs.putUserId("")
+                     navigationView.showSnackBar("已退出登录")
+                     initNavHeader()
+                     true
+                 }
                 else -> false
             }
         }
@@ -196,6 +231,22 @@ class MainActivity : BaseActivity() {
         val view = navigationView.getHeaderView(0)
         val headImage: ShapeableImageView = view.findViewById(R.id.headImage)
         headImage.setOnClickListener { startActivity<LoginActivity>() }
+        initNavHeader()
+    }
+
+    private fun initNavHeader() {
+        if (prefs.getUserId() != "") {
+            userIdText.text = prefs.getUserId()
+            viewModel.getUserDetail(prefs.getUserId(), prefs.getCookie())
+        } else if (prefs.getCookie() != "") {
+            nicknameText.text = "已登录"
+            userIdText.text = "输入用户ID以获取头像昵称"
+            Glide.with(this).load(R.drawable.person_48px).into(headImage)
+        } else {
+            nicknameText.text = "未登录"
+            userIdText.text = "点按头像以登录"
+            Glide.with(this).load(R.drawable.person_48px).into(headImage)
+        }
     }
 
     private fun setupToolbar()  {

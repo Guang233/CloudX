@@ -1,10 +1,10 @@
 package com.guang.cloudx.logic.network
 
-import android.util.Log
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.MusicUrl
 import com.guang.cloudx.logic.model.PlayList
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.model.User
 import com.guang.cloudx.logic.utils.AESECBHelper
 import com.guang.cloudx.logic.utils.Decrypt
 import com.guang.cloudx.logic.utils.MD5Helper
@@ -55,6 +55,16 @@ object MusicNetwork {
         return Decrypt.decryptPlayList(
             musicService
                 .getPlayList(AESECBHelper.encrypt(query), cookie)
+                .await()
+        )
+    }
+
+    suspend fun getUserDetail(id: String, cookie: String): User {
+        val bodyJSON = "{\"all\":\"true\",\"userId\":\"$id\",\"e_r\":true,\"header\":\"\"}"
+        val query = "/api/w/v1/user/detail/$id-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/w/v1/user/detail/${id}use${bodyJSON}md5forencrypt")}"
+        return Decrypt.decryptUserDetail(
+            musicService.getUserDetail(
+                AESECBHelper.encrypt(query), cookie)
                 .await()
         )
     }

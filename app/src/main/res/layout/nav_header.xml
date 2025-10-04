@@ -10,14 +10,14 @@
 
     <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/headImage"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:src="@drawable/person_24px"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:src="@drawable/person_48px"
             app:shapeAppearance="@style/RoundedStyle"
             app:strokeColor="?attr/colorPrimary"
             app:strokeWidth="1dp"
-            android:layout_marginBottom="8dp"
             android:padding="2dp"
+            android:layout_marginBottom="8dp"
             android:clickable="true"
             android:focusable="true"
             android:checkable="true"/>
@@ -26,7 +26,8 @@
             android:id="@+id/nicknameText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="UserName"
+            android:text="未登录"
+            android:layout_marginVertical="2dp"
             android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
             android:textColor="?attr/colorPrimary"/>
 
@@ -34,7 +35,7 @@
             android:id="@+id/emailText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="EmailOrOthers"
+            android:text="点按头像以登录"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
             android:textColor="?attr/colorSecondary"/>
 

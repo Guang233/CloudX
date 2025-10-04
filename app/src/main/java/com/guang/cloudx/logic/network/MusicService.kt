@@ -1,7 +1,6 @@
 package com.guang.cloudx.logic.network
 
 import retrofit2.Call
-import retrofit2.http.Body
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.Header
@@ -27,5 +26,10 @@ interface MusicService {
     @POST("eapi/v6/playlist/detail")
     fun getPlayList(@Field("params") body: String,
                     @Header("Cookie") cookie: String): Call<String>
+
+    @FormUrlEncoded
+    @POST("/eapi/w/v1/user/detail")
+    fun getUserDetail(@Field("params") body: String,
+                      @Header("Cookie") cookie: String): Call<String>
 }
 
