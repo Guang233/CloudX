@@ -15,7 +15,7 @@
                 android:id="@+id/downloadTopAppBar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
-                app:title="Download Manager"
+                app:title="下载管理"
                 app:navigationIcon="@drawable/arrow_back_24px"
                 app:menu="@menu/menu_download_manager"/>
 
