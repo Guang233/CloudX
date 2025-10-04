@@ -218,11 +218,18 @@ class MainActivity : BaseActivity() {
                      true
                  }
                  R.id.nav_log_out -> {
-                     prefs.putCookie("")
-                     prefs.putUserId("")
-                     navigationView.showSnackBar("已退出登录")
-                     userId = ""
-                     initNavHeader()
+                     MaterialAlertDialogBuilder(this)
+                         .setTitle("提示")
+                         .setMessage("真的要退出登录吗？")
+                         .setNegativeButton("取消", null)
+                         .setPositiveButton("确定") { _, _ ->
+                             prefs.putCookie("")
+                             prefs.putUserId("")
+                             navigationView.showSnackBar("已退出登录")
+                             userId = ""
+                             initNavHeader()
+                         }
+                         .show()
                      true
                  }
                 else -> false
