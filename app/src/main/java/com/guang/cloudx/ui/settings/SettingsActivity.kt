@@ -1,8 +1,14 @@
 package com.guang.cloudx.ui.settings
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -146,21 +152,40 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    var pickedUri by remember { mutableStateOf<Uri?>(null) }
+
+                    LaunchedEffect(Unit) {
+                        prefs.getSafUri()?.let {
+                            pickedUri = Uri.parse(it)
+                        }
+                    }
+
+                    val launcher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocumentTree()
+                    ) { uri ->
+                        if (uri != null) {
+                            val takeFlags = (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                            context.contentResolver.takePersistableUriPermission(uri, takeFlags)
+
+                            prefs.putSafUri(uri.toString())
+                            pickedUri = uri
+                        }
+                    }
+
+                    val path = pickedUri?.let { tryResolveAbsolutePathFromTreeUri(context, it) } ?: "未选择"
                     ActionListItem(
                         icon = Icons.Outlined.Folder,
                         title = "音乐文件保存路径",
-                        description = "/storage/emulated/0/Android/data/com.guang.cloudx/files/Download/",
+                        description = path,
                         onClick = {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
-                            }
+                            launcher.launch(null)
                         },
                         onLongClick = {
                             scope.launch {
                                 SystemUtils.copyToClipboard(
                                     context,
                                     "downloadPath",
-                                    "/storage/emulated/0/Android/data/com.guang.cloudx/files/Download/"
+                                    path
                                 )
                             }
                         }
@@ -394,4 +419,28 @@ class SettingsActivity : BaseActivity() {
         )
     }
 
+    private fun tryResolveAbsolutePathFromTreeUri(context: Context, treeUri: Uri): String? {
+        // 文档 id 例如 "primary:Music/myfolder" 或 "0123-4567:some/folder"
+        val docId = DocumentsContract.getTreeDocumentId(treeUri)
+        // 常见 primary 情况
+        if (docId.startsWith("primary:")) {
+            val rel = docId.removePrefix("primary:")
+            return "/storage/emulated/0/$rel"
+        }
+
+        // 如果是 "volumeId:rest" 形式，尝试构造 /storage/<volumeId>/rest
+        val idx = docId.indexOf(':')
+        if (idx > 0) {
+            val volumeId = docId.substring(0, idx)
+            val rest = docId.substring(idx + 1)
+            // 这在某些设备上可能位于 /storage/<volumeId>/<rest>
+            val candidate = "/storage/$volumeId/$rest"
+            // 简单校验：文件存在则返回
+            val f = java.io.File(candidate)
+            if (f.exists()) return candidate
+        }
+
+        // 其他情况无法解析
+        return null
+    }
 }

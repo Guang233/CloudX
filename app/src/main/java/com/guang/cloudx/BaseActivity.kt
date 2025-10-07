@@ -2,8 +2,8 @@ package com.guang.cloudx
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
@@ -11,6 +11,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.documentfile.provider.DocumentFile
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
@@ -19,6 +20,7 @@ import com.guang.cloudx.ui.downloadManager.DownloadViewModel
 
 open class BaseActivity: AppCompatActivity() {
     protected lateinit var prefs: SharedPreferencesUtils
+    var dir: DocumentFile? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +41,8 @@ open class BaseActivity: AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatusBarIconBySystemTheme()
+
+        dir = prefs.getSafUri()?.let { DocumentFile.fromTreeUri(this, Uri.parse(it)) }
     }
 
     private fun updateStatusBarIconBySystemTheme() {
@@ -58,16 +62,22 @@ open class BaseActivity: AppCompatActivity() {
 
 
     protected fun startDownloadMusic(level: String = prefs.getMusicLevel(), musics: List<Music> = listOf(), music: Music? = null, view: View) {
+        if (dir == null) {
+            view.showSnackBar("未选择下载目录，请前往设置选择")
+            return
+        }
+
         val musicList = if (music != null) listOf(music)
         else musics
 
-        val targetDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)!!
         val downloadViewModel: DownloadViewModel by applicationViewModels(application)
 
-        downloadViewModel.startDownloads(musicList,
+        downloadViewModel.startDownloads(
+            this,
+            musicList,
             level,
             prefs.getCookie(),
-            targetDir,
+            dir!!,
             prefs.getIsSaveLrc())
 
         view.showSnackBar("已加入下载队列")

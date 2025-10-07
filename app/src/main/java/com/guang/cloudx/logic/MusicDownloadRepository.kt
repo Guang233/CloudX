@@ -1,17 +1,17 @@
 package com.guang.cloudx.logic
 
+import android.content.Context
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModelProvider
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.network.MusicNetwork
-import com.guang.cloudx.logic.utils.AudioTagWriter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -21,11 +21,12 @@ class MusicDownloadRepository(
     private val semaphore = Semaphore(maxParallel)
 
     suspend fun downloadMusicList(
+        context: Context,
         isSaveLrc: Boolean,
         musics: List<Music>,
         level: String,
         cookie: String,
-        targetDir: File,
+        targetDir: DocumentFile,
         onProgress: (Music, Int) -> Unit
     ) {
         coroutineScope {
@@ -34,7 +35,7 @@ class MusicDownloadRepository(
                     semaphore.withPermit {
                         try {
                             val musicUrl = MusicNetwork.getMusicUrl(music.id.toString(), level, cookie)
-                            val quality = when(musicUrl.level) {
+                            val quality = when (musicUrl.level) {
                                 "standard" -> ""
                                 "exhigh" -> "[HQ]"
                                 "lossless" -> "[SQ]"
@@ -42,35 +43,41 @@ class MusicDownloadRepository(
                                 else -> ""
                             }
                             val fileName = "$quality${music.name}-${music.artists.joinToString("_") { it.name }}"
-                            val file = File(targetDir, fileName)
 
-                            downloadFile(musicUrl.url, file) { progress ->
+                            val musicFile = targetDir.createFile("audio/*", fileName)
+                                ?: throw Exception("无法创建音乐文件")
+
+                            downloadFile(
+                                context,
+                                musicUrl.url,
+                                documentFile = musicFile
+                            ) { progress ->
                                 onProgress(music, progress)
                             }
 
-                            val ext = detectFileType(file)
-                            val finalFile = File(file.parent, "$fileName.$ext")
-                            if (finalFile.exists()) finalFile.delete()
-                            file.renameTo(finalFile)
+                            val ext = detectFileType(context, musicFile)
+                            musicFile.renameTo("$fileName.$ext")
 
-                            val coverFile = File(targetDir, "${music.id}.jpg")
-                            downloadFile(music.album.picUrl, coverFile)
-                            val lrc = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music)
-                            AudioTagWriter.writeTags(finalFile,
-                                AudioTagWriter.TagInfo(
-                                    title = music.name,
-                                    artist = music.artists.joinToString("、") { it.name },
-                                    album = music.album.name,
-                                    lyrics = lrc,
-                                    coverFile = coverFile
-                                )
+                            val coverFile = targetDir.createFile("image/jpeg", "${music.id}.jpg")
+                                ?: throw Exception("无法创建封面文件")
+                            downloadFile(
+                                context,
+                                music.album.picUrl,
+                                documentFile = coverFile
                             )
                             coverFile.delete()
 
+                            // 写入歌词
+                            val lrc = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music)
                             if (isSaveLrc) {
-                                val lrcFile = File(targetDir, "${fileName}.lrc")
-                                lrcFile.writeText(lrc)
+                                val lrcFile = targetDir.createFile("application/octet-stream", "$fileName.lrc")
+                                if (lrcFile != null) {
+                                    context.contentResolver.openOutputStream(lrcFile.uri)?.use { output ->
+                                        output.write(lrc.toByteArray())
+                                    }
+                                }
                             }
+
                         } catch (e: Exception) {
                             throw e
                         }
@@ -80,50 +87,62 @@ class MusicDownloadRepository(
         }
     }
 
+
     suspend fun downloadMusic(
+        context: Context,
         isSaveLrc: Boolean,
         music: Music,
         level: String,
         cookie: String,
-        targetDir: File,
+        targetDir: DocumentFile,
         onProgress: (Music, Int) -> Unit
-    ) = downloadMusicList(isSaveLrc, listOf(music), level, cookie, targetDir, onProgress)
+    ) = downloadMusicList(context, isSaveLrc, listOf(music), level, cookie, targetDir, onProgress)
 
-    private suspend fun downloadFile(
+    suspend fun downloadFile(
+        context: Context,
         url: String,
-        file: File,
+        file: File? = null,                // 如果是普通 File
+        documentFile: DocumentFile? = null, // 如果是 SAF 目录的 DocumentFile
         progressCallback: (Int) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
+        require(file != null || documentFile != null) { "必须提供 file 或 documentFile" }
+
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
-            // 设置超时
             conn.connectTimeout = 10_000
             conn.readTimeout = 20_000
             conn.requestMethod = "GET"
 
-            // 检查 HTTP 状态码
             if (conn.responseCode != HttpURLConnection.HTTP_OK) {
                 throw Exception("HTTP error: ${conn.responseCode}")
             }
 
             val total: Long = conn.contentLengthLong
             var downloaded: Long = 0
-
             val buffer = ByteArray(8 * 1024)
 
+            val output: OutputStream = when {
+                file != null -> file.outputStream()
+                documentFile != null -> {
+                    context.contentResolver.openOutputStream(documentFile.uri)
+                        ?: throw Exception("无法打开 OutputStream")
+                }
+                else -> throw IllegalStateException()
+            }
+
             conn.inputStream.use { input: InputStream ->
-                FileOutputStream(file).use { output ->
+                output.use { out ->
                     var bytes = input.read(buffer)
                     while (bytes != -1) {
                         ensureActive() // 支持协程取消
-                        output.write(buffer, 0, bytes)
+                        out.write(buffer, 0, bytes)
                         downloaded += bytes
-                        if (total > 0) { // 只有在 Content-Length 有效时才计算进度
+                        if (total > 0) {
                             progressCallback(((downloaded * 100) / total).toInt())
                         }
                         bytes = input.read(buffer)
                     }
-                    output.flush()
+                    out.flush()
                 }
             }
 
@@ -132,9 +151,9 @@ class MusicDownloadRepository(
         }
     }
 
-    private fun detectFileType(file: File): String {
+    fun detectFileType(context: Context, docFile: DocumentFile): String {
         val buffer = ByteArray(12)
-        FileInputStream(file).use { it.read(buffer) }
+        context.contentResolver.openInputStream(docFile.uri)?.use { it.read(buffer) }
 
         val hex = buffer.joinToString(" ") { String.format("%02X", it) }
 

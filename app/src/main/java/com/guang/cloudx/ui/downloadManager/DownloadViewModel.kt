@@ -1,17 +1,18 @@
 package com.guang.cloudx.ui.downloadManager
 
 import android.app.Application
+import android.content.Context
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import com.guang.cloudx.logic.MusicDownloadRepository
 import com.guang.cloudx.logic.model.Album
 import com.guang.cloudx.logic.model.Artist
 import com.guang.cloudx.logic.model.Music
-import java.io.File
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 enum class TaskStatus { DOWNLOADING, FAILED, COMPLETED }
 
@@ -36,7 +37,7 @@ class DownloadViewModel(
     val completed: StateFlow<List<DownloadItemUi>> = _completed
 
     /** 启动下载（支持批量） */
-    fun startDownloads(musics: List<Music>, level: String, cookie: String, targetDir: File, isSaveLrc: Boolean = false) {
+    fun startDownloads(context: Context, musics: List<Music>, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean = false) {
         musics.forEach { music ->
             val newTask = DownloadItemUi(
                 id = music.id,
@@ -51,6 +52,7 @@ class DownloadViewModel(
             viewModelScope.launch {
                 try {
                     repository.downloadMusic(
+                        context,
                         isSaveLrc,
                         music,
                         level,
@@ -79,10 +81,10 @@ class DownloadViewModel(
     }
 
     /** 失败 → 重试 */
-    fun retryDownload(item: DownloadItemUi, level: String, cookie: String, targetDir: File) {
+    fun retryDownload(context: Context, item: DownloadItemUi, level: String, cookie: String, targetDir: DocumentFile) {
         _downloading.update { it.filterNot { t -> t.id == item.id } }
         val music = Music(item.title, listOf(Artist(item.artist, 0)), Album("", 0, item.coverUrl), item.id)
-        startDownloads(listOf(music), level, cookie, targetDir)
+        startDownloads(context,listOf(music), level, cookie, targetDir)
     }
 
     /** 删除失败任务 */
