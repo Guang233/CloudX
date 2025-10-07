@@ -9,7 +9,6 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
-import com.guang.cloudx.logic.utils.showSnackBar
 
 class LoginActivity : BaseActivity() {
     private val cookieEditText by lazy { findViewById<EditText>(R.id.cookieEditText) }
@@ -35,7 +34,7 @@ class LoginActivity : BaseActivity() {
         button.setOnClickListener { _ ->
             prefs.putUserId(userIdEditText.text.toString())
             prefs.putCookie(cookieEditText.text.toString())
-            button.showSnackBar("已保存")
+            finish()
         }
     }
 
