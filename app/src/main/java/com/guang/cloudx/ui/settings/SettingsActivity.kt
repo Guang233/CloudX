@@ -1,6 +1,5 @@
 package com.guang.cloudx.ui.settings
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -9,6 +8,7 @@ import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -108,9 +108,9 @@ class SettingsActivity : BaseActivity() {
                 item {
                     Text(
                         "应用",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
-                    color = MaterialTheme.colorScheme.primary
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -164,7 +164,8 @@ class SettingsActivity : BaseActivity() {
                         contract = ActivityResultContracts.OpenDocumentTree()
                     ) { uri ->
                         if (uri != null) {
-                            val takeFlags = (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                            val takeFlags =
+                                (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                             context.contentResolver.takePersistableUriPermission(uri, takeFlags)
 
                             prefs.putSafUri(uri.toString())
@@ -172,7 +173,7 @@ class SettingsActivity : BaseActivity() {
                         }
                     }
 
-                    val path = pickedUri?.let { tryResolveAbsolutePathFromTreeUri(context, it) } ?: "未选择"
+                    val path = pickedUri?.let { tryResolveAbsolutePathFromTreeUri(it) } ?: "未选择"
                     ActionListItem(
                         icon = Icons.Outlined.Folder,
                         title = "音乐文件保存路径",
@@ -272,20 +273,25 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    val url = "https://github.com/Guang233/CloudX"
                     ActionListItem(
                         icon = Icons.Outlined.Link,
                         title = "GitHub",
-                        description = "https://github.com/Guang233/CloudX",
-                        onClick = {}, // TODO: 跳转浏览器
+                        description = url,
+                        onClick = {
+                            val builder = CustomTabsIntent.Builder()
+                            val customTabsIntent = builder.build()
+                            customTabsIntent.launchUrl(context, Uri.parse(url))
+                        },
                         onLongClick = {
                             scope.launch {
-                                SystemUtils.copyToClipboard(context, "github", "https://github.com/Guang233/CloudX")
+                                SystemUtils.copyToClipboard(context, "github", url)
                             }
                         }
                     )
                 }
-                
-                item { 
+
+                item {
                     ActionListItem(
                         icon = Icons.Outlined.CleaningServices,
                         title = "清除缓存",
@@ -413,13 +419,13 @@ class SettingsActivity : BaseActivity() {
                 )
             },
             headlineContent = { Text(title) },
-            supportingContent = description?.let { { Text(it, maxLines = 1,  overflow = TextOverflow.Ellipsis) } },
+            supportingContent = description?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
             modifier = Modifier
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
         )
     }
 
-    private fun tryResolveAbsolutePathFromTreeUri(context: Context, treeUri: Uri): String? {
+    private fun tryResolveAbsolutePathFromTreeUri(treeUri: Uri): String? {
         // 文档 id 例如 "primary:Music/myfolder" 或 "0123-4567:some/folder"
         val docId = DocumentsContract.getTreeDocumentId(treeUri)
         // 常见 primary 情况
@@ -431,7 +437,7 @@ class SettingsActivity : BaseActivity() {
         // 如果是 "volumeId:rest" 形式，尝试构造 /storage/<volumeId>/rest
         val idx = docId.indexOf(':')
         if (idx > 0) {
-            val volumeId = docId.substring(0, idx)
+            val volumeId = docId.take(idx)
             val rest = docId.substring(idx + 1)
             // 这在某些设备上可能位于 /storage/<volumeId>/<rest>
             val candidate = "/storage/$volumeId/$rest"

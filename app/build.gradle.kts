@@ -9,7 +9,7 @@ plugins {
     id("kotlin-parcelize")
 }
 
-val appVersion = "0.0.3"
+val appVersion = "0.0.4"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
 
@@ -55,6 +55,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.documentfile:documentfile:1.1.0")
+    implementation("androidx.browser:browser:1.9.0")
     implementation("com.google.android.material:material:1.14.0-alpha05")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("androidx.fragment:fragment-ktx:1.8.9")
@@ -99,7 +100,7 @@ fun getGitCommitCount(): Int {
         }
         stdout.toString().trim().toInt()
     } catch (e: Exception) {
-        3
+        4
     }
 }
 
