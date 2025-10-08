@@ -2,7 +2,6 @@ package com.guang.cloudx.ui.settings
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,7 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -33,6 +31,7 @@ import com.bumptech.glide.Glide
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.BuildConfig
 import com.guang.cloudx.logic.utils.SystemUtils
+import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,35 +41,10 @@ class SettingsActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MyAppTheme {
+            CloudXTheme {
                 SettingsScreen()
             }
         }
-    }
-
-    @Composable
-    fun MyAppTheme(
-        dynamicColor: Boolean = true,
-        darkTheme: Boolean = isSystemInDarkTheme(),
-        content: @Composable () -> Unit
-    ) {
-        val colorScheme = when {
-            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                val context = LocalContext.current
-                if (darkTheme) dynamicDarkColorScheme(context)
-                else dynamicLightColorScheme(context)
-            }
-
-            darkTheme -> darkColorScheme()
-            else -> lightColorScheme()
-        }
-
-        MaterialTheme(
-            colorScheme = colorScheme,
-//            typography = Typography,
-//            shapes = Shapes,
-            content = content
-        )
     }
 
 

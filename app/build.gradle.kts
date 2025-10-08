@@ -9,7 +9,7 @@ plugins {
     id("kotlin-parcelize")
 }
 
-val appVersion = "0.0.4"
+val appVersion = "0.1.0"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
 
@@ -58,6 +58,7 @@ dependencies {
     implementation("androidx.browser:browser:1.9.0")
     implementation("com.google.android.material:material:1.14.0-alpha05")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("androidx.compose.foundation:foundation:1.9.1")
     implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("androidx.activity:activity-ktx:1.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
@@ -80,6 +81,7 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:5.0.5")
     implementation("androidx.activity:activity:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.2.1")
+    implementation("androidx.navigation:navigation-compose:2.9.5")
     annotationProcessor("com.github.bumptech.glide:compiler:5.0.5")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
