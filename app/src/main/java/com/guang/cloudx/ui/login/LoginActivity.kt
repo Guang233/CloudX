@@ -3,9 +3,11 @@ package com.guang.cloudx.ui.login
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -24,9 +26,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.guang.cloudx.BaseActivity
+import com.guang.cloudx.logic.model.UserData
 import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import kotlinx.coroutines.launch
 
+// 嗯，对，总之，一开始是xml，后来用 compose 重构，所以，嗯，这一坨先拉这
 class LoginActivity : BaseActivity() {
 //    private val cookieEditText by lazy { findViewById<EditText>(R.id.cookieEditText) }
 //    private val userIdEditText by lazy { findViewById<EditText>(R.id.userIdEditText) }
@@ -34,6 +38,8 @@ class LoginActivity : BaseActivity() {
 //
 //    private val topAppBar by lazy { findViewById<MaterialToolbar>(R.id.topAppBar) }
 
+
+     private val viewModel by viewModels<LoginViewModel>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -87,7 +93,10 @@ class LoginActivity : BaseActivity() {
                         }
                     }
                 )
-            }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding(),
         ) { innerPadding ->
             Column(
                 modifier = Modifier.padding(innerPadding)
@@ -116,7 +125,11 @@ class LoginActivity : BaseActivity() {
                 ) { page ->
                     when (pages[page]) {
                         Destination.COOKIES -> CookiesScreen()
-                        Destination.PHONE_NUMBER -> PhoneNumberScreen()
+                        Destination.PHONE_NUMBER -> PhoneNumberScreen { message ->
+                            scope.launch {
+                                snackbarHostState.showSnackbar(message)
+                            }
+                        }
                     }
                 }
             }
@@ -178,11 +191,14 @@ class LoginActivity : BaseActivity() {
     }
 
     @Composable
-    fun PhoneNumberScreen() {
+    fun PhoneNumberScreen(showSnackBar: (String) -> Unit) {
         var phoneNumber by remember { mutableStateOf("") }
         var otp by remember { mutableStateOf("") }
         var isError by remember { mutableStateOf(false) }
         var isFocused by remember { mutableStateOf(false) }
+
+        val captchaState = viewModel.captchaState
+        val loginState = viewModel.loginState
 
         val focusRequester = remember { FocusRequester() }
 
@@ -227,7 +243,11 @@ class LoginActivity : BaseActivity() {
                 label = { Text("验证码") },
                 trailingIcon = {
                     Button(
-                        onClick = { }, //TODO: 获取验证码
+                        onClick = {
+                            if (phoneNumber.length == 11)
+                                viewModel.sendCaptcha(phoneNumber)
+                            else showSnackBar("请输入正确的手机号")
+                        },
                         modifier = Modifier.padding(end = 4.dp)
                     ) { Text("获取") }
                 },
@@ -240,12 +260,38 @@ class LoginActivity : BaseActivity() {
                     .fillMaxWidth()
             )
 
+            when (captchaState) {
+                is LoginViewModel.UiState.Error -> { showSnackBar(captchaState.message) }
+                LoginViewModel.UiState.Idle -> {}
+                LoginViewModel.UiState.Loading -> {}
+                is LoginViewModel.UiState.Success<*> -> { showSnackBar("验证码发送成功") }
+            }
+
             Button(
-                onClick = { }, // TODO: 验证并保存
+                onClick = { if (otp.length == 4) viewModel.login(phoneNumber, otp) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp),
             ) { Text("登录") }
+
+            when (loginState) {
+                is LoginViewModel.UiState.Error -> { showSnackBar(loginState.message) }
+                LoginViewModel.UiState.Idle -> {}
+                LoginViewModel.UiState.Loading -> { showSnackBar("正在登录") }
+                is LoginViewModel.UiState.Success<*> -> {
+                    val data = loginState.data as UserData
+                    prefs.putUserId(data.id)
+                    prefs.putCookie("os=pc; osver=Microsoft-Windows-11-Home-China-build-26100-64bit; appver=3.1.11.203994; channel=netease; mode=83NN; MUSIC_U=${data.token}")
+                    finish()
+                }
+            }
+
+            Text(
+                text = "注意：请勿短时间内多次请求验证码或重复登录，容易冻结账号",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

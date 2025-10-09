@@ -147,5 +147,19 @@ class Decrypt {
             return User(data.getString("nickname"), data.getString("avatarUrl"))
         }
 
+        fun decryptSendCaptcha(encryptedBody: String): Boolean {
+            val decryptedJson = AESECBHelper.decrypt(encryptedBody)
+            val data = JSONObject(decryptedJson)
+            return data.getInt("code") == 200 && data.getString("data") == "True"
+        }
+
+        fun decryptLogin(encryptedBody: String): UserData {
+            val decryptedJson = AESECBHelper.decrypt(encryptedBody)
+            val data = JSONObject(decryptedJson)
+            return UserData(
+                data.getJSONObject("account").getLong("id").toString(),
+                data.getString("token"))
+        }
+
     }
 }

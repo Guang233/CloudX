@@ -31,5 +31,14 @@ interface MusicService {
     @POST("/eapi/w/v1/user/detail")
     fun getUserDetail(@Field("params") body: String,
                       @Header("Cookie") cookie: String): Call<String>
+
+    @FormUrlEncoded
+    @POST("/eapi/sms/captcha/sent")
+    fun sendCaptcha(@Field("params") body: String): Call<String>
+
+    @FormUrlEncoded
+    @POST("/eapi/w/login/cellphone")
+    fun loginCaptcha(@Field("params") body: String): Call<String>
+
 }
 

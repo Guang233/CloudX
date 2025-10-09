@@ -5,6 +5,7 @@ import com.guang.cloudx.logic.model.MusicUrl
 import com.guang.cloudx.logic.model.PlayList
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.User
+import com.guang.cloudx.logic.model.UserData
 import com.guang.cloudx.logic.utils.AESECBHelper
 import com.guang.cloudx.logic.utils.Decrypt
 import com.guang.cloudx.logic.utils.MD5Helper
@@ -66,6 +67,22 @@ object MusicNetwork {
             musicService.getUserDetail(
                 AESECBHelper.encrypt(query), cookie)
                 .await()
+        )
+    }
+
+    suspend fun sendCaptcha(phoneNumber: String): Boolean {
+        val bodyJson = "{\"cellphone\":\"$phoneNumber\",\"ctcode\":\"86\",\"secrete\":\"music_middleuser_pclogin\",\"e_r\":true,\"header\":\"\"}\"}"
+        val query = "/api/sms/captcha/sent-36cd479b6b5-$bodyJson-36cd479b6b5-${MD5Helper.md5("nobody/api/sms/captcha/sentuse${bodyJson}md5forencrypt")}"
+        return Decrypt.decryptSendCaptcha(
+            musicService.sendCaptcha(AESECBHelper.encrypt(query)).await()
+        )
+    }
+
+    suspend fun getLoginData(phoneNumber: String, captcha: String): UserData {
+        val bodyJSON = "{\"type\":\"1\",\"phone\":\"$phoneNumber\",\"captcha\":\"$captcha\",\"remember\":\"true\",\"https\":\"true\",\"countrycode\":\"86\",\"e_r\":true,\"header\":\"\"}"
+        val query = "/api/w/login/cellphone-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/w/login/cellphoneuse${bodyJSON}md5forencrypt")}"
+        return Decrypt.decryptLogin(
+            musicService.loginCaptcha(AESECBHelper.encrypt(query)).await()
         )
     }
 

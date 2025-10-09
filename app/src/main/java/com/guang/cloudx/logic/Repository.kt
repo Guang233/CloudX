@@ -33,4 +33,8 @@ object Repository {
             emit(Result.failure(e))
         }
     }
+
+    suspend fun sendCaptcha(phone: String) = MusicNetwork.sendCaptcha(phone)
+
+    suspend fun getLoginData(phone: String, captcha: String) = MusicNetwork.getLoginData(phone, captcha)
 }
