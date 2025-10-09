@@ -11,6 +11,8 @@ class SharedPreferencesUtils(context: Context) {
     fun getIsAutoLevel() = sharedPreferences.getBoolean("auto_level", false)
     fun getCookie() =  sharedPreferences.getString("cookie", "").toString()
     fun getIsSaveLrc() = sharedPreferences.getBoolean("is_save_lrc", false)
+    fun getIsSaveTlLrc() = sharedPreferences.getBoolean("is_save_translate_lrc", true)
+    fun getIsSaveRomaLrc() = sharedPreferences.getBoolean("is_save_roma_lrc", false)
     fun getUserId() = sharedPreferences.getString("user_id", "").toString()
     fun getSafUri() = sharedPreferences.getString("saf_uri", null).run { this }
 
@@ -18,6 +20,8 @@ class SharedPreferencesUtils(context: Context) {
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }
     fun putCookie(cookie: String) = sharedPreferences.edit { putString("cookie", cookie) }
     fun putIsSaveLrc(value: Boolean) = sharedPreferences.edit { putBoolean("is_save_lrc", value) }
+    fun putIsSaveTlLrc(value: Boolean) = sharedPreferences.edit { putBoolean("is_save_translate_lrc", value) }
+    fun putIsSaveRomaLrc(value: Boolean) = sharedPreferences.edit { putBoolean("is_save_roma_lrc", value) }
     fun putUserId(userId: String) = sharedPreferences.edit { putString("user_id", userId) }
     fun putSafUri(value: String) = sharedPreferences.edit { putString("saf_uri", value) }
 }

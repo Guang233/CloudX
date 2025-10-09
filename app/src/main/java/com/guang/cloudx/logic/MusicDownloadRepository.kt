@@ -26,6 +26,8 @@ class MusicDownloadRepository(
     suspend fun downloadMusicList(
         context: Context,
         isSaveLrc: Boolean,
+        isSaveTlLrc: Boolean,
+        isSaveRomaLrc: Boolean,
         musics: List<Music>,
         level: String,
         cookie: String,
@@ -72,6 +74,8 @@ class MusicDownloadRepository(
                                 file = tmpCover
                             )
 
+                            val lrcText = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music, isSaveTlLrc, isSaveRomaLrc)
+
                             // ========= 5. 写入元数据 =========
                             AudioTagWriter.writeTags(
                                 tmpWithExt,
@@ -80,7 +84,7 @@ class MusicDownloadRepository(
                                     artist = music.artists.joinToString("、") { it.name },
                                     album = music.album.name,
                                     coverFile = tmpCover,
-                                    lyrics = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music)
+                                    lyrics = lrcText
                                 )
                             )
                             tmpCover.delete()
@@ -123,7 +127,6 @@ class MusicDownloadRepository(
 
                             // ========= 7. 写入 .lrc =========
                             if (isSaveLrc) {
-                                val lrcText = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music)
                                 val lrcName = "$baseFileName.lrc"
                                 val existingLrc = targetDir.findFile(lrcName)
                                 if (existingLrc != null) {
@@ -175,12 +178,14 @@ class MusicDownloadRepository(
     suspend fun downloadMusic(
         context: Context,
         isSaveLrc: Boolean,
+        isSaveTlLrc: Boolean,
+        isSaveRomaLrc: Boolean,
         music: Music,
         level: String,
         cookie: String,
         targetDir: DocumentFile,
         onProgress: (Music, Int) -> Unit
-    ) = downloadMusicList(context, isSaveLrc, listOf(music), level, cookie, targetDir, onProgress)
+    ) = downloadMusicList(context, isSaveLrc, isSaveTlLrc, isSaveRomaLrc, listOf(music), level, cookie, targetDir, onProgress)
 
     suspend fun downloadFile(
         context: Context,
@@ -252,16 +257,16 @@ class MusicDownloadRepository(
         }
     }
 
-    private fun createLyrics(lrc: Lyric, music: Music): String = """
+    private fun createLyrics(lrc: Lyric, music: Music, isSaveTlLrc: Boolean, isSaveRomaLrc: Boolean): String = """
 [ti:${music.name}]
 [ar:${music.artists.joinToString("、") { it.name }}]
 [al:${music.album.name}]
 
 ${lrc.lrc}
 
-${lrc.tlyric}
+${if (isSaveTlLrc) lrc.tlyric else ""}
 
-${lrc.romalrc}
+${if (isSaveRomaLrc) lrc.romalrc else ""}
 """.trimIndent()
 }
 

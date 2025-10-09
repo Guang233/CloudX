@@ -37,7 +37,7 @@ class DownloadViewModel(
     val completed: StateFlow<List<DownloadItemUi>> = _completed
 
     /** 启动下载（支持批量） */
-    fun startDownloads(context: Context, musics: List<Music>, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean = false) {
+    fun startDownloads(context: Context, musics: List<Music>, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean = false, isSaveTlLrc: Boolean = true, isSaveRomaLrc: Boolean = false) {
         musics.forEach { music ->
             val newTask = DownloadItemUi(
                 id = music.id,
@@ -54,6 +54,8 @@ class DownloadViewModel(
                     repository.downloadMusic(
                         context,
                         isSaveLrc,
+                        isSaveTlLrc,
+                        isSaveRomaLrc,
                         music,
                         level,
                         cookie,

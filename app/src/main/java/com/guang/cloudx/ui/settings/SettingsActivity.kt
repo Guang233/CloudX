@@ -1,5 +1,6 @@
 package com.guang.cloudx.ui.settings
 
+import android.R.attr.checked
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -35,6 +36,7 @@ import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class SettingsActivity : BaseActivity() {
 
@@ -52,6 +54,8 @@ class SettingsActivity : BaseActivity() {
     @Composable
     fun SettingsScreen() {
         var lrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveLrc()) }
+        var tlLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveTlLrc()) }
+        var romaLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveRomaLrc()) }
         val snackbarHostState = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
@@ -178,6 +182,30 @@ class SettingsActivity : BaseActivity() {
                             prefs.putIsSaveLrc(checked)
                         }
                     )
+                }
+                
+                item {
+                    SwitchListItem(
+                        icon = Icons.Outlined.Translate,
+                        title = "保存歌词翻译",
+                        description = "此选项也于写入歌曲数据时生效",
+                        checked = tlLrcEnabled,
+                    ) {
+                        tlLrcEnabled = it
+                        prefs.putIsSaveTlLrc(it)
+                    }
+                }
+                
+                item {
+                    SwitchListItem(
+                        icon = Icons.Outlined.TextFields,
+                        description = "同上，日语歌词将保存罗马音",
+                        title = "保存歌词罗马音",
+                        checked = romaLrcEnabled
+                    ) {
+                        romaLrcEnabled = it
+                        prefs.putIsSaveRomaLrc(it)
+                    }
                 }
 
                 item {
@@ -416,7 +444,7 @@ class SettingsActivity : BaseActivity() {
             // 这在某些设备上可能位于 /storage/<volumeId>/<rest>
             val candidate = "/storage/$volumeId/$rest"
             // 简单校验：文件存在则返回
-            val f = java.io.File(candidate)
+            val f = File(candidate)
             if (f.exists()) return candidate
         }
 
