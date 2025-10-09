@@ -102,7 +102,7 @@ fun getGitCommitCount(): Int {
         }
         stdout.toString().trim().toInt()
     } catch (e: Exception) {
-        4
+        5
     }
 }
 
