@@ -12,7 +12,7 @@
 
 </div>
 
----
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)
 
 ## ⚠️ 声明
 > [!WARNING]
@@ -21,17 +21,12 @@
 > [!NOTE]
 > 为保护音乐版权及应用的实际需要，本软件的部分服务需要您登录平台的账号以进行使用。
 
----
-
-
 ## 📋 项目简介
 CloudX是一个轻量、精简的音乐下载器。
 - **以用户为主导**：开源免费，支持多项特性，精准解决用户需求。
 - **满足不同需求**：支持自定义下载路径，支持多线程、不同音质同时下载。
 - **注重隐私**：通过官方接口进行下载，无任何第三方服务器参与。
 - **一步到位**：歌曲元数据自动导入，并支持同步下载`.lrc`格式歌词文件（已支持下载歌词翻译、罗马音）。
-
----
 
 ## ✨ 特性
 - [x] 搜索/下载音乐
@@ -47,11 +42,7 @@ CloudX是一个轻量、精简的音乐下载器。
 
 CloudX采用 MIT 许可证，详情请见 [LICENSE](./LICENSE)。
 
----
-
 如有问题或建议，请在 Issues 区留言。
-
----
 
 ## ⭐ Star History
 
