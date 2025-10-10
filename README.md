@@ -12,7 +12,7 @@
 
 </div>
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)
+[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://mit-license.org/)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)
 
 ## ⚠️ 声明
 > [!WARNING]
