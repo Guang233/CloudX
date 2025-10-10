@@ -8,7 +8,7 @@
   <img src="app/src/main/ic_launcher-playstore.png" width="180" alt="CloudX logo" />
 </p>
 
-<h3>🎵 一款采用MD3语言设计的第三方音乐下载工具 🎵</h3>
+<h3>🎵 一款采用MD3风格设计的第三方音乐下载工具 🎵</h3>
 
 </div>
 
