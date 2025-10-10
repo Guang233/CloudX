@@ -1,19 +1,28 @@
 package com.guang.cloudx.ui.home
 
-import com.guang.cloudx.R
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.imageview.ShapeableImageView
+import com.guang.cloudx.BaseActivity
+import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
+import com.guang.cloudx.logic.utils.showSnackBar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.io.File
 
 class MusicBottomSheet(
     private val music: Music,
@@ -49,6 +58,40 @@ class MusicBottomSheet(
         bsMusicName.setOnClickListener { SystemUtils.copyToClipboard(this.requireContext(), "musicName", music.name) }
         bsMusicAuthor.setOnClickListener { SystemUtils.copyToClipboard(this.requireContext(), "musicArtists", artists) }
         bsMusicAlbum.setOnClickListener { SystemUtils.copyToClipboard(this.requireContext(), "musicAlbum", music.album.name) }
+        bsMusicIcon.setOnClickListener {
+            val shapeableImageView = ShapeableImageView(requireContext()).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
+            val container = FrameLayout(requireContext()).apply {
+                val padding = (24 * resources.displayMetrics.density).toInt()
+                setPadding(padding, padding, padding, 0)
+                addView(shapeableImageView)
+            }
+            Glide.with(this).load(music.album.picUrl).into(shapeableImageView)
+
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("封面查看")
+                .setView(container)
+                .setPositiveButton("保存") { _, _ ->
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val file = Glide.with(requireContext())
+                            .asFile()
+                            .load(music.album.picUrl)
+                            .submit()
+                            .get()
+
+                        saveImageWithDocumentFile(file, music.name.replace(Regex("[\\\\/:*?\"<>|]"), " "), requireContext()) {
+                            bsMusicIcon.showSnackBar("已保存封面至下载目录")
+                        }
+
+                    }
+                }
+                .setNegativeButton("关闭", null)
+                .show()
+        }
 
         bsCancelButton.setOnClickListener {
             dismiss()
@@ -68,5 +111,19 @@ class MusicBottomSheet(
         }
         return view
     }
+
+    private fun saveImageWithDocumentFile(sourceFile: File, fileName: String, context: Context, ifSucceed: () -> Unit) {
+        val pickedDir = (context as BaseActivity).dir ?: return
+
+        val newFile = pickedDir.createFile("image/jpeg", fileName) ?: return
+
+            context.contentResolver.openOutputStream(newFile.uri)?.use { output ->
+            sourceFile.inputStream().use { input ->
+                input.copyTo(output)
+            }
+        }
+        ifSucceed()
+    }
+
 
 }
