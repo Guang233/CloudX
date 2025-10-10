@@ -36,7 +36,6 @@
         <activity
             android:name=".ui.home.MainActivity"
             android:exported="true"
-            android:label="@string/title_activity_main"
             android:theme="@style/Theme.CloudX" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
