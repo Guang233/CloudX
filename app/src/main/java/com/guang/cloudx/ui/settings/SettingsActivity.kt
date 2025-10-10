@@ -212,14 +212,14 @@ class SettingsActivity : BaseActivity() {
                     MenuListItem(
                         icon = Icons.Outlined.Equalizer,
                         title = "默认下载音质",
-                        options = listOf("标准", "极高", "无损", "Hi-res", "上次选择"),
+                        options = listOf("标准", "极高", "无损", "Hi-Res", "上次选择"),
                         selectedOption = if (prefs.getIsAutoLevel())
                             "上次选择"
                         else when (prefs.getMusicLevel()) {
                             "standard" -> "标准"
                             "exhigh" -> "极高"
                             "lossless" -> "无损"
-                            "hires" -> "标准"
+                            "hires" -> "Hi-Res"
                             else -> "标准"
                         },
                         onOptionSelected = { selectedOption ->
@@ -228,7 +228,7 @@ class SettingsActivity : BaseActivity() {
                                     "标准" -> "standard"
                                     "极高" -> "exhigh"
                                     "无损" -> "lossless"
-                                    "Hi-res" -> "hires"
+                                    "Hi-Res" -> "hires"
                                     else -> "exhigh"
                                 }
                                 prefs.putIsAutoLevel(false)
