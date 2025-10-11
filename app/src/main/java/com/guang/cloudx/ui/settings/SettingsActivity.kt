@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.core.net.toUri
 
 class SettingsActivity : BaseActivity() {
 
@@ -134,7 +135,7 @@ class SettingsActivity : BaseActivity() {
 
                     LaunchedEffect(Unit) {
                         prefs.getSafUri()?.let {
-                            pickedUri = Uri.parse(it)
+                            pickedUri = it.toUri()
                         }
                     }
 
@@ -320,7 +321,6 @@ class SettingsActivity : BaseActivity() {
         checked: Boolean,
         onCheckedChange: (Boolean) -> Unit
     ) {
-        val interactionSource = remember { MutableInteractionSource() }
 
         ListItem(
             leadingContent = {
@@ -337,14 +337,11 @@ class SettingsActivity : BaseActivity() {
             trailingContent = {
                 Switch(
                     checked = checked,
-                    onCheckedChange = onCheckedChange,
-                    interactionSource = interactionSource
+                    onCheckedChange = onCheckedChange
                 )
             },
             modifier = Modifier
-                .clickable(
-                    interactionSource = interactionSource
-                ) {
+                .clickable {
                     onCheckedChange(!checked)
                 }
         )
@@ -421,7 +418,7 @@ class SettingsActivity : BaseActivity() {
                 )
             },
             headlineContent = { Text(title) },
-            supportingContent = description?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+            supportingContent = description?.let { { Text(it) } },
             modifier = Modifier
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
         )
