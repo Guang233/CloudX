@@ -75,7 +75,7 @@ class MusicDownloadRepository(
                             )
 
                             val lrc = MusicNetwork.getLyrics(music.id.toString(), cookie)
-                            val lrcText = createLyrics(lrc, music, isSaveTlLrc, isSaveRomaLrc)
+                            val lrcText = lrc.let { if (it.lrc != "") createLyrics(lrc, music, isSaveTlLrc, isSaveRomaLrc) else null}
 
                             // ========= 5. 写入元数据 =========
                             AudioTagWriter.writeTags(
@@ -127,7 +127,7 @@ class MusicDownloadRepository(
 
 
                             // ========= 7. 写入 .lrc =========
-                            if (isSaveLrc) {
+                            if (isSaveLrc && lrcText != null) {
                                 val lrcName = "$baseFileName.lrc"
                                 val existingLrc = targetDir.findFile(lrcName)
                                 if (existingLrc != null) {
