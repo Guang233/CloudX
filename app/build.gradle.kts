@@ -9,7 +9,7 @@ plugins {
     id("kotlin-parcelize")
 }
 
-val appVersion = "0.1.1"
+val appVersion = "0.1.2"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
 
@@ -102,7 +102,7 @@ fun getGitCommitCount(): Int {
         }
         stdout.toString().trim().toInt()
     } catch (e: Exception) {
-        6
+        7
     }
 }
 

@@ -6,8 +6,6 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.guang.cloudx.logic.MusicDownloadRepository
-import com.guang.cloudx.logic.model.Album
-import com.guang.cloudx.logic.model.Artist
 import com.guang.cloudx.logic.model.Music
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
