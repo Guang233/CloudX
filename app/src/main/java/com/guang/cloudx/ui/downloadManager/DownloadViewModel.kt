@@ -17,7 +17,8 @@ enum class TaskStatus { DOWNLOADING, FAILED, COMPLETED }
 data class DownloadItemUi(
     val music: Music,
     val progress: Int,
-    val status: TaskStatus
+    val status: TaskStatus,
+    val timeStamp: Long = System.currentTimeMillis()
 )
 
 class DownloadViewModel(
@@ -82,12 +83,13 @@ class DownloadViewModel(
 
     /** 删除失败任务 */
     fun deleteFailed(item: DownloadItemUi) {
-        _downloading.update { it.filterNot { t -> t.music == item.music } }
+        _downloading.update { it.filterNot { t -> t.timeStamp == item.timeStamp } }
     }
 
     /** 删除已完成任务 */
     fun deleteCompleted(item: DownloadItemUi) {
-        _completed.update { it.filterNot { t -> t.music == item.music } }
+
+        _completed.update { it.filterNot { t -> t.timeStamp == item.timeStamp } }
         // TODO 删除本地文件
     }
 
