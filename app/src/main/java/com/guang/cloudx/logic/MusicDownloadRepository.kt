@@ -74,7 +74,8 @@ class MusicDownloadRepository(
                                 file = tmpCover
                             )
 
-                            val lrcText = createLyrics(MusicNetwork.getLyrics(music.id.toString(), cookie), music, isSaveTlLrc, isSaveRomaLrc)
+                            val lrc = MusicNetwork.getLyrics(music.id.toString(), cookie)
+                            val lrcText = createLyrics(lrc, music, isSaveTlLrc, isSaveRomaLrc)
 
                             // ========= 5. 写入元数据 =========
                             AudioTagWriter.writeTags(
@@ -267,7 +268,7 @@ ${lrc.lrc}
 ${if (isSaveTlLrc) lrc.tlyric else ""}
 
 ${if (isSaveRomaLrc) lrc.romalrc else ""}
-""".trimIndent()
+""".trimIndent().trimEnd()
 }
 
 
