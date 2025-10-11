@@ -7,6 +7,7 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.brotli.BrotliInterceptor
 import org.brotli.dec.BrotliInputStream
 import retrofit2.Retrofit
@@ -15,7 +16,7 @@ import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
 
 object ServiceCreator {
-    private  const val BASE_URL = "https://interface.music.163.com/"
+    private const val BASE_URL = "https://interface.music.163.com/"
 
     val fuckNeteaseMusicClient = OkHttpClient.Builder()
         .addInterceptor(BrotliInterceptor) // 这个 Brotli 卡了我很长时间，网易云你为什么不用gzip
@@ -59,10 +60,8 @@ class HexResponseInterceptor : Interceptor {
         val hexString = bytesToHex(decompressedBytes)
 
         // 创建新的响应体（包含 HEX 字符串）
-        val newBody = ResponseBody.create(
-            body.contentType(),
-            hexString
-        )
+        val newBody = hexString
+            .toResponseBody(body.contentType())
 
         // 记录到日志（可选）
 //        Log.d("HEX_RESPONSE", "Decompressed HEX (${decompressedBytes.size} bytes):\n${hexString.take(100)}...")
