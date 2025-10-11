@@ -17,10 +17,7 @@ import kotlinx.coroutines.launch
 enum class TaskStatus { DOWNLOADING, FAILED, COMPLETED }
 
 data class DownloadItemUi(
-    val id: Long,
-    val coverUrl: String,
-    val title: String,
-    val artist: String,
+    val music: Music,
     val progress: Int,
     val status: TaskStatus
 )
@@ -40,10 +37,7 @@ class DownloadViewModel(
     fun startDownloads(context: Context, musics: List<Music>, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean = false, isSaveTlLrc: Boolean = true, isSaveRomaLrc: Boolean = false) {
         musics.forEach { music ->
             val newTask = DownloadItemUi(
-                id = music.id,
-                coverUrl = music.album.picUrl,
-                title = music.name,
-                artist = music.artists.joinToString("、") { it.name },
+                music = music,
                 progress = 0,
                 status = TaskStatus.DOWNLOADING
             )
@@ -64,7 +58,7 @@ class DownloadViewModel(
                         // 更新下载进度
                         _downloading.update { list ->
                             list.map {
-                                if (it.id == m.id) it.copy(
+                                if (it.music == m) it.copy(
                                     progress = progress,
                                     status = if (progress == 100) TaskStatus.COMPLETED else TaskStatus.DOWNLOADING
                                 ) else it
@@ -84,19 +78,18 @@ class DownloadViewModel(
 
     /** 失败 → 重试 */
     fun retryDownload(context: Context, item: DownloadItemUi, level: String, cookie: String, targetDir: DocumentFile) {
-        _downloading.update { it.filterNot { t -> t.id == item.id } }
-        val music = Music(item.title, listOf(Artist(item.artist, 0)), Album("", 0, item.coverUrl), item.id)
-        startDownloads(context,listOf(music), level, cookie, targetDir)
+        _downloading.update { it.filterNot { t -> t.music == item.music } }
+        startDownloads(context,listOf(item.music), level, cookie, targetDir)
     }
 
     /** 删除失败任务 */
     fun deleteFailed(item: DownloadItemUi) {
-        _downloading.update { it.filterNot { t -> t.id == item.id } }
+        _downloading.update { it.filterNot { t -> t.music == item.music } }
     }
 
     /** 删除已完成任务 */
     fun deleteCompleted(item: DownloadItemUi) {
-        _completed.update { it.filterNot { t -> t.id == item.id } }
+        _completed.update { it.filterNot { t -> t.music == item.music } }
         // TODO 删除本地文件
     }
 
@@ -109,14 +102,11 @@ class DownloadViewModel(
     /** 下载完成 → 移动到 completed */
     private fun moveToCompleted(music: Music) {
         val finished = DownloadItemUi(
-            id = music.id,
-            coverUrl = music.album.picUrl,
-            title = music.name,
-            artist = music.artists.joinToString("、") { it.name },
+            music = music,
             progress = 100,
             status = TaskStatus.COMPLETED
         )
-        _downloading.update { it.filterNot { it.id == music.id } }
+        _downloading.update { it -> it.filterNot { it.music == music } }
         _completed.update { it + finished }
     }
 
@@ -124,7 +114,7 @@ class DownloadViewModel(
     private fun markAsFailed(music: Music) {
         _downloading.update { list ->
             list.map {
-                if (it.id == music.id) it.copy(status = TaskStatus.FAILED, progress = 0) else it
+                if (it.music == music) it.copy(status = TaskStatus.FAILED, progress = 0) else it
             }
         }
     }

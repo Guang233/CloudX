@@ -30,7 +30,7 @@ class InProgressAdapter(
 
     companion object {
         private val diff = object : DiffUtil.ItemCallback<DownloadItemUi>() {
-            override fun areItemsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.id == n.id
+            override fun areItemsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.music == n.music
             override fun areContentsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o == n
         }
     }
@@ -45,9 +45,9 @@ class InProgressVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
     private val btnDelete = itemView.findViewById<MaterialButton>(R.id.btnDelete)
 
     fun bind(item: DownloadItemUi, onRetry: (DownloadItemUi) -> Unit, onDeleteFailed: (DownloadItemUi) -> Unit) {
-        Glide.with(itemView.context).load(item.coverUrl).into(iv)
-        title.text = item.title
-        artist.text = item.artist
+        Glide.with(itemView.context).load(item.music.album.picUrl).into(iv)
+        title.text = item.music.name
+        artist.text = item.music.artists.joinToString("、") { it.name }
 
         when (item.status) {
             TaskStatus.DOWNLOADING -> {
@@ -85,7 +85,7 @@ class CompletedAdapter(
 
     companion object {
         private val diff = object : DiffUtil.ItemCallback<DownloadItemUi>() {
-            override fun areItemsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.id == n.id
+            override fun areItemsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.music == n.music
             override fun areContentsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o == n
         }
     }
@@ -98,9 +98,9 @@ class CompletedVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
     private val btnDelete = itemView.findViewById<MaterialButton>(R.id.btnDelete)
 
     fun bind(item: DownloadItemUi, onDelete: (DownloadItemUi) -> Unit) {
-        Glide.with(itemView.context).load(item.coverUrl).into(iv)
-        title.text = item.title
-        artist.text = item.artist
+        Glide.with(itemView.context).load(item.music.album.picUrl).into(iv)
+        title.text = item.music.name
+        artist.text = item.music.artists.joinToString("、") { it.name }
         btnDelete.setOnClickListener { onDelete(item) }
     }
 }
