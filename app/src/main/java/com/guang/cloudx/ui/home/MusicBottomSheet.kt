@@ -1,6 +1,5 @@
 package com.guang.cloudx.ui.home
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -83,7 +82,7 @@ class MusicBottomSheet(
                             .submit()
                             .get()
 
-                        saveImageWithDocumentFile(file, music.name.replace(Regex("[\\\\/:*?\"<>|]"), " "), requireContext()) {
+                        saveImageWithDocumentFile(file, music.name.replace(Regex("[\\\\/:*?\"<>|]"), " "), requireContext() as BaseActivity) {
                             bsMusicIcon.showSnackBar("已保存封面至下载目录")
                         }
 
@@ -112,8 +111,8 @@ class MusicBottomSheet(
         return view
     }
 
-    private fun saveImageWithDocumentFile(sourceFile: File, fileName: String, context: Context, ifSucceed: () -> Unit) {
-        val pickedDir = (context as BaseActivity).dir ?: return
+    private fun saveImageWithDocumentFile(sourceFile: File, fileName: String, context: BaseActivity, ifSucceed: () -> Unit) {
+        val pickedDir = context.dir ?: return
 
         val newFile = pickedDir.createFile("image/jpeg", fileName) ?: return
 
