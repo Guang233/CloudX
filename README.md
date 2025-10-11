@@ -12,7 +12,7 @@
 
 </div>
 
-[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2FGuang233%2FCloudX%2Fbadge%3Fref%3Dmaster&style=flat)](https://actions-badge.atrox.dev/Guang233/CloudX/goto?ref=master)
+[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Android CL](https://github.com/Guang233/CloudX/actions/workflows/android.yml/badge.svg)](https://github.com/Guang233/CloudX/actions/workflows/android.yml)
 
 ## ⚠️ 声明
 > [!WARNING]
