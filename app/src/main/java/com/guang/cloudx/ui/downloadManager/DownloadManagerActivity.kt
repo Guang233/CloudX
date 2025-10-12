@@ -49,7 +49,12 @@ class DownloadManagerActivity : BaseActivity() {
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_delete_all -> {
-                    viewModel.deleteAllCompleted()
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("提示")
+                        .setMessage("真的要删除全部记录吗？")
+                        .setPositiveButton("确定"){ _, _ -> viewModel.deleteAllCompleted() }
+                        .setNegativeButton("取消", null)
+                        .show()
                     true
                 }
                 else -> false
