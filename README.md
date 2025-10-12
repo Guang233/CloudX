@@ -12,7 +12,7 @@
 
 </div>
 
-[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2FGuang233%2FCloudX%2Fbadge%3Fref%3Dmaster&style=flat)](https://actions-badge.atrox.dev/Guang233/CloudX/goto?ref=master)
+[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Android CL](https://github.com/Guang233/CloudX/actions/workflows/android.yml/badge.svg)](https://github.com/Guang233/CloudX/actions/workflows/android.yml)
 
 ## ⚠️ 声明
 > [!WARNING]
@@ -24,7 +24,7 @@
 ## 📋 项目简介
 CloudX是一个轻量、精简的音乐下载器。
 - **以用户为主导**：开源免费，支持多项特性，精准解决用户需求。
-- **满足不同需求**：支持自定义下载路径，支持多线程、不同音质同时下载。
+- **满足不同需求**：支持自定义下载路径，支持多线程下载。
 - **注重隐私**：通过官方接口进行下载，无任何第三方服务器参与。
 - **一步到位**：歌曲元数据自动导入，并支持同步下载`.lrc`格式歌词文件（已支持下载歌词翻译、罗马音）。
 
@@ -32,15 +32,19 @@ CloudX是一个轻量、精简的音乐下载器。
 - [x] 搜索/下载音乐
 - [x] 解析歌单
 - [x] 导入歌曲元数据
-- [x] 下载歌词
-- [x] 登录网易云账号（填入cookie、手机验证码登录）
+- [x] 下载歌词（逐行）
+- [x] 填入cookies登录网易云账号
+- [x] 使用手机验证码登录网易云账号
 - [ ] 邮箱登录
 - [ ] 自定义主题色
 - [ ] 自定义歌曲文件命名规则
+- [ ] 自动检测软件更新
 
 ## 📄 许可证
 
 CloudX采用 MIT 许可证，详情请见 [LICENSE](./LICENSE)。
+
+## 🧑‍💻 社区反馈共建
 
 如有问题或建议，请在 Issues 区留言。
 
