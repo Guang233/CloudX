@@ -1,6 +1,6 @@
 package com.guang.cloudx.ui.downloadManager
 
-import com.guang.cloudx.R
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +12,7 @@ import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.progressindicator.LinearProgressIndicator
+import com.guang.cloudx.R
 
 class InProgressAdapter(
     private val onRetry: (DownloadItemUi) -> Unit,
@@ -70,7 +71,8 @@ class InProgressVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
 }
 
 class CompletedAdapter(
-    private val onDelete: (DownloadItemUi) -> Unit
+    private val onDelete: (DownloadItemUi) -> Unit,
+    private val onClick: (DownloadItemUi) -> Unit
 ) : ListAdapter<DownloadItemUi, CompletedVH>(diff) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CompletedVH {
@@ -80,7 +82,7 @@ class CompletedAdapter(
     }
 
     override fun onBindViewHolder(holder: CompletedVH, position: Int) {
-        holder.bind(getItem(position), onDelete)
+        holder.bind(getItem(position), onDelete, onClick)
     }
 
     companion object {
@@ -97,10 +99,11 @@ class CompletedVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
     private val artist = itemView.findViewById<TextView>(R.id.tvArtist)
     private val btnDelete = itemView.findViewById<MaterialButton>(R.id.btnDelete)
 
-    fun bind(item: DownloadItemUi, onDelete: (DownloadItemUi) -> Unit) {
+    fun bind(item: DownloadItemUi, onDelete: (DownloadItemUi) -> Unit, onClick: (DownloadItemUi) -> Unit) {
         Glide.with(itemView.context).load(item.music.album.picUrl).into(iv)
         title.text = item.music.name
         artist.text = item.music.artists.joinToString("、") { it.name }
         btnDelete.setOnClickListener { onDelete(item) }
+        itemView.setOnClickListener { onClick(item) }
     }
 }

@@ -10,12 +10,16 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
+import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
+import java.text.SimpleDateFormat
+import java.util.*
 
 class DownloadManagerActivity : BaseActivity() {
 
@@ -104,12 +108,36 @@ class CompletedFragment : Fragment(R.layout.fragment_download_list) {
 
         recycler = view.findViewById(R.id.recycler)
         recycler.layoutManager = LinearLayoutManager(requireContext())
-        val adapter = CompletedAdapter(onDelete = { item -> viewModel.deleteCompleted(item) })
+        val adapter = CompletedAdapter(
+            onDelete = { item -> viewModel.deleteCompleted(item) },
+            onClick = { item ->
+                val message = with(item) {
+                    """
+                    标题：${music.name}
+                    音乐ID：${music.id}
+                    艺术家：${music.artists.joinToString("、") { "${it.name}(${it.id})" }}
+                    专辑：${music.album.name}
+                    专辑ID：${music.album.id}
+                    封面：${music.album.picUrl}
+                    
+                    保存时间：${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(timeStamp))}
+                    """.trimIndent()
+                }
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("详细信息")
+                    .setMessage(message)
+                    .setPositiveButton("关闭", null)
+                    .setNeutralButton("复制") { _, _ ->
+                        SystemUtils.copyToClipboard(requireContext(), "MusicDetail", message)
+                    }
+                    .show()
+            }
+        )
         recycler.adapter = adapter
 
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.completed.collect { list ->
-                adapter.submitList(list)
+                adapter.submitList(list.reversed())
             }
         }
     }
