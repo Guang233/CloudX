@@ -78,7 +78,9 @@ open class BaseActivity: AppCompatActivity() {
             level,
             prefs.getCookie(),
             dir!!,
-            prefs.getIsSaveLrc())
+            prefs.getIsSaveLrc(),
+            prefs.getIsSaveTlLrc(),
+            prefs.getIsSaveRomaLrc())
 
         view.showSnackBar("已加入下载队列")
     }

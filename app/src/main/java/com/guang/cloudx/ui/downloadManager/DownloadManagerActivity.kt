@@ -88,7 +88,16 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
         recycler.layoutManager = LinearLayoutManager(requireContext())
         val adapter = InProgressAdapter(
                 onRetry = { item ->
-                    (requireContext() as BaseActivity).dir?.let { viewModel.retryDownload(requireContext(), item, SharedPreferencesUtils(requireContext()).getMusicLevel(), SharedPreferencesUtils(requireContext()).getCookie(), it) }
+                    (requireContext() as BaseActivity).dir?.let { viewModel.retryDownload(
+                        requireContext(),
+                        item,
+                        SharedPreferencesUtils(requireContext()).getMusicLevel(),
+                        SharedPreferencesUtils(requireContext()).getCookie(),
+                        it,
+                        SharedPreferencesUtils(requireContext()).getIsSaveLrc(),
+                        SharedPreferencesUtils(requireContext()).getIsSaveTlLrc(),
+                        SharedPreferencesUtils(requireContext()).getIsSaveRomaLrc()
+                    ) }
                 },
                 onDeleteFailed = { item ->
                     viewModel.deleteFailed(item)

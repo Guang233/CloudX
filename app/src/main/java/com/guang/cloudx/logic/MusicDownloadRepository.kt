@@ -135,7 +135,6 @@ class MusicDownloadRepository(
                                         context.contentResolver.openFileDescriptor(existingLrc.uri, "w")?.use { pfd ->
                                             FileOutputStream(pfd.fileDescriptor).use { out ->
                                                 out.write(lrcText.toByteArray())
-                                                out.flush()
                                             }
                                         } ?: throw Exception("无法打开已存在的 lrc 输出流")
                                     } catch (e: Exception) {

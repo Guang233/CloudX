@@ -33,7 +33,7 @@ class DownloadViewModel(
     val completed: StateFlow<List<DownloadItemUi>> = _completed
 
     /** 启动下载（支持批量） */
-    fun startDownloads(context: Context, musics: List<Music>, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean = false, isSaveTlLrc: Boolean = true, isSaveRomaLrc: Boolean = false) {
+    fun startDownloads(context: Context, musics: List<Music>, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean, isSaveTlLrc: Boolean, isSaveRomaLrc: Boolean) {
         musics.forEach { music ->
             val newTask = DownloadItemUi(
                 music = music,
@@ -76,9 +76,9 @@ class DownloadViewModel(
     }
 
     /** 失败 → 重试 */
-    fun retryDownload(context: Context, item: DownloadItemUi, level: String, cookie: String, targetDir: DocumentFile) {
+    fun retryDownload(context: Context, item: DownloadItemUi, level: String, cookie: String, targetDir: DocumentFile, isSaveLrc: Boolean, isSaveTlLrc: Boolean, isSaveRomaLrc: Boolean) {
         _downloading.update { it.filterNot { t -> t.music == item.music } }
-        startDownloads(context,listOf(item.music), level, cookie, targetDir)
+        startDownloads(context,listOf(item.music), level, cookie, targetDir, isSaveLrc, isSaveTlLrc, isSaveRomaLrc)
     }
 
     /** 删除失败任务 */
