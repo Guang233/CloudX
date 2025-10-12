@@ -59,7 +59,7 @@ class Decrypt {
         fun decryptLytic(encryptedBody: String): Lyric {
             val decryptedJson = AESECBHelper.decrypt(encryptedBody)
             val data = JSONObject(decryptedJson)
-            val lrc = data.optJSONObject("lrc")?.optString("lyric").orEmpty()
+            val lrc = parseMixedLyrics(data.optJSONObject("lrc")?.optString("lyric").orEmpty())
             val tlyric = data.optJSONObject("tlyric")?.optString("lyric").orEmpty()
             val romalrc = data.optJSONObject("romalrc")?.optString("lyric").orEmpty()
 
