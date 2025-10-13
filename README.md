@@ -1,18 +1,16 @@
-<div style="text-align: center;">
-    <h1> CloudX </h1>
-</div>
-
 <div align="center">
+
+<h1> CloudX </h1>
 
 <p>
   <img src="app/src/main/ic_launcher-playstore.png" width="180" alt="CloudX logo" />
 </p>
 
-<h3>🎵 一款采用MD3风格设计的第三方音乐下载工具 🎵</h3>
-
-</div>
+<h3>🎵 一款采用MD3风格设计的第三方网易云音乐下载工具 🎵</h3>
 
 [![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Android CL](https://github.com/Guang233/CloudX/actions/workflows/android.yml/badge.svg)](https://github.com/Guang233/CloudX/actions/workflows/android.yml)
+
+</div>
 
 ## ⚠️ 声明
 > [!WARNING]
@@ -33,8 +31,8 @@ CloudX是一个轻量、精简的音乐下载器。
 - [x] 解析歌单
 - [x] 导入ID3标签
 - [x] 下载歌词（逐行）
-- [x] 填入cookies登录网易云账号
-- [x] 使用手机验证码登录网易云账号
+- [x] 填入cookies登录账号
+- [x] 使用手机验证码登录账号
 - [ ] 邮箱登录
 - [ ] 自定义主题色
 - [ ] 自定义歌曲文件命名规则
