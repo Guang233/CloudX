@@ -15,6 +15,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getIsSaveRomaLrc() = sharedPreferences.getBoolean("is_save_roma_lrc", false)
     fun getUserId() = sharedPreferences.getString("user_id", "").toString()
     fun getSafUri() = sharedPreferences.getString("saf_uri", null).run { this }
+    fun getCompletedMusic() = sharedPreferences.getString("completed_music", "")
 
     fun putMusicLevel(musicLevel: String) = sharedPreferences.edit { putString("music_level", musicLevel) }
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }
@@ -24,4 +25,5 @@ class SharedPreferencesUtils(context: Context) {
     fun putIsSaveRomaLrc(value: Boolean) = sharedPreferences.edit { putBoolean("is_save_roma_lrc", value) }
     fun putUserId(userId: String) = sharedPreferences.edit { putString("user_id", userId) }
     fun putSafUri(value: String) = sharedPreferences.edit { putString("saf_uri", value) }
+    fun putCompletedMusic(value: String) = sharedPreferences.edit { putString("completed_music", value) }
 }

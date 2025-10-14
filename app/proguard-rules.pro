@@ -21,3 +21,9 @@
 #-renamesourcefileattribute SourceFile
 
 -keep class org.jcodec.containers.** { *; }
+
+-keep class com.google.gson.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+
+-keep class com.guang.cloudx.logic.model.** { *; }

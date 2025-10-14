@@ -5,8 +5,12 @@ import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.guang.cloudx.logic.MusicDownloadRepository
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.utils.SharedPreferencesUtils
+import com.guang.cloudx.util.ext.e
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -25,11 +29,19 @@ class DownloadViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
-    private val repository: MusicDownloadRepository =  MusicDownloadRepository(5)
+    private val repository: MusicDownloadRepository =  MusicDownloadRepository(3)
     private val _downloading = MutableStateFlow<List<DownloadItemUi>>(emptyList())
     val downloading: StateFlow<List<DownloadItemUi>> = _downloading
 
-    private val _completed = MutableStateFlow<List<DownloadItemUi>>(emptyList())
+    private val _completed: MutableStateFlow<List<DownloadItemUi>> by lazy {
+        val typeOf = object : TypeToken<List<DownloadItemUi>>() {}.type
+        val data = Gson().fromJson<List<DownloadItemUi>>(
+            SharedPreferencesUtils(application).getCompletedMusic(),
+            typeOf
+        ) ?: emptyList()
+        MutableStateFlow(data)
+    }
+
     val completed: StateFlow<List<DownloadItemUi>> = _completed
 
     /** 启动下载（支持批量） */
@@ -65,11 +77,18 @@ class DownloadViewModel(
                         }
 
                         if (progress == 100) {
-                            moveToCompleted(music)
+                            moveToCompleted(music) {
+                                val typeOf = object: TypeToken<List<DownloadItemUi>>(){}.type
+                                val data = Gson().fromJson<List<DownloadItemUi>>(SharedPreferencesUtils(context).getCompletedMusic(), typeOf) ?: listOf()
+                                SharedPreferencesUtils(context).putCompletedMusic(
+                                    Gson().toJson(data + it)
+                                )
+                            }
                         }
                     }
                 } catch (e: Exception) {
                     markAsFailed(music)
+                    e.e()
                 }
             }
         }
@@ -87,20 +106,19 @@ class DownloadViewModel(
     }
 
     /** 删除已完成任务 */
-    fun deleteCompleted(item: DownloadItemUi) {
-
-        _completed.update { it.filterNot { t -> t.timeStamp == item.timeStamp } }
-        // TODO 删除本地文件
+    fun deleteCompleted(item: DownloadItemUi, deletedSavedData: () -> Unit) {
+        _completed.update { it.filterNot { t -> t.timeStamp == item.timeStamp && t.music == item.music } }
+        deletedSavedData()
     }
 
     /** 删除全部已完成 */
-    fun deleteAllCompleted() {
+    fun deleteAllCompleted(deletedSavedData: () -> Unit) {
         _completed.value = emptyList()
-        // TODO 删除本地文件
+        deletedSavedData()
     }
 
     /** 下载完成 → 移动到 completed */
-    private fun moveToCompleted(music: Music) {
+    private fun moveToCompleted(music: Music, savedCompletedMusic: (DownloadItemUi)-> Unit) {
         val finished = DownloadItemUi(
             music = music,
             progress = 100,
@@ -108,6 +126,7 @@ class DownloadViewModel(
         )
         _downloading.update { it -> it.filterNot { it.music == music } }
         _completed.update { it + finished }
+        savedCompletedMusic(finished)
     }
 
     /** 标记失败 */
