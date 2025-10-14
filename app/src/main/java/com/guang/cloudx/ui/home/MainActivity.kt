@@ -224,6 +224,15 @@ class MainActivity : BaseActivity() {
                      startActivity<SettingsActivity>()
                      true
                  }
+                 R.id.nav_support -> {
+                     val view = layoutInflater.inflate(R.layout.dialog_support_me, null)
+                     MaterialAlertDialogBuilder(this)
+                         .setTitle("赞助")
+                         .setMessage("如果能赞助一下就更好了喵！谢谢老板喵！")
+                         .setView(view)
+                         .show()
+                     true
+                 }
                  R.id.nav_log_out -> {
                      MaterialAlertDialogBuilder(this)
                          .setTitle("提示")
