@@ -207,8 +207,15 @@ class MainActivity : BaseActivity() {
                          .setNegativeButton("取消", null)
                          .setPositiveButton("确定") { _, _ ->
                              val editText = view.findViewById<EditText>(R.id.playListIdEditText)
-                             if(!editText.text.isEmpty())
-                                startActivity<PlayListActivity> { putExtra("id", editText.text.toString()) }
+                             if (!editText.text.isEmpty()) {
+                                 val id = with(editText.text.toString()) {
+                                     if (this.matches(Regex("[0-9]+"))) this
+                                     else """music\.163\.com.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                 }
+                                 if (id != null)
+                                    startActivity<PlayListActivity> { putExtra("id", id) }
+                                 else navigationView.showSnackBar("请输入正确的歌单ID或链接")
+                             }
                          }
                          .show()
                      true

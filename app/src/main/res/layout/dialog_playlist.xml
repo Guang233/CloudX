@@ -11,7 +11,7 @@
             android:layout_gravity="center"
             android:layout_marginHorizontal="24dp"
             android:layout_marginTop="12dp"
-            android:hint="歌单ID"
+            android:hint="歌单ID或链接"
             app:endIconDrawable="@drawable/close_24px"
             app:endIconMode="clear_text">
 
@@ -20,7 +20,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:imeOptions="actionDone"
-            android:inputType="number"
+            android:inputType="text"
             android:textSize="16sp"/>
     </com.google.android.material.textfield.TextInputLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
