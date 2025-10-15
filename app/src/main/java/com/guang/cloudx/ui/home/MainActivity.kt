@@ -8,6 +8,8 @@ import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.CookieManager
+import android.webkit.WebStorage
 import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.addCallback
@@ -33,6 +35,8 @@ import com.guang.cloudx.ui.login.LoginActivity
 import com.guang.cloudx.ui.playList.PlayListActivity
 import com.guang.cloudx.ui.settings.SettingsActivity
 import com.guang.cloudx.util.ext.d
+import com.guang.cloudx.util.ext.e
+import java.io.File
 
 class MainActivity : BaseActivity() {
     private val searchMusicList = mutableListOf<Music>()
@@ -241,6 +245,17 @@ class MainActivity : BaseActivity() {
                          .setPositiveButton("确定") { _, _ ->
                              prefs.putCookie("")
                              prefs.putUserId("")
+
+                             CookieManager.getInstance().removeAllCookies(null)
+                             CookieManager.getInstance().flush()
+                             WebStorage.getInstance().deleteAllData()
+                             try {
+                                 File(dataDir, "app_webview").deleteRecursively()
+                                 File(cacheDir, "webviewCache").deleteRecursively()
+                             } catch (e: Exception) {
+                                 e.e()
+                             }
+
                              navigationView.showSnackBar("已退出登录")
                              userId = ""
                              initNavHeader()

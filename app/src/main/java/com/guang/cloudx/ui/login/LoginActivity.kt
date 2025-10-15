@@ -1,6 +1,12 @@
 package com.guang.cloudx.ui.login
 
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.view.MotionEvent
+import android.webkit.CookieManager
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -25,6 +31,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.logic.model.UserData
 import com.guang.cloudx.ui.ui.theme.CloudXTheme
@@ -77,6 +84,8 @@ class LoginActivity : BaseActivity() {
             pageCount = { pages.size }
         )
 
+        var pagerScrollEnabled by remember { mutableStateOf(true) }
+
         Scaffold(
             snackbarHost = {
                 SnackbarHost(hostState = snackbarHostState)
@@ -121,7 +130,8 @@ class LoginActivity : BaseActivity() {
 
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    userScrollEnabled = pagerScrollEnabled
                 ) { page ->
                     when (pages[page]) {
                         Destination.COOKIES -> CookiesScreen()
@@ -129,6 +139,9 @@ class LoginActivity : BaseActivity() {
                             scope.launch {
                                 snackbarHostState.showSnackbar(message)
                             }
+                        }
+                        Destination.WEB -> WebScreen {
+                            pagerScrollEnabled = !it
                         }
                     }
                 }
@@ -138,7 +151,8 @@ class LoginActivity : BaseActivity() {
 
     enum class Destination(val route: String, val label: String) {
         COOKIES("cookies", "Cookies"),
-        PHONE_NUMBER("phone-numbers", "手机验证码")
+        PHONE_NUMBER("phone-numbers", "手机验证码"),
+        WEB("web", "网页(测试)")
     }
 
     @Composable
@@ -307,5 +321,68 @@ class LoginActivity : BaseActivity() {
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Composable
+    fun WebScreen(onTouchEvent: (Boolean) -> Unit) {
+        var webUrl by remember { mutableStateOf("https://music.163.com/") }
+
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                WebView(it).apply {
+                    settings.apply {
+                        javaScriptEnabled = true
+
+                        userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                                "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                                "Chrome/114.0.0.0 Safari/537.36"
+
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                        setSupportZoom(true)
+
+                        cacheMode = WebSettings.LOAD_DEFAULT
+                        domStorageEnabled = true
+                        useWideViewPort = true
+                        loadWithOverviewMode = true
+                    }
+
+                    CookieManager.getInstance().setAcceptCookie(true)
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                    setOnTouchListener { _, event: MotionEvent ->
+                        when (event.action) {
+                            MotionEvent.ACTION_DOWN,
+                            MotionEvent.ACTION_MOVE -> onTouchEvent(true)
+                            MotionEvent.ACTION_UP,
+                            MotionEvent.ACTION_CANCEL -> onTouchEvent(false)
+                        }
+                        false
+                    }
+
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            if (url != null) {
+                                webUrl = url
+                                val cookie = CookieManager.getInstance().getCookie(url)
+                                if (cookie != null) {
+                                    prefs.putCookie(cookie)
+                                }
+                            }
+                        }
+                    }
+
+                    loadUrl(webUrl)
+                }
+            },
+            update = { webView ->
+                if (webView.url != webUrl) {
+                    webView.loadUrl(webUrl)
+                }
+            }
+        )
     }
 }
