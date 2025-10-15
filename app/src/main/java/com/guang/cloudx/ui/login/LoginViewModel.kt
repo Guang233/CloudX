@@ -25,7 +25,7 @@ class LoginViewModel: ViewModel() {
             }.onSuccess {
                 captchaState = UiState.Success(it)
             }.onFailure { e ->
-                captchaState = UiState.Error(e.message ?: "验证码发送失败")
+                captchaState = UiState.Error("验证码发送失败：${e.message}")
             }
         }
     }
@@ -38,7 +38,7 @@ class LoginViewModel: ViewModel() {
             }.onSuccess {
                 loginState = UiState.Success(it)
             }.onFailure { e ->
-                loginState = UiState.Error(e.message ?: "登录失败")
+                loginState = UiState.Error("登录失败：${e.message}")
             }
         }
     }

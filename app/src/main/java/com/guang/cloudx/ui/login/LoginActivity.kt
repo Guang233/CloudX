@@ -260,11 +260,17 @@ class LoginActivity : BaseActivity() {
                     .fillMaxWidth()
             )
 
-            when (captchaState) {
-                is LoginViewModel.UiState.Error -> { showSnackBar(captchaState.message) }
-                LoginViewModel.UiState.Idle -> {}
-                LoginViewModel.UiState.Loading -> {}
-                is LoginViewModel.UiState.Success<*> -> { showSnackBar("验证码发送成功") }
+            LaunchedEffect(captchaState) {
+                when (captchaState) {
+                    is LoginViewModel.UiState.Error -> {
+                        showSnackBar(captchaState.message)
+                    }
+                    LoginViewModel.UiState.Idle -> {}
+                    LoginViewModel.UiState.Loading -> {}
+                    is LoginViewModel.UiState.Success<*> -> {
+                        showSnackBar("验证码发送成功")
+                    }
+                }
             }
 
             Button(
@@ -274,15 +280,23 @@ class LoginActivity : BaseActivity() {
                     .padding(top = 12.dp),
             ) { Text("登录") }
 
-            when (loginState) {
-                is LoginViewModel.UiState.Error -> { showSnackBar(loginState.message) }
-                LoginViewModel.UiState.Idle -> {}
-                LoginViewModel.UiState.Loading -> { showSnackBar("正在登录") }
-                is LoginViewModel.UiState.Success<*> -> {
-                    val data = loginState.data as UserData
-                    prefs.putUserId(data.id)
-                    prefs.putCookie("os=pc; osver=Microsoft-Windows-11-Home-China-build-26100-64bit; appver=3.1.11.203994; channel=netease; mode=83NN; MUSIC_U=${data.token}")
-                    finish()
+            LaunchedEffect(loginState) {
+                when (loginState) {
+                    is LoginViewModel.UiState.Error -> {
+                        showSnackBar(loginState.message)
+                    }
+
+                    LoginViewModel.UiState.Idle -> {}
+                    LoginViewModel.UiState.Loading -> {
+                        showSnackBar("正在登录")
+                    }
+
+                    is LoginViewModel.UiState.Success<*> -> {
+                        val data = loginState.data as UserData
+                        prefs.putUserId(data.id)
+                        prefs.putCookie("os=pc; osver=Microsoft-Windows-11-Home-China-build-26100-64bit; appver=3.1.11.203994; channel=netease; mode=83NN; MUSIC_U=${data.token}")
+                        finish()
+                    }
                 }
             }
 
