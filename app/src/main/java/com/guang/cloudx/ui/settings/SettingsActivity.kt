@@ -54,6 +54,7 @@ class SettingsActivity : BaseActivity() {
         var lrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveLrc()) }
         var tlLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveTlLrc()) }
         var romaLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveRomaLrc()) }
+        var yrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveYrc()) }
         val snackbarHostState = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
@@ -203,6 +204,18 @@ class SettingsActivity : BaseActivity() {
                     ) {
                         romaLrcEnabled = it
                         prefs.putIsSaveRomaLrc(it)
+                    }
+                }
+
+                item {
+                    SwitchListItem(
+                        Icons.Outlined.Subtitles,
+                        title = "保存逐字歌词",
+                        description = "尝试保存并转换为lrc格式(如果有)",
+                        checked = yrcEnabled
+                    ) {
+                        yrcEnabled = it
+                        prefs.putIsSaveYrc(it)
                     }
                 }
 

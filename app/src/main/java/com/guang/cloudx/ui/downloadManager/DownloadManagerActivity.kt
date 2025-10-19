@@ -17,6 +17,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
+import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
@@ -101,9 +102,12 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
                         prefs.getMusicLevel(),
                         prefs.getCookie(),
                         it,
-                        prefs.getIsSaveLrc(),
-                        prefs.getIsSaveTlLrc(),
-                        prefs.getIsSaveRomaLrc()
+                        MusicDownloadRules(prefs.getIsSaveLrc(),
+                            prefs.getIsSaveTlLrc(),
+                            prefs.getIsSaveRomaLrc(),
+                            prefs.getIsSaveYrc(),
+                            prefs.getDownloadFileName()!!,
+                            prefs.getArtistsDelimiter()!!)
                     ) }
                 },
                 onDeleteFailed = { item ->

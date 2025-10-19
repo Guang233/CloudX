@@ -13,6 +13,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.logic.utils.showSnackBar
@@ -78,9 +79,13 @@ open class BaseActivity: AppCompatActivity() {
             level,
             prefs.getCookie(),
             dir!!,
-            prefs.getIsSaveLrc(),
-            prefs.getIsSaveTlLrc(),
-            prefs.getIsSaveRomaLrc())
+            MusicDownloadRules(prefs.getIsSaveLrc(),
+                prefs.getIsSaveTlLrc(),
+                prefs.getIsSaveRomaLrc(),
+                prefs.getIsSaveYrc(),
+                prefs.getDownloadFileName()!!,
+                prefs.getArtistsDelimiter()!!)
+        )
 
         view.showSnackBar("已加入下载队列")
     }

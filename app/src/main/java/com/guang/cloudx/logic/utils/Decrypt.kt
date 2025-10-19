@@ -63,7 +63,11 @@ class Decrypt {
             val tlyric = data.optJSONObject("tlyric")?.optString("lyric").orEmpty()
             val romalrc = data.optJSONObject("romalrc")?.optString("lyric").orEmpty()
 
-            return Lyric(lrc, tlyric, romalrc)
+            val yrc = convertMultiLineToLrc(parseMixedLyrics(data.optJSONObject("yrc")?.optString("lyric").orEmpty()))
+            val ytlrc = convertMultiLineToLrc(data.optJSONObject("ytlrc")?.optString("lyric").orEmpty())
+            val yromalrc = convertMultiLineToLrc(data.optJSONObject("yromalrc")?.optString("lyric").orEmpty())
+
+            return Lyric(lrc, tlyric, romalrc, yrc, ytlrc, yromalrc)
         }
         @SuppressLint("DefaultLocale")
         private fun parseMixedLyrics(input: String): String {
@@ -76,15 +80,7 @@ class Decrypt {
                             val json = JSONObject(line)
                             val timeMs = json.getLong("t")
 
-                            // 转换毫秒为 [mm:ss.xx] 格式
-                            val minutes = timeMs / 60000
-                            val seconds = (timeMs % 60000) / 1000
-                            val centiseconds = (timeMs % 1000) / 10
-
-                            val timeLabel = String.format(
-                                "[%02d:%02d.%02d]",
-                                minutes, seconds, centiseconds
-                            )
+                            val timeLabel = formatTime(timeMs)
 
                             val content = buildString {
                                 val array = json.getJSONArray("c")
@@ -94,7 +90,7 @@ class Decrypt {
                                 }
                             }
 
-                            result.append("$timeLabel$content\n")
+                            result.append("[$timeLabel]$content\n")
                         } catch (e: Exception) {
                             result.append("$line\n")
                         }
@@ -108,6 +104,48 @@ class Decrypt {
                 }
             }
             return result.toString().trim()
+        }
+
+        private fun convertMultiLineToLrc(input: String): String =
+            input.lines()
+                .joinToString("\n") { line -> convertSingleLine(line) }
+
+        private fun convertSingleLine(line: String): String {
+            val result = StringBuilder()
+
+            if (line.matches(Regex("""\[(\d+),(\d+)].+"""))) {
+                // 1. 提取 [开始,结束]
+                val lineTimeRegex = Regex("""\[(\d+),(\d+)]""")
+                val timeMatch = lineTimeRegex.find(line)
+                val endTimeMs = timeMatch?.groupValues?.get(2)?.toLongOrNull() ?: 0L
+
+                // 2. 提取逐字部分
+                val wordRegex = Regex("""\((\d+),\d+,\d+\)(.)""")
+                val matches = wordRegex.findAll(line)
+
+                for (match in matches) {
+                    val wordTime = match.groupValues[1].toLongOrNull() ?: 0L
+                    val word = match.groupValues[2]
+                    result.append("[${formatTime(wordTime)}]").append(word)
+                }
+
+                // 3. 最后追加结尾时间戳
+                if (endTimeMs > 0) {
+                    result.append("[${formatTime(endTimeMs)}]")
+                }
+                return result.toString()
+            }
+            else
+                return line
+        }
+
+        @SuppressLint("DefaultLocale")
+        private fun formatTime(ms: Long): String {
+            val totalSeconds = ms / 1000
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            val millis = ms % 1000
+            return String.format("%02d:%02d.%03d", minutes, seconds, millis)
         }
 
         fun decryptMusicUrl(encryptedBody: String): MusicUrl {
