@@ -5,7 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.guang.cloudx.logic.Repository
+import com.guang.cloudx.logic.repository.Repository
 import com.guang.cloudx.logic.model.UserData
 import kotlinx.coroutines.launch
 

@@ -1,4 +1,4 @@
-package com.guang.cloudx.logic
+package com.guang.cloudx.logic.repository
 
 import androidx.lifecycle.liveData
 import com.guang.cloudx.logic.model.Music

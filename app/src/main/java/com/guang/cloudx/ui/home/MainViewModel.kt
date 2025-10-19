@@ -3,7 +3,7 @@ package com.guang.cloudx.ui.home
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.switchMap
-import com.guang.cloudx.logic.Repository
+import com.guang.cloudx.logic.repository.Repository
 
 
 class MainViewModel: ViewModel() {

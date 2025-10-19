@@ -7,7 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.guang.cloudx.logic.MusicDownloadRepository
+import com.guang.cloudx.logic.repository.MusicDownloadRepository
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
