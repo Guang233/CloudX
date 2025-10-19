@@ -54,8 +54,10 @@ class MusicDownloadRepository(
                             }
                             val baseFileName = rules.fileName.replace($$"${level}", quality)
                                 .replace($$"${name}", music.name.replace(Regex("[\\\\/:*?\"<>|]"), " "))
+                                .replace($$"${id}", music.id.toString())
                                 .replace($$"${artists}", music.artists.joinToString(rules.delimiter) { it.name })
                                 .replace($$"${album}", music.album.name.replace(Regex("[\\\\/:*?\"<>|]"), " "))
+                                .replace($$"${albumId}", music.album.id.toString())
                             downloadFile(
                                 context,
                                 musicUrl.url,

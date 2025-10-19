@@ -13,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -21,9 +23,17 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bumptech.glide.Glide
@@ -48,6 +58,7 @@ class SettingsActivity : BaseActivity() {
     }
 
 
+    @Suppress("DEPRECATION")
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun SettingsScreen() {
@@ -182,7 +193,7 @@ class SettingsActivity : BaseActivity() {
                         }
                     )
                 }
-                
+
                 item {
                     SwitchListItem(
                         icon = Icons.Outlined.Translate,
@@ -194,7 +205,7 @@ class SettingsActivity : BaseActivity() {
                         prefs.putIsSaveTlLrc(it)
                     }
                 }
-                
+
                 item {
                     SwitchListItem(
                         icon = Icons.Outlined.TextFields,
@@ -251,16 +262,137 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    var openFileNameDialog by remember { mutableStateOf(false) }
+
+                    var isFileNameFocused by remember { mutableStateOf(false) }
+                    val variableList = listOf(
+                        $$"${name}" to "歌曲名称",
+                        $$"${id}" to "歌曲id",
+                        $$"${album}" to "专辑名称",
+                        $$"${albumId}" to "专辑id",
+                        $$"${artists}" to "艺术家",
+                        $$"${level}" to "实际下载音质 (格式为 [音质] ，若为标准音质则为空)"
+                    )
+
+                    // 用 AnnotatedString 构建带点击区域的 Text
+                    val annotatedText = buildAnnotatedString {
+                        append("命名规则可用变量：\n")
+
+                        variableList.forEachIndexed { index, (code, desc) ->
+                            val start = length
+                            append(code)
+                            val end = length
+                            addStyle(
+                                style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                start = start,
+                                end = end
+                            )
+                            addStringAnnotation(
+                                tag = "VAR",
+                                annotation = code,
+                                start = start,
+                                end = end
+                            )
+                            append(" $desc")
+                            if (index != variableList.lastIndex) append("\n")
+                        }
+
+                        append("\n\n艺术家分隔符：若有多个艺术家则在多个艺术家间添加分隔符")
+                    }
+
                     ActionListItem(
                         icon = Icons.Outlined.Edit,
                         title = "文件命名规则",
                         description = "修改下载的歌曲文件名命名规则",
                         onClick = {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
-                            }
+                            openFileNameDialog = true
                         }
                     )
+
+                    if (openFileNameDialog) {
+                        var fileName by remember { mutableStateOf(TextFieldValue(text = prefs.getDownloadFileName()!!)) }
+                        var delimiter by remember { mutableStateOf(prefs.getArtistsDelimiter()) }
+                        AlertDialog(
+                            title = { Text("命名规则") },
+                            onDismissRequest = { openFileNameDialog = false },
+                            text = {
+                                Column {
+                                    OutlinedTextField(
+                                        label = { Text("文件命名规则") },
+                                        value = fileName,
+                                        onValueChange = { fileName = it },
+                                        keyboardOptions = KeyboardOptions(
+                                            imeAction = ImeAction.Next
+                                        ),
+                                        modifier = Modifier
+                                            .onFocusChanged { focusState ->
+                                                isFileNameFocused = focusState.isFocused
+                                            }
+                                    )
+                                    OutlinedTextField(
+                                        label = { Text("艺术家分隔符") },
+                                        value = delimiter!!,
+                                        onValueChange = { delimiter = it },
+                                        keyboardOptions = KeyboardOptions(
+                                            imeAction = ImeAction.Done
+                                        )
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+
+                                    ClickableText(
+                                        text = annotatedText,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        onClick = { offset ->
+                                            annotatedText.getStringAnnotations(
+                                                tag = "VAR",
+                                                start = offset,
+                                                end = offset
+                                            ).firstOrNull()?.let { annotation ->
+                                                if (isFileNameFocused) {
+                                                    val code = annotation.item
+                                                    val cursor = fileName.selection.start
+                                                    val newText = fileName.text.substring(0, cursor) +
+                                                            code +
+                                                            fileName.text.substring(cursor)
+                                                    fileName = fileName.copy(
+                                                        text = newText,
+                                                        selection = TextRange(cursor + code.length)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        prefs.putDownloadFileName(fileName.text)
+                                        prefs.putArtistsDelimiter(delimiter!!)
+                                        openFileNameDialog = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("已保存")
+                                        }
+                                    }
+                                ) {
+                                    Text("保存")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = { openFileNameDialog = false }
+                                ) {
+                                    Text("取消")
+                                }
+                            }
+                        )
+                    }
                 }
 
                 item {
@@ -273,13 +405,14 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    val v = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
                     ActionListItem(
                         icon = Icons.Outlined.Apps,
                         title = "应用版本",
-                        description = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        description = v,
                         onClick = {
                             scope.launch {
-                                SystemUtils.copyToClipboard(context, "version", BuildConfig.VERSION_NAME)
+                                SystemUtils.copyToClipboard(context, "version", v)
                             }
                         }
                     )
