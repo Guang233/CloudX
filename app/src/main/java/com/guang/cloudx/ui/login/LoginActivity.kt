@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -151,7 +153,7 @@ class LoginActivity : BaseActivity() {
 
     enum class Destination(val route: String, val label: String) {
         COOKIES("cookies", "Cookies"),
-        PHONE_NUMBER("phone-numbers", "手机验证码"),
+        PHONE_NUMBER("phone-numbers", "手机号(推荐)"),
         WEB("web", "网页(测试)")
     }
 
@@ -188,7 +190,7 @@ class LoginActivity : BaseActivity() {
                     imeAction = ImeAction.Done
                 ),
                 minLines = 5,
-                maxLines = 10
+                maxLines = 12
             )
 
             Button(
@@ -323,66 +325,78 @@ class LoginActivity : BaseActivity() {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @Suppress("COMPOSE_APPLIER_CALL_MISMATCH")
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     @Composable
     fun WebScreen(onTouchEvent: (Boolean) -> Unit) {
         var webUrl by remember { mutableStateOf("https://music.163.com/") }
 
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = {
-                WebView(it).apply {
-                    settings.apply {
-                        javaScriptEnabled = true
+        if (prefs.getCookie() != "") {
+            Text(
+                text = "请先退出登录后再进行网页登录",
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .wrapContentSize(align = Alignment.Center)
+            )
+        } else {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = {
+                    WebView(it).apply {
+                        settings.apply {
+                            javaScriptEnabled = true
 
-                        userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                                "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                                "Chrome/114.0.0.0 Safari/537.36"
+                            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                                    "Chrome/114.0.0.0 Safari/537.36"
 
-                        builtInZoomControls = true
-                        displayZoomControls = false
-                        setSupportZoom(true)
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                            setSupportZoom(true)
 
-                        cacheMode = WebSettings.LOAD_DEFAULT
-                        domStorageEnabled = true
-                        useWideViewPort = true
-                        loadWithOverviewMode = true
-                    }
-
-                    CookieManager.getInstance().setAcceptCookie(true)
-                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-
-                    setOnTouchListener { _, event: MotionEvent ->
-                        when (event.action) {
-                            MotionEvent.ACTION_DOWN,
-                            MotionEvent.ACTION_MOVE -> onTouchEvent(true)
-                            MotionEvent.ACTION_UP,
-                            MotionEvent.ACTION_CANCEL -> onTouchEvent(false)
+                            cacheMode = WebSettings.LOAD_DEFAULT
+                            domStorageEnabled = true
+                            useWideViewPort = true
+                            loadWithOverviewMode = true
                         }
-                        false
-                    }
 
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            if (url != null) {
-                                webUrl = url
-                                val cookie = CookieManager.getInstance().getCookie(url)
-                                if (cookie != null) {
-                                    prefs.putCookie(cookie)
+                        CookieManager.getInstance().setAcceptCookie(true)
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                        setOnTouchListener { _, event: MotionEvent ->
+                            when (event.action) {
+                                MotionEvent.ACTION_DOWN,
+                                MotionEvent.ACTION_MOVE -> onTouchEvent(true)
+
+                                MotionEvent.ACTION_UP,
+                                MotionEvent.ACTION_CANCEL -> onTouchEvent(false)
+                            }
+                            false
+                        }
+
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                if (url != null) {
+                                    webUrl = url
+                                    val cookie = CookieManager.getInstance().getCookie(url)
+                                    if (cookie != null) {
+                                        prefs.putCookie(cookie)
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    loadUrl(webUrl)
+                        loadUrl(webUrl)
+                    }
+                },
+                update = { webView ->
+                    if (webView.url != webUrl) {
+                        webView.loadUrl(webUrl)
+                    }
                 }
-            },
-            update = { webView ->
-                if (webView.url != webUrl) {
-                    webView.loadUrl(webUrl)
-                }
-            }
-        )
+            )
+        }
     }
 }
