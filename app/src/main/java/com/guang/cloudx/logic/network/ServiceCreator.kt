@@ -43,7 +43,7 @@ class HexResponseInterceptor : Interceptor {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun intercept(chain: Interceptor.Chain): Response {
         val response = chain.proceed(chain.request())
-        val body = response.body ?: return response
+        val body = response.body
 
         // 获取原始字节
         val rawBytes = body.bytes()
@@ -75,14 +75,14 @@ class HexResponseInterceptor : Interceptor {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun decompressBrotli(data: ByteArray): ByteArray {
         return BrotliInputStream(ByteArrayInputStream(data)).use { bis ->
-            bis.readAllBytes()
+            bis.readBytes()
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun decompressGzip(data: ByteArray): ByteArray {
         return GZIPInputStream(ByteArrayInputStream(data)).use { gis ->
-            gis.readAllBytes()
+            gis.readBytes()
         }
     }
 
