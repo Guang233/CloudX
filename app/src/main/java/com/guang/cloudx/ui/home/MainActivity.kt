@@ -1,6 +1,9 @@
 package com.guang.cloudx.ui.home
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.Menu
@@ -14,6 +17,8 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.drawerlayout.widget.DrawerLayout
@@ -43,15 +48,18 @@ class MainActivity : BaseActivity() {
     private var isLastPage = false
     private var lastSearchText: String = ""
     private lateinit var userId: String
-    private val adapter by lazy { MusicAdapter(searchMusicList,
-        { music -> startDownloadMusic(music = music, view = recyclerView) },
-        { music -> showBottomSheet(music = music) },
-        { num ->
-            multiSelectToolbar.title = "已选 $num 项"
-            multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled =
-                !(num == 0 && multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled == true)
+    private val adapter by lazy {
+        MusicAdapter(
+            searchMusicList,
+            { music -> startDownloadMusic(music = music, view = recyclerView) },
+            { music -> showBottomSheet(music = music) },
+            { num ->
+                multiSelectToolbar.title = "已选 $num 项"
+                multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled =
+                    !(num == 0 && multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled == true)
             },
-        { enterMultiSelectMode() }) }
+            { enterMultiSelectMode() })
+    }
 
     private val appBarLayout by lazy { findViewById<AppBarLayout>(R.id.appBarLayout) }
     private val toolbar by lazy { findViewById<MaterialToolbar>(R.id.topAppBar) }
@@ -81,6 +89,21 @@ class MainActivity : BaseActivity() {
         applyTopInsets(appBarLayout)
         applyTopInsets(navigationView)
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
+        }
+
+
         swipeRefresh.setOnRefreshListener {
             if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
             if (viewModel.isMultiSelectionMode) swipeRefresh.isRefreshing = false
@@ -95,7 +118,7 @@ class MainActivity : BaseActivity() {
             if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.close()
             else if (viewModel.isMultiSelectionMode) exitMultiSelectMode()
             else if (viewModel.isSearchMode) exitSearchMode()
-                else moveTaskToBack(true)
+            else moveTaskToBack(true)
         }
 
         userId = prefs.getUserId()
@@ -118,21 +141,21 @@ class MainActivity : BaseActivity() {
         viewModel.searchResults.observe(this) { result ->
             swipeRefresh.isRefreshing = false
 
-                val musicList = result.getOrNull()
-                if (musicList != null) {
-                    searchMusicList.addAll(musicList)
-                    tipText.visibility = View.GONE
-                    // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
+            val musicList = result.getOrNull()
+            if (musicList != null) {
+                searchMusicList.addAll(musicList)
+                tipText.visibility = View.GONE
+                // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
+            } else {
+                if (searchMusicList.isEmpty()) {
+                    searchMusicList.clear()
+                    recyclerView.showSnackBar("未搜到")
                 } else {
-                    if (searchMusicList.isEmpty()) {
-                        searchMusicList.clear()
-                        recyclerView.showSnackBar("未搜到")
-                    } else {
-                        recyclerView.showSnackBar("没有更多了")
-                        isLastPage = true
-                    }
+                    recyclerView.showSnackBar("没有更多了")
+                    isLastPage = true
                 }
-                adapter.notifyDataSetChanged()
+            }
+            adapter.notifyDataSetChanged()
         }
 
         viewModel.userDetail.observe(this) { result ->
@@ -151,13 +174,14 @@ class MainActivity : BaseActivity() {
         super.onResume()
         if (prefs.getUserId() != userId) {
             initNavHeader()
-            userId =  prefs.getUserId()
+            userId = prefs.getUserId()
         }
     }
 
     private fun showBottomSheet(music: Music) {
         val bottomSheet = MusicBottomSheet(music) { music, level ->
-            startDownloadMusic(level= level, music = music, view = recyclerView) }
+            startDownloadMusic(level = level, music = music, view = recyclerView)
+        }
         bottomSheet.show(supportFragmentManager, "MusicBottomSheet")
 
     }
@@ -175,7 +199,7 @@ class MainActivity : BaseActivity() {
                 val totalItemCount = layoutManager.itemCount                 // 总的 item 数
                 val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition() // 第一个可见 item 的位置
 
-                if ( !isLastPage
+                if (!isLastPage
                     && !TextUtils.isEmpty(searchEditText.text)
                     && !swipeRefresh.isRefreshing
                     && !viewModel.isMultiSelectionMode
@@ -196,73 +220,78 @@ class MainActivity : BaseActivity() {
         })
     }
 
-    private fun initNavigationView(){
+    private fun initNavigationView() {
         navigationView.setNavigationItemSelectedListener { menuItem ->
-             when(menuItem.itemId) {
+            when (menuItem.itemId) {
                 R.id.nav_download_manager -> {
                     startActivity<DownloadManagerActivity>()
                     true
                 }
-                 R.id.nav_add_playlist -> {
-                     val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
-                     MaterialAlertDialogBuilder(this)
-                         .setTitle("解析歌单")
-                         .setView(view)
-                         .setNegativeButton("取消", null)
-                         .setPositiveButton("确定") { _, _ ->
-                             val editText = view.findViewById<EditText>(R.id.playListIdEditText)
-                             if (!editText.text.isEmpty()) {
-                                 val id = with(editText.text.toString()) {
-                                     if (this.matches(Regex("[0-9]+"))) this
-                                     else """music\.163\.com.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                                 }
-                                 if (id != null)
+
+                R.id.nav_add_playlist -> {
+                    val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("解析歌单")
+                        .setView(view)
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("确定") { _, _ ->
+                            val editText = view.findViewById<EditText>(R.id.playListIdEditText)
+                            if (!editText.text.isEmpty()) {
+                                val id = with(editText.text.toString()) {
+                                    if (this.matches(Regex("[0-9]+"))) this
+                                    else """music\.163\.com.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                }
+                                if (id != null)
                                     startActivity<PlayListActivity> { putExtra("id", id) }
-                                 else navigationView.showSnackBar("请输入正确的歌单ID或链接")
-                             }
-                         }
-                         .show()
-                     true
-                 }
-                 R.id.nav_settings -> {
-                     startActivity<SettingsActivity>()
-                     true
-                 }
-                 R.id.nav_support -> {
-                     val view = layoutInflater.inflate(R.layout.dialog_support_me, null)
-                     MaterialAlertDialogBuilder(this)
-                         .setTitle("赞助")
-                         .setMessage("如果能赞助一下就更好了喵！谢谢老板喵！")
-                         .setView(view)
-                         .show()
-                     true
-                 }
-                 R.id.nav_log_out -> {
-                     MaterialAlertDialogBuilder(this)
-                         .setTitle("提示")
-                         .setMessage("真的要退出登录吗？")
-                         .setNegativeButton("取消", null)
-                         .setPositiveButton("确定") { _, _ ->
-                             prefs.putCookie("")
-                             prefs.putUserId("")
+                                else navigationView.showSnackBar("请输入正确的歌单ID或链接")
+                            }
+                        }
+                        .show()
+                    true
+                }
 
-                             CookieManager.getInstance().removeAllCookies(null)
-                             CookieManager.getInstance().flush()
-                             WebStorage.getInstance().deleteAllData()
-                             try {
-                                 File(dataDir, "app_webview").deleteRecursively()
-                                 File(cacheDir, "webviewCache").deleteRecursively()
-                             } catch (e: Exception) {
-                                 e.e()
-                             }
+                R.id.nav_settings -> {
+                    startActivity<SettingsActivity>()
+                    true
+                }
 
-                             navigationView.showSnackBar("已退出登录")
-                             userId = ""
-                             initNavHeader()
-                         }
-                         .show()
-                     true
-                 }
+                R.id.nav_support -> {
+                    val view = layoutInflater.inflate(R.layout.dialog_support_me, null)
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("赞助")
+                        .setMessage("如果能赞助一下就更好了喵！谢谢老板喵！")
+                        .setView(view)
+                        .show()
+                    true
+                }
+
+                R.id.nav_log_out -> {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("提示")
+                        .setMessage("真的要退出登录吗？")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("确定") { _, _ ->
+                            prefs.putCookie("")
+                            prefs.putUserId("")
+
+                            CookieManager.getInstance().removeAllCookies(null)
+                            CookieManager.getInstance().flush()
+                            WebStorage.getInstance().deleteAllData()
+                            try {
+                                File(dataDir, "app_webview").deleteRecursively()
+                                File(cacheDir, "webviewCache").deleteRecursively()
+                            } catch (e: Exception) {
+                                e.e()
+                            }
+
+                            navigationView.showSnackBar("已退出登录")
+                            userId = ""
+                            initNavHeader()
+                        }
+                        .show()
+                    true
+                }
+
                 else -> false
             }
         }
@@ -288,7 +317,7 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    private fun setupToolbar()  {
+    private fun setupToolbar() {
         setSupportActionBar(toolbar)
 
         // 导航图标点击事件（打开侧边栏）
@@ -310,10 +339,12 @@ class MainActivity : BaseActivity() {
                     adapter.selectAll()
                     true
                 }
+
                 R.id.action_invert_selection -> {
                     adapter.invertSelection()
                     true
                 }
+
                 R.id.action_download -> {
                     if (adapter.getSelectedMusic().isNotEmpty()) {
                         startDownloadMusic(musics = adapter.getSelectedMusic(), view = recyclerView)
@@ -321,6 +352,7 @@ class MainActivity : BaseActivity() {
                     }
                     true
                 }
+
                 else -> false
             }
         }
@@ -380,6 +412,7 @@ class MainActivity : BaseActivity() {
                 enterSearchMode()
                 true
             }
+
             else -> super.onOptionsItemSelected(item)
         }
     }

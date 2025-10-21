@@ -1,12 +1,16 @@
 package com.guang.cloudx
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -19,7 +23,7 @@ import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.logic.utils.showSnackBar
 import com.guang.cloudx.ui.downloadManager.DownloadViewModel
 
-open class BaseActivity: AppCompatActivity() {
+open class BaseActivity : AppCompatActivity() {
     protected lateinit var prefs: SharedPreferencesUtils
     var dir: DocumentFile? = null
 
@@ -61,8 +65,23 @@ open class BaseActivity: AppCompatActivity() {
     }
 
 
+    protected fun startDownloadMusic(
+        level: String = prefs.getMusicLevel(),
+        musics: List<Music> = listOf(),
+        music: Music? = null,
+        view: View
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                view.showSnackBar("请给予通知权限(用于后台下载)")
+                return
+            }
+        }
 
-    protected fun startDownloadMusic(level: String = prefs.getMusicLevel(), musics: List<Music> = listOf(), music: Music? = null, view: View) {
         if (dir == null) {
             view.showSnackBar("未选择下载目录，请前往设置选择")
             return
@@ -79,12 +98,14 @@ open class BaseActivity: AppCompatActivity() {
             level,
             prefs.getCookie(),
             dir!!,
-            MusicDownloadRules(prefs.getIsSaveLrc(),
+            MusicDownloadRules(
+                prefs.getIsSaveLrc(),
                 prefs.getIsSaveTlLrc(),
                 prefs.getIsSaveRomaLrc(),
                 prefs.getIsSaveYrc(),
                 prefs.getDownloadFileName()!!,
-                prefs.getArtistsDelimiter()!!)
+                prefs.getArtistsDelimiter()!!
+            )
         )
 
         view.showSnackBar("已加入下载队列")
