@@ -31,8 +31,8 @@ class InProgressAdapter(
 
     companion object {
         private val diff = object : DiffUtil.ItemCallback<DownloadItemUi>() {
-            override fun areItemsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.music == n.music
-            override fun areContentsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o == n
+            override fun areItemsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.music.id == n.music.id
+            override fun areContentsTheSame(o: DownloadItemUi, n: DownloadItemUi) = o.status == n.status && o.progress == n.progress
         }
     }
 }

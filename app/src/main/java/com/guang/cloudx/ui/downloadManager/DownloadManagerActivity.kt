@@ -7,6 +7,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.SimpleItemAnimator
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.appbar.MaterialToolbar
@@ -93,6 +94,7 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
 
         recycler = view.findViewById(R.id.recycler)
         recycler.layoutManager = LinearLayoutManager(requireContext())
+        (recycler.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
         val adapter = InProgressAdapter(
                 onRetry = { item ->
                     val prefs = SharedPreferencesUtils(requireContext())
@@ -118,7 +120,7 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
 
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.downloading.collect { list ->
-                adapter.submitList(list)
+                adapter.submitList(list.reversed())
             }
         }
     }
@@ -167,7 +169,7 @@ class CompletedFragment : Fragment(R.layout.fragment_download_list) {
 
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.completed.collect { list ->
-                adapter.submitList(list.reversed())
+                adapter.submitList(list.asReversed())
             }
         }
     }
