@@ -15,11 +15,19 @@ import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
 import kotlinx.coroutines.*
+import java.util.*
 
 class DownloadService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val repository = MusicDownloadRepository(maxParallel = 3)
     private lateinit var notificationManager: NotificationManager
+
+    private val queueLock = Any()
+    private val downloadQueue = LinkedList<Music>() // 队列
+    private var isDownloading = false
+    private var totalCompleted = 0
+    private val musicTimeStampMap = mutableMapOf<Music, Long>()
+    private val progressMap = mutableMapOf<Long, Int>()
 
     override fun onCreate() {
         super.onCreate()
@@ -42,33 +50,62 @@ class DownloadService : Service() {
         val uri = intent.getParcelableExtra<Uri>("targetUri") ?: return START_NOT_STICKY
         val targetDir = DocumentFile.fromTreeUri(this, uri) ?: return START_NOT_STICKY
 
-        // 启动通知
-        updateNotification("正在准备下载 ${musics.size} 首歌曲…", "", 0)
+        updateNotification("正在准备下载…", "", 0)
 
-        scope.launch {
-            val total = musics.size
-            val progressList = MutableList(total) { 0 }
-            var completedCount = 0
+        synchronized(queueLock) {
+            musics.forEachIndexed { index, music ->
+                if (!downloadQueue.contains(music)) {
+                    downloadQueue.add(music)
+                    val ts = timeStampList.getOrNull(index) ?: System.currentTimeMillis()
+                    musicTimeStampMap[music] = ts
+                }
+            }
+        }
 
-            val jobs = musics.mapIndexed { id, it ->
-                async {
+
+        if (!isDownloading) {
+            isDownloading = true
+            scope.launch {
+
+                while (isActive) {
+                    val item = synchronized(queueLock) { downloadQueue.poll() }
+
+                    // 如果队列为空则检查是否应退出
+                    if (item == null) {
+                        if (synchronized(queueLock) { downloadQueue.isEmpty() }) {
+                            sendBroadcast(
+                                Intent("DOWNLOAD_FINISHED")
+                                    .setPackage(packageName)
+                                    .putExtra("totalCompleted", totalCompleted)
+                            )
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                            stopSelf()
+                            isDownloading = false
+                            break
+                        } else {
+                            delay(200)
+                            continue
+                        }
+                    }
+
+                    val id = musicTimeStampMap[item] ?: System.currentTimeMillis()
+
                     try {
                         repository.downloadMusic(
                             this@DownloadService,
                             rules,
-                            it,
+                            item,
                             level,
                             cookie,
                             targetDir
                         ) { music, progress ->
-                            progressList[id] = progress
-
-                            val totalProgress = progressList.sum() / total
-
+                            progressMap[id] = progress
+                            val avgProgress =
+                                if (progressMap.isNotEmpty()) progressMap.values.sum() / (totalCompleted + downloadQueue.size + 1) else 0
                             updateNotification(
-                                "音乐下载（$completedCount/${musics.size}）",
-                                "正在下载 ${it.name}（$progress%）",
-                                totalProgress
+                                "音乐下载（$totalCompleted/${totalCompleted + downloadQueue.size + 1}）",
+                                "正在下载 ${music.name}（$progress%）",
+                                avgProgress
                             )
 
                             sendBroadcast(
@@ -76,20 +113,13 @@ class DownloadService : Service() {
                                     .setPackage(packageName)
                                     .apply {
                                         putExtra("musicJson", Gson().toJson(music))
-                                        putExtra("timeStamp", timeStampList[id])
+                                        putExtra("timeStamp", id)
                                         putExtra("progress", progress)
                                     }
                             )
                         }
 
-                        completedCount++
-                        progressList[id] = 100
-                        val totalProgress = progressList.sum() / total
-                        updateNotification(
-                            "音乐下载（$completedCount/${musics.size}）",
-                            "已完成 ${it.name}",
-                            totalProgress
-                        )
+                        totalCompleted++
 
                     } catch (e: Exception) {
                         sendBroadcast(
@@ -97,24 +127,18 @@ class DownloadService : Service() {
                                 .setPackage(packageName)
                                 .apply {
                                     putExtra("reason", e.localizedMessage)
-                                    putExtra("timeStamp", timeStampList[id])
-                                    putExtra("musicJson", Gson().toJson(it))
+                                    putExtra("timeStamp", id)
+                                    putExtra("musicJson", Gson().toJson(item))
                                 }
                         )
                     }
                 }
             }
-
-            jobs.awaitAll()
-            updateNotification("下载完成", "", 100)
-            sendBroadcast(Intent("DOWNLOAD_FINISHED").setPackage(packageName))
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
         }
-
 
         return START_STICKY
     }
+
 
     private fun createNotificationChannel() {
         val channelId = "download_channel"

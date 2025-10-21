@@ -112,13 +112,13 @@ class DownloadViewModel(
     }
 
     /** 下载完成 → 移动到 completed */
-    private fun moveToCompleted(music: Music, savedCompletedMusic: (DownloadItemUi) -> Unit) {
+    private fun moveToCompleted(music: Music, timeStamp: Long, savedCompletedMusic: (DownloadItemUi) -> Unit) {
         val finished = DownloadItemUi(
             music = music,
             progress = 100,
             status = TaskStatus.COMPLETED
         )
-        _downloading.update { it -> it.filterNot { it.music == music } }
+        _downloading.update { it -> it.filterNot { it.music == music && it.timeStamp == timeStamp } }
         _completed.update { it + finished }
         savedCompletedMusic(finished)
     }
@@ -151,7 +151,7 @@ class DownloadViewModel(
                 if (progress == 100) {
                     val finishedMusic =
                         _downloading.value.find { it.music == music && it.timeStamp == timeStamp }?.music ?: return
-                    moveToCompleted(finishedMusic) { finished ->
+                    moveToCompleted(finishedMusic, timeStamp) { finished ->
                         val typeOf = object : TypeToken<List<DownloadItemUi>>() {}.type
                         val data = Gson().fromJson<List<DownloadItemUi>>(
                             SharedPreferencesUtils(getApplication()).getCompletedMusic(),
