@@ -54,6 +54,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <meta-data
+            android:name="app_description_title"
+            android:resource="@string/uninstall_tip"/>
+        <meta-data
+            android:name="app_description_content"
+            android:resource="@string/uninstall_content"/>
     </application>
 
 </manifest>
