@@ -14,6 +14,7 @@ import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
+import com.guang.cloudx.util.ext.d
 import kotlinx.coroutines.*
 import java.util.*
 
@@ -58,6 +59,7 @@ class DownloadService : Service() {
                     downloadQueue.add(music)
                     val ts = timeStampList.getOrNull(index) ?: System.currentTimeMillis()
                     musicTimeStampMap[music] = ts
+                    progressMap.putIfAbsent(ts + music.id, 0)
                 }
             }
         }
@@ -88,7 +90,8 @@ class DownloadService : Service() {
                         }
                     }
 
-                    val id = musicTimeStampMap[item] ?: System.currentTimeMillis()
+                    val timestamp = musicTimeStampMap[item] ?: System.currentTimeMillis()
+                    val id = timestamp + item.id
 
                     try {
                         repository.downloadMusic(
@@ -100,8 +103,9 @@ class DownloadService : Service() {
                             targetDir
                         ) { music, progress ->
                             progressMap[id] = progress
+                            progressMap.size.d()
                             val avgProgress =
-                                if (progressMap.isNotEmpty()) progressMap.values.sum() / (totalCompleted + downloadQueue.size + 1) else 0
+                                if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
                             updateNotification(
                                 "音乐下载（$totalCompleted/${totalCompleted + downloadQueue.size + 1}）",
                                 "正在下载 ${music.name}（$progress%）",
@@ -113,7 +117,7 @@ class DownloadService : Service() {
                                     .setPackage(packageName)
                                     .apply {
                                         putExtra("musicJson", Gson().toJson(music))
-                                        putExtra("timeStamp", id)
+                                        putExtra("timeStamp", timestamp)
                                         putExtra("progress", progress)
                                     }
                             )
@@ -127,7 +131,7 @@ class DownloadService : Service() {
                                 .setPackage(packageName)
                                 .apply {
                                     putExtra("reason", e.localizedMessage)
-                                    putExtra("timeStamp", id)
+                                    putExtra("timeStamp", timestamp)
                                     putExtra("musicJson", Gson().toJson(item))
                                 }
                         )
