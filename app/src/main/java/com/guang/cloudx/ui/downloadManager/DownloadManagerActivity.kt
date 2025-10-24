@@ -109,7 +109,9 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
                             prefs.getIsSaveRomaLrc(),
                             prefs.getIsSaveYrc(),
                             prefs.getDownloadFileName()!!,
-                            prefs.getArtistsDelimiter()!!)
+                            prefs.getArtistsDelimiter()!!,
+                            prefs.getLrcEncoding()!!,
+                        )
                     ) }
                 },
                 onDeleteFailed = { item ->

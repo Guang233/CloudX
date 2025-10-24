@@ -13,4 +13,5 @@ data class Lyric(val lrc: String, val tlyric: String, val romalrc: String,
 data class MusicUrl(val url: String, val level: String)
 
 data class MusicDownloadRules(val isSaveLrc: Boolean, val isSaveTlLrc: Boolean, val isSaveRomaLrc: Boolean, val isSaveYrc: Boolean,
-                              val fileName: String, val delimiter: String)
+                              val fileName: String, val delimiter: String,
+                              val encoding: String)

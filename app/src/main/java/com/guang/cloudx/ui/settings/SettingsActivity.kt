@@ -396,6 +396,22 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    MenuListItem(
+                        icon = Icons.Outlined.Code,
+                        title = "保存歌词文件编码",
+                        options = listOf(
+                            "UTF-8", "UTF-8-BOM", "UTF-16", "UTF-16LE", "UTF-16BE",
+                            "GB2312", "GBK", "GB18030",
+                            "Big5", "Big5-HKSCS",
+                            "ISO-8859-1", "Windows-1252",
+                            "ASCII"
+                        ),
+                        selectedOption = prefs.getLrcEncoding()!!,
+                        onOptionSelected = { prefs.putLrcEncoding(it) }
+                    )
+                }
+
+                item {
                     Text(
                         "关于",
                         style = MaterialTheme.typography.titleSmall,

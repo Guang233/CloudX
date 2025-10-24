@@ -104,7 +104,8 @@ open class BaseActivity : AppCompatActivity() {
                 prefs.getIsSaveRomaLrc(),
                 prefs.getIsSaveYrc(),
                 prefs.getDownloadFileName()!!,
-                prefs.getArtistsDelimiter()!!
+                prefs.getArtistsDelimiter()!!,
+                prefs.getLrcEncoding()!!
             )
         )
 

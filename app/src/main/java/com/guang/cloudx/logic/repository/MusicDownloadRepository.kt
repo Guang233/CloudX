@@ -20,6 +20,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.charset.Charset
 
 class MusicDownloadRepository(
     maxParallel: Int
@@ -156,7 +157,7 @@ class MusicDownloadRepository(
                         try {
                             context.contentResolver.openFileDescriptor(existingLrc.uri, "w")?.use { pfd ->
                                 FileOutputStream(pfd.fileDescriptor).use { out ->
-                                    out.write(lrcText.toByteArray())
+                                    out.write(lrcText.toByteArray(Charset.forName(rules.encoding)))
                                 }
                             } ?: throw Exception("无法打开已存在的 lrc 输出流")
                         } catch (e: Exception) {
@@ -165,7 +166,7 @@ class MusicDownloadRepository(
                             val lrcDoc = targetDir.createFile("application/octet-stream", lrcName)
                             lrcDoc?.let {
                                 context.contentResolver.openOutputStream(it.uri)?.use { out ->
-                                    out.write(lrcText.toByteArray())
+                                    out.write(lrcText.toByteArray(Charset.forName(rules.encoding)))
                                     out.flush()
                                 }
                             }
@@ -174,7 +175,7 @@ class MusicDownloadRepository(
                         val lrcDoc = targetDir.createFile("application/octet-stream", lrcName)
                         lrcDoc?.let {
                             context.contentResolver.openOutputStream(it.uri)?.use { out ->
-                                out.write(lrcText.toByteArray())
+                                out.write(lrcText.toByteArray(Charset.forName(rules.encoding)))
                                 out.flush()
                             }
                         }
