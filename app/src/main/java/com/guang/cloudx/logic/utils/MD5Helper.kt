@@ -8,7 +8,7 @@ object MD5Helper {
      * @param input 输入字符串
      * @return 32位小写十六进制 MD5 哈希值
      */
-    fun md5(input: String): String {
+    fun calculateMD5(input: String): String {
         val digest = MessageDigest.getInstance("MD5")
         val hashBytes = digest.digest(input.toByteArray(Charsets.UTF_8))
 

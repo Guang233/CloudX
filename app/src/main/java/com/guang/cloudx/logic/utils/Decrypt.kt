@@ -4,8 +4,8 @@ import android.annotation.SuppressLint
 import com.guang.cloudx.logic.model.*
 import org.json.JSONObject
 
-class Decrypt {
-    companion object {
+object Decrypt {
+
         fun decryptSearch(encryptedBody: String): List<Music> {
             val decryptedJson = AESECBHelper.decrypt(encryptedBody)
             val data = JSONObject(decryptedJson)
@@ -215,5 +215,5 @@ class Decrypt {
                 data.getString("token"))
         }
 
-    }
+
 }
