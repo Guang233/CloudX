@@ -8,7 +8,7 @@
 
 <h3>🎵 一款采用MD3风格设计的第三方网易云音乐下载工具 🎵</h3>
 
-[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Android CL](https://github.com/Guang233/CloudX/actions/workflows/android.yml/badge.svg)](https://github.com/Guang233/CloudX/actions/workflows/android.yml)
+[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/Guang233/CloudX/blob/master/LICENSE)[![Latest Release](https://img.shields.io/github/v/release/Guang233/CloudX?label=稳定版)](https://github.com/Guang233/CloudX/releases/latest)[![Prerelease](https://img.shields.io/github/v/release/Guang233/CloudX?include_prereleases&label=测试版)](https://github.com/Guang233/CloudX/releases)[![Android CI](https://github.com/Guang233/CloudX/actions/workflows/android.yml/badge.svg)](https://github.com/Guang233/CloudX/actions/workflows/android.yml)
 
 </div>
 
@@ -34,7 +34,7 @@ CloudX是一个轻量、精简的音乐下载器。
 - [x] 解析专辑
 - [x] 导入ID3标签
 - [x] 后台下载
-- [x] 下载歌词（逐行）
+- [x] 下载歌词（默认逐行、逐字需歌曲支持）
 - [x] 歌词支持常见编码
 - [x] 填入cookies登录账号
 - [x] 使用手机验证码登录账号
