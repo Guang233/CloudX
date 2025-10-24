@@ -4,6 +4,7 @@ import androidx.lifecycle.liveData
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.PlayList
 import com.guang.cloudx.logic.network.MusicNetwork
+import com.guang.cloudx.util.ext.e
 import kotlinx.coroutines.Dispatchers
 
 object Repository {
@@ -13,15 +14,27 @@ object Repository {
             emit(Result.success(musicList))
         } catch (e: Exception) {
             emit(Result.failure<List<Music>>(e))
+            e.e()
         }
     }
 
     fun getPlayList(id: String, cookie: String) = liveData(Dispatchers.IO) {
         try {
-            val playList = MusicNetwork.getPlayList(id,  cookie)
+            val playList = MusicNetwork.getPlayList(id, cookie)
             emit(Result.success(playList))
         } catch (e: Exception) {
             emit(Result.failure<PlayList>(e))
+            e.e()
+        }
+    }
+
+    fun getAlbum(id: String, cookie: String) = liveData(Dispatchers.IO) {
+        try {
+            val album = MusicNetwork.getAlbum(id, cookie)
+            emit(Result.success(album))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+            e.e()
         }
     }
 
@@ -31,6 +44,7 @@ object Repository {
             emit(Result.success(userDetail))
         } catch (e: Exception) {
             emit(Result.failure(e))
+            e.e()
         }
     }
 

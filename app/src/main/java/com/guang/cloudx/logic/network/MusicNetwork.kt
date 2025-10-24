@@ -1,11 +1,6 @@
 package com.guang.cloudx.logic.network
 
-import com.guang.cloudx.logic.model.Lyric
-import com.guang.cloudx.logic.model.MusicUrl
-import com.guang.cloudx.logic.model.PlayList
-import com.guang.cloudx.logic.model.Music
-import com.guang.cloudx.logic.model.User
-import com.guang.cloudx.logic.model.UserData
+import com.guang.cloudx.logic.model.*
 import com.guang.cloudx.logic.utils.AESECBHelper
 import com.guang.cloudx.logic.utils.Decrypt
 import com.guang.cloudx.logic.utils.MD5Helper
@@ -56,6 +51,23 @@ object MusicNetwork {
         return Decrypt.decryptPlayList(
             musicService
                 .getPlayList(AESECBHelper.encrypt(query), cookie)
+                .await()
+        )
+    }
+
+    suspend fun getAlbum(id: String, cookie: String): PlayList {
+        val cacheKey = AESECBHelper.encrypt(
+            input = "e_r=true&id=$id",
+            outputFormat = AESECBHelper.Format.BASE64,
+            secretKey = ")(13daqP@ssw0rd~".toByteArray(Charsets.UTF_8)
+        )
+        val bodyJSON = "{\"id\":\"$id\",\"e_r\":true,\"cache_key\":\"$cacheKey\",\"header\":\"\"}"
+        val query = "/api/album/v3/detail-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.md5("nobody/api/album/v3/detailuse${bodyJSON}md5forencrypt")}"
+        return Decrypt.decryptAlbum(
+            musicService.getAlbum(
+                body = AESECBHelper.encrypt(query),
+                cookie = cookie
+            )
                 .await()
         )
     }

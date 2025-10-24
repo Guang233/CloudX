@@ -2,10 +2,9 @@ package com.guang.cloudx.logic.utils
 
 import android.annotation.SuppressLint
 import android.os.Build
-import android.util.Log
+import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
-import java.util.Base64
 
 class AESECBHelper {
 
@@ -29,7 +28,8 @@ class AESECBHelper {
         fun encrypt(
             input: String,
             inputFormat: Format = Format.STRING,
-            outputFormat: Format = Format.HEX
+            outputFormat: Format = Format.HEX,
+            secretKey: ByteArray = SECRET_KEY
         ): String {
             val inputBytes = when (inputFormat) {
                 Format.STRING -> input.toByteArray(Charsets.UTF_8)
@@ -41,7 +41,7 @@ class AESECBHelper {
                 }
             }
 
-            val encrypted = encryptBytes(inputBytes)
+            val encrypted = encryptBytes(inputBytes, secretKey)
 
             return when (outputFormat) {
                 Format.STRING -> String(encrypted, Charsets.UTF_8)
@@ -59,7 +59,8 @@ class AESECBHelper {
         fun decrypt(
             input: String,
             inputFormat: Format = Format.HEX,
-            outputFormat: Format = Format.STRING
+            outputFormat: Format = Format.STRING,
+            secretKey: ByteArray = SECRET_KEY
         ): String {
             val inputBytes = when (inputFormat) {
                 Format.STRING -> input.toByteArray(Charsets.UTF_8)
@@ -71,7 +72,7 @@ class AESECBHelper {
                 }
             }
 
-            val decrypted = decryptBytes(inputBytes)
+            val decrypted = decryptBytes(inputBytes, secretKey)
 
             return when (outputFormat) {
                 Format.STRING -> String(decrypted, Charsets.UTF_8)
@@ -81,17 +82,17 @@ class AESECBHelper {
         }
 
         @SuppressLint("GetInstance")
-        private fun encryptBytes(input: ByteArray): ByteArray {
+        private fun encryptBytes(input: ByteArray, secretKey: ByteArray): ByteArray {
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            val keySpec = SecretKeySpec(SECRET_KEY, ALGORITHM)
+            val keySpec = SecretKeySpec(secretKey, ALGORITHM)
             cipher.init(Cipher.ENCRYPT_MODE, keySpec)
             return cipher.doFinal(input)
         }
 
         @SuppressLint("GetInstance")
-        private fun decryptBytes(input: ByteArray): ByteArray {
+        private fun decryptBytes(input: ByteArray, secretKey: ByteArray): ByteArray {
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            val keySpec = SecretKeySpec(SECRET_KEY, ALGORITHM)
+            val keySpec = SecretKeySpec(secretKey, ALGORITHM)
             cipher.init(Cipher.DECRYPT_MODE, keySpec)
 //            Log.d("TAG", byteArrayToHexString(input))
             val doFinal = cipher.doFinal(input)

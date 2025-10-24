@@ -31,6 +31,7 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.navigation.NavigationView
+import com.google.android.material.textfield.TextInputLayout
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
@@ -239,12 +240,42 @@ class MainActivity : BaseActivity() {
                             if (!editText.text.isEmpty()) {
                                 val id = with(editText.text.toString()) {
                                     if (this.matches(Regex("[0-9]+"))) this
-                                    else """music\.163\.com.*?playlist*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                    else """music\.163\.com.*?playlist*?id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                                         ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                                 }
                                 if (id != null)
-                                    startActivity<PlayListActivity> { putExtra("id", id) }
+                                    startActivity<PlayListActivity> {
+                                        putExtra("type", "playlist")
+                                        putExtra("id", id)
+                                    }
                                 else navigationView.showSnackBar("请输入正确的歌单ID或链接")
+                            }
+                        }
+                        .show()
+                    true
+                }
+
+                R.id.nav_add_album -> {
+                    val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
+                    view.findViewById<TextInputLayout>(R.id.playListIdInputLayout).hint = "专辑ID或链接"
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("解析专辑")
+                        .setView(view)
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("确定") { _, _ ->
+                            val editText = view.findViewById<EditText>(R.id.playListIdEditText)
+                            if (!editText.text.isEmpty()) {
+                                val id = with(editText.text.toString()) {
+                                    if (this.matches(Regex("[0-9]+"))) this
+                                    else """music\.163\.com.*?album*?id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                        ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                }
+                                if (id != null)
+                                    startActivity<PlayListActivity> {
+                                        putExtra("type", "album")
+                                        putExtra("id", id)
+                                    }
+                                else navigationView.showSnackBar("请输入正确的专辑ID或链接")
                             }
                         }
                         .show()

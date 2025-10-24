@@ -2,7 +2,6 @@ package com.guang.cloudx.logic.utils
 
 import android.annotation.SuppressLint
 import com.guang.cloudx.logic.model.*
-import com.guang.cloudx.util.ext.d
 import org.json.JSONObject
 
 class Decrypt {
@@ -167,8 +166,7 @@ class Decrypt {
             val id = data.getLong("id")
 
             val tracks = data.getJSONArray("tracks")
-            tracks.length().d()
-            val music = with(ArrayList<Music>()) {
+            val musics = with(ArrayList<Music>()) {
                 for (i in 0 until tracks.length()) {
                     val track = tracks.getJSONObject(i)
                     add(parseSong(track))
@@ -176,7 +174,25 @@ class Decrypt {
                 toList()
             }
 
-            return PlayList(name, coverImgUrl, music, id)
+            return PlayList(name, coverImgUrl, musics, id)
+        }
+
+        fun decryptAlbum(encryptedBody: String): PlayList {
+            val decryptedJson = AESECBHelper.decrypt(encryptedBody)
+            val data = JSONObject(decryptedJson).getJSONObject("album")
+            val name = data.getString("name")
+            val coverImgUrl = data.getString("picUrl")
+            val id = data.getLong("id")
+
+            val songs = JSONObject(decryptedJson).getJSONArray("songs")
+            val musics = with(ArrayList<Music>()) {
+                for (i in 0 until songs.length()) {
+                    val song = songs.getJSONObject(i)
+                    add(parseSong(song))
+                }
+                toList()
+            }
+            return PlayList(name, coverImgUrl, musics, id)
         }
 
         fun decryptUserDetail(encryptedBody: String): User {

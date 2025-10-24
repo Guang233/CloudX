@@ -36,6 +36,7 @@ class PlayListActivity : BaseActivity() {
     private lateinit var playList: PlayList
     private val musicList = mutableListOf<Music>()
     private lateinit var playListId: String
+    private lateinit var type: String
     private val viewModel by viewModels<PlayListViewModel>()
 
     private val rootLayout by lazy { findViewById<CoordinatorLayout>(R.id.rootLayout) }
@@ -61,9 +62,10 @@ class PlayListActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_playlist)
 
+        type = intent.getStringExtra("type")!!
         playListId = intent.getStringExtra("id")!!
 
-        if (prefs.getCookie() == "") {
+        if (prefs.getCookie() == "" && type == "playlist") {
             MaterialAlertDialogBuilder(this)
                 .setTitle("提示")
                 .setMessage("此接口未登录只能获取前十首歌曲")
@@ -91,7 +93,7 @@ class PlayListActivity : BaseActivity() {
         }
 
         swipeRefresh.isRefreshing = true
-        viewModel.getPlayList(playListId, prefs.getCookie())
+        viewModel.getPlayList(playListId, prefs.getCookie(), type)
 
         initRecyclerView()
 
@@ -123,7 +125,7 @@ class PlayListActivity : BaseActivity() {
             else if (viewModel.isMultiSelectionMode) swipeRefresh.isRefreshing = false
             else {
                 musicList.clear()
-                viewModel.getPlayList(playListId, prefs.getCookie())
+                viewModel.getPlayList(playListId, prefs.getCookie(), type)
             }
         }
 
