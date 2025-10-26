@@ -119,7 +119,7 @@ object Decrypt {
                 val endTimeMs = timeMatch?.groupValues?.get(2)?.toLongOrNull() ?: 0L
 
                 // 2. 提取逐字部分
-                val wordRegex = Regex("""\((\d+),\d+,\d+\)(.)""")
+                val wordRegex = Regex("""\((\d+),\d+,\d+\)([\s\S]*?)(?=(?:\(\d+|\[\d+)|$)""")
                 val matches = wordRegex.findAll(line)
 
                 for (match in matches) {
