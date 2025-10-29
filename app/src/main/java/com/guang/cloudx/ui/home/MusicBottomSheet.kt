@@ -55,9 +55,18 @@ class MusicBottomSheet(
             else -> buttonGroup.check(R.id.btnStandardQuality)
         }
 
-        bsMusicName.setOnClickListener { SystemUtils.copyToClipboard(this.requireContext(), "musicName", music.name) }
-        bsMusicAuthor.setOnClickListener { SystemUtils.copyToClipboard(this.requireContext(), "musicArtists", artists) }
-        bsMusicAlbum.setOnClickListener { SystemUtils.copyToClipboard(this.requireContext(), "musicAlbum", music.album.name) }
+        bsMusicName.apply {
+            isSelected = true
+            setOnClickListener { SystemUtils.copyToClipboard(requireContext(), "musicName", music.name) }
+        }
+        bsMusicAuthor.apply {
+            isSelected = true
+            setOnClickListener { SystemUtils.copyToClipboard(requireContext(), "musicArtists", artists) }
+        }
+        bsMusicAlbum.apply {
+            isSelected = true
+            setOnClickListener { SystemUtils.copyToClipboard(requireContext(), "musicAlbum", music.album.name) }
+        }
         bsMusicIcon.setOnClickListener {
             val shapeableImageView = ShapeableImageView(requireContext()).apply {
                 layoutParams = ViewGroup.LayoutParams(

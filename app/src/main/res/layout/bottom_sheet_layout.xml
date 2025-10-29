@@ -8,108 +8,68 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="20dp"
+        android:paddingBottom="8dp"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
             android:id="@+id/drag_handle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
-    <TextView
-            android:id="@+id/itemTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="歌曲信息"
-            android:layout_gravity="center"
-            android:textSize="24sp"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold"/>
 
-    <LinearLayout
+
+    <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/musicIconDetail"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_gravity="center"
+            android:src="@mipmap/ic_launcher"
+            android:elevation="2dp"
+            android:layout_marginBottom="16dp"
+            app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.ExtraLarge"/>
+
+    <TextView
+            android:id="@+id/musicNameDetail"
+            style="?attr/textAppearanceTitleLarge"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="horizontal"
-            android:layout_gravity="center"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp"
-            android:layout_marginTop="16dp">
+            android:layout_marginVertical="5dp"
+            android:layout_marginHorizontal="24dp"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:scrollHorizontally="true"
+            android:gravity="center"/>
 
-        <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/musicIconDetail"
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:src="@mipmap/ic_launcher"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Large"
-                android:layout_marginEnd="20dp"/>
+    <TextView
+            android:id="@+id/musicAuthorDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="5dp"
+            android:layout_marginHorizontal="24dp"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:scrollHorizontally="true"
+            android:gravity="center"/>
 
-        <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:layout_marginVertical="2dp"
-                android:paddingHorizontal="8dp">
+    <TextView
+            android:id="@+id/musicAlbumDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="5dp"
+            android:layout_marginHorizontal="24dp"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:scrollHorizontally="true"
+            android:gravity="center"/>
 
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="曲名"
-                    android:textColor="?attr/colorOnSurface"/>
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="作者"
-                    android:textColor="?attr/colorOnSurface"/>
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="专辑"
-                    android:textColor="?attr/colorOnSurface"/>
-
-        </LinearLayout>
-
-        <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="5"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:layout_marginVertical="2dp"
-                android:paddingHorizontal="8dp">
-
-            <TextView
-                    android:id="@+id/musicNameDetail"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:gravity="center_vertical"/>
-            <TextView
-                    android:id="@+id/musicAuthorDetail"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:gravity="center_vertical"/>
-            <TextView
-                    android:id="@+id/musicAlbumDetail"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:gravity="center_vertical"/>
-        </LinearLayout>
-    </LinearLayout>
     <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -121,7 +81,7 @@
             android:isScrollContainer="false"
             android:fillViewport="true">
 
-<!--        这里套一层 FrameLayout 是为了可以居中显示-->
+        <!--        这里套一层 FrameLayout 是为了可以居中显示-->
         <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
@@ -132,7 +92,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="24dp"
                     android:layout_marginEnd="24dp"
-                    android:layout_marginTop="24dp"
+                    android:layout_marginTop="20dp"
                     android:gravity="center"
                     app:singleSelection="true"
                     app:selectionRequired="true">
@@ -146,7 +106,7 @@
                         android:minWidth="0dp"
                         android:minHeight="45dp"
                         android:checkable="true"
-                        android:text="标准" />
+                        android:text="标准"/>
 
                 <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnHQ"
@@ -157,7 +117,7 @@
                         android:minWidth="0dp"
                         android:minHeight="45dp"
                         android:checkable="true"
-                        android:text="极高" />
+                        android:text="极高"/>
 
                 <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSQ"
@@ -168,7 +128,7 @@
                         android:minWidth="0dp"
                         android:minHeight="45dp"
                         android:checkable="true"
-                        android:text="无损" />
+                        android:text="无损"/>
 
                 <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnHiRes"
@@ -179,7 +139,7 @@
                         android:minWidth="0dp"
                         android:minHeight="45dp"
                         android:checkable="true"
-                        android:text="Hi-Res" />
+                        android:text="Hi-Res"/>
 
             </com.google.android.material.button.MaterialButtonToggleGroup>
         </FrameLayout>
