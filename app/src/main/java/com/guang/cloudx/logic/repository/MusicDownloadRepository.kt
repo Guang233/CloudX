@@ -249,15 +249,16 @@ class MusicDownloadRepository(
 
     suspend fun cacheMusic(
         music: Music,
-        parent: File
+        parent: File,
+        cookie: String
     ): File {
         val file = File(parent, music.id.toString())
         if (!file.exists()) {
-            file.createNewFile()
             downloadFile(
-                url = MusicNetwork.getMusicUrl(music.id.toString(), "standard", "").url,
+                url = MusicNetwork.getMusicUrl(music.id.toString(), "standard", cookie).url,
                 file = file
             )
+            file.createNewFile()
         }
         return file
     }

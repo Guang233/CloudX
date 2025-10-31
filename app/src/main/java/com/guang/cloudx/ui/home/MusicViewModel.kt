@@ -11,10 +11,10 @@ import java.io.File
 class MusicViewModel : ViewModel() {
     val musicFile = MutableLiveData<File?>()
 
-    fun cacheMusic(music: Music, parent: File) {
+    fun cacheMusic(music: Music, parent: File, cookie: String) {
         viewModelScope.launch {
             runCatching {
-                MusicDownloadRepository(maxParallel = 1).cacheMusic(music, parent)
+                MusicDownloadRepository(maxParallel = 1).cacheMusic(music, parent, cookie)
             }.onSuccess {
                 musicFile.postValue(it)
             }.onFailure {

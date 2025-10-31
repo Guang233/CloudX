@@ -180,7 +180,11 @@ class MusicBottomSheet(
 
         playButton.setOnClickListener {
             if (musicFile == null) {
-                viewModel.cacheMusic(music, requireContext().externalCacheDir!!)
+                viewModel.cacheMusic(
+                    music,
+                    requireContext().externalCacheDir!!,
+                    SharedPreferencesUtils(requireContext()).getCookie()
+                )
                 playButton.visibility = View.GONE
                 progress.visibility = View.VISIBLE
             } else {
