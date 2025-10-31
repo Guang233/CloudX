@@ -194,7 +194,7 @@ class MusicDownloadRepository(
     }
 
     suspend fun downloadFile(
-        context: Context,
+        context: Context? = null,
         url: String,
         file: File? = null,                // 如果是普通 File
         documentFile: DocumentFile? = null, // 如果是 SAF 目录的 DocumentFile
@@ -219,7 +219,7 @@ class MusicDownloadRepository(
             val output: OutputStream = when {
                 file != null -> file.outputStream()
                 documentFile != null -> {
-                    context.contentResolver.openOutputStream(documentFile.uri)
+                    context!!.contentResolver.openOutputStream(documentFile.uri)
                         ?: throw Exception("无法打开 OutputStream")
                 }
 
@@ -245,6 +245,21 @@ class MusicDownloadRepository(
         } finally {
             conn.disconnect()
         }
+    }
+
+    suspend fun cacheMusic(
+        music: Music,
+        parent: File
+    ): File {
+        val file = File(parent, music.id.toString())
+        if (!file.exists()) {
+            file.createNewFile()
+            downloadFile(
+                url = MusicNetwork.getMusicUrl(music.id.toString(), "standard", "").url,
+                file = file
+            )
+        }
+        return file
     }
 
     private fun detectFileTypeFromFile(file: File): String {

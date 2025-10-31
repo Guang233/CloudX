@@ -62,6 +62,7 @@ class SettingsActivity : BaseActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun SettingsScreen() {
+        var previewMusicEnabled by rememberSaveable { mutableStateOf(prefs.getIsPreviewMusic()) }
         var lrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveLrc()) }
         var tlLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveTlLrc()) }
         var romaLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveRomaLrc()) }
@@ -126,6 +127,19 @@ class SettingsActivity : BaseActivity() {
                             scope.launch {
                                 snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
                             }
+                        }
+                    )
+                }
+
+                item {
+                    SwitchListItem(
+                        icon = Icons.Outlined.MusicNote,
+                        title = "音乐试听",
+                        description = "音乐详情界面可以试听音乐",
+                        checked = previewMusicEnabled,
+                        onCheckedChange = {
+                            previewMusicEnabled = it
+                            prefs.putIsPreviewMusic(previewMusicEnabled)
                         }
                     )
                 }
@@ -457,10 +471,16 @@ class SettingsActivity : BaseActivity() {
                     ActionListItem(
                         icon = Icons.Outlined.CleaningServices,
                         title = "清除缓存",
-                        description = "清除歌曲封面缓存",
+                        description = "清除歌曲封面和试听缓存",
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 Glide.get(context).clearDiskCache()
+
+                                val cacheDir = context.externalCacheDir!!
+                                if (cacheDir.exists() && cacheDir.isDirectory) {
+                                    cacheDir.deleteRecursively()
+                                }
+
                                 withContext(Dispatchers.Main) {
                                     snackbarHostState.showSnackbar("已清理")
                                 }

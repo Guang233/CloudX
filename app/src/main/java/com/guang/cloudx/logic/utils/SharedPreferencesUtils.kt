@@ -6,10 +6,10 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 
 class SharedPreferencesUtils(context: Context) {
-    val sharedPreferences: SharedPreferences =  context.getSharedPreferences("settings", MODE_PRIVATE)
+    val sharedPreferences: SharedPreferences = context.getSharedPreferences("settings", MODE_PRIVATE)
     fun getMusicLevel() = sharedPreferences.getString("music_level", "standard").toString()
     fun getIsAutoLevel() = sharedPreferences.getBoolean("auto_level", true)
-    fun getCookie() =  sharedPreferences.getString("cookie", "").toString()
+    fun getCookie() = sharedPreferences.getString("cookie", "").toString()
     fun getIsSaveLrc() = sharedPreferences.getBoolean("is_save_lrc", false)
     fun getIsSaveTlLrc() = sharedPreferences.getBoolean("is_save_translate_lrc", true)
     fun getIsSaveRomaLrc() = sharedPreferences.getBoolean("is_save_roma_lrc", false)
@@ -20,6 +20,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getDownloadFileName() = sharedPreferences.getString("download_file_name", $$"${level}${name}-${artists}")
     fun getArtistsDelimiter() = sharedPreferences.getString("artists_delimiter", "、")
     fun getLrcEncoding() = sharedPreferences.getString("lrc_encoding", "UTF-8")
+    fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", true)
 
     fun putMusicLevel(musicLevel: String) = sharedPreferences.edit { putString("music_level", musicLevel) }
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }
@@ -34,4 +35,5 @@ class SharedPreferencesUtils(context: Context) {
     fun putDownloadFileName(value: String) = sharedPreferences.edit { putString("download_file_name", value) }
     fun putArtistsDelimiter(value: String) = sharedPreferences.edit { putString("artists_delimiter", value) }
     fun putLrcEncoding(value: String) = sharedPreferences.edit { putString("lrc_encoding", value) }
+    fun putIsPreviewMusic(value: Boolean) = sharedPreferences.edit { putBoolean("is_preview_music", value) }
 }
