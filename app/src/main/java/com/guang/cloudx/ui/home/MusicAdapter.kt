@@ -1,7 +1,7 @@
 package com.guang.cloudx.ui.home
 
+import android.annotation.SuppressLint
 import android.view.LayoutInflater
-import com.guang.cloudx.R
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -11,14 +11,17 @@ import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.imageview.ShapeableImageView
+import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
 
-class MusicAdapter(val musicList: List<Music>,
-                   private val onDownloadClick: (Music) -> Unit,
-                   private val onItemClick: (Music) -> Unit,
-                   private val onSelect: (Int) -> Unit,
-                   private val onItemLongClick: () -> Unit): RecyclerView.Adapter<MusicAdapter.ViewHolder>() {
-    inner class ViewHolder(view: View): RecyclerView.ViewHolder(view) {
+class MusicAdapter(
+    val musicList: List<Music>,
+    private val onDownloadClick: (Music) -> Unit,
+    private val onItemClick: (Music) -> Unit,
+    private val onSelect: (Int) -> Unit,
+    private val onItemLongClick: () -> Unit
+) : RecyclerView.Adapter<MusicAdapter.ViewHolder>() {
+    inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val musicIcon: ShapeableImageView = view.findViewById(R.id.musicIcon)
         val musicName: TextView = view.findViewById(R.id.musicName)
         val musicAuthor: TextView = view.findViewById(R.id.musicAuthor)
@@ -47,7 +50,7 @@ class MusicAdapter(val musicList: List<Music>,
         Glide.with(holder.itemView.context).load(music.album.picUrl).into(holder.musicIcon)
         holder.musicName.text = music.name
         val authors = music.artists.joinToString("/") { it.name }
-        val album =  music.album.name
+        val album = music.album.name
         holder.musicAuthor.text =
             if ("" != album) "$authors - $album"
             else authors
@@ -69,8 +72,9 @@ class MusicAdapter(val musicList: List<Music>,
                 holder.checkBox.isChecked = true
                 toggleSelection(music)
                 onSelect(selectedItems.size)
-            }
-            true
+                true
+            } else
+                false
         }
         holder.checkBox.setOnClickListener {
             toggleSelection(music)
@@ -88,17 +92,20 @@ class MusicAdapter(val musicList: List<Music>,
         }
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     fun enterMultiSelectMode() {
         multiSelectMode = true
         notifyDataSetChanged()
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     fun exitMultiSelectMode() {
         multiSelectMode = false
         selectedItems.clear()
         notifyDataSetChanged()
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     fun selectAll() {
         selectedItems.clear()
         selectedItems.addAll(musicList)
@@ -106,6 +113,7 @@ class MusicAdapter(val musicList: List<Music>,
         onSelect(selectedItems.size)
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     fun invertSelection() {
         val newSelection = mutableSetOf<Music>()
         musicList.forEach { music ->
@@ -119,5 +127,5 @@ class MusicAdapter(val musicList: List<Music>,
         onSelect(selectedItems.size)
     }
 
-    fun getSelectedMusic() =  selectedItems.toList()
+    fun getSelectedMusic() = selectedItems.toList()
 }
