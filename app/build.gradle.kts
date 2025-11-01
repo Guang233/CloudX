@@ -76,7 +76,7 @@ dependencies {
     implementation("androidx.browser:browser:1.9.0")
     implementation("com.google.android.material:material:1.14.0-alpha06")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
-    implementation("androidx.compose.foundation:foundation:1.9.3")
+    implementation("androidx.compose.foundation:foundation:1.9.4")
     implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("androidx.activity:activity-ktx:1.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4")
