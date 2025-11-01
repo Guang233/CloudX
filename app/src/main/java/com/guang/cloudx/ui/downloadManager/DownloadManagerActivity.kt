@@ -122,7 +122,7 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
 
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.downloading.collect { list ->
-                adapter.submitList(list.reversed())
+                adapter.submitList(list)
             }
         }
     }
