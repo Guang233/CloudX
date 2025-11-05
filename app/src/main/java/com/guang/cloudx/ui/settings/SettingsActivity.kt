@@ -39,7 +39,9 @@ import androidx.core.net.toUri
 import com.bumptech.glide.Glide
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.BuildConfig
+import com.guang.cloudx.logic.repository.UpdateResult
 import com.guang.cloudx.logic.utils.SystemUtils
+import com.guang.cloudx.logic.utils.toast
 import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -435,17 +437,31 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    var isChecked by remember { mutableStateOf(false) }
                     val v = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
                     ActionListItem(
                         icon = Icons.Outlined.Apps,
                         title = "应用版本",
                         description = v,
                         onClick = {
+                            isChecked = true
+                        },
+                        onLongClick = {
                             scope.launch {
                                 SystemUtils.copyToClipboard(context, "version", v)
                             }
                         }
                     )
+
+                    if (isChecked) {
+                        UpdateScreen(
+                            onEnd = { isChecked = false },
+                            showSnackbar = {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(it)
+                                }
+                            })
+                    }
                 }
 
                 item {
@@ -457,7 +473,7 @@ class SettingsActivity : BaseActivity() {
                         onClick = {
                             val builder = CustomTabsIntent.Builder()
                             val customTabsIntent = builder.build()
-                            customTabsIntent.launchUrl(context, Uri.parse(url))
+                            customTabsIntent.launchUrl(context, url.toUri())
                         },
                         onLongClick = {
                             scope.launch {
@@ -627,4 +643,43 @@ class SettingsActivity : BaseActivity() {
         // 其他情况无法解析
         return null
     }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun UpdateScreen(
+        viewModel: SettingsViewModel = SettingsViewModel(),
+        onEnd: () -> Unit,
+        showSnackbar: (String) -> Unit
+    ) {
+        val state by viewModel.updateState.collectAsState()
+
+        LaunchedEffect(Unit) {
+            viewModel.checkUpdate()
+        }
+
+        when (state) {
+            is UpdateResult.Loading -> {
+                showSnackbar("正在检测更新...")
+            }
+
+            is UpdateResult.Success -> {
+                val info = (state as UpdateResult.Success).data
+                if (BuildConfig.VERSION_CODE <= info.build) {
+                    val builder = CustomTabsIntent.Builder()
+                    val customTabsIntent = builder.build()
+                    "检测到新版本".toast(LocalContext.current)
+                    customTabsIntent.launchUrl(LocalContext.current, info.download_url.toUri())
+                } else {
+                    showSnackbar("已是最新版本")
+                }
+                onEnd.invoke()
+            }
+
+            is UpdateResult.Error -> {
+                showSnackbar((state as UpdateResult.Error).message)
+                onEnd.invoke()
+            }
+        }
+    }
+
 }

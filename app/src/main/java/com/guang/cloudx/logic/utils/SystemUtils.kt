@@ -13,3 +13,5 @@ object SystemUtils {
         Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
     }
 }
+
+fun String.toast(context: Context) = Toast.makeText(context, this, Toast.LENGTH_SHORT).show()
