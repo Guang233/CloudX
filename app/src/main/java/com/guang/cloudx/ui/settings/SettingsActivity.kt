@@ -664,7 +664,7 @@ class SettingsActivity : BaseActivity() {
 
             is UpdateResult.Success -> {
                 val info = (state as UpdateResult.Success).data
-                if (BuildConfig.VERSION_CODE <= info.build) {
+                if (BuildConfig.VERSION_CODE < info.build) {
                     val builder = CustomTabsIntent.Builder()
                     val customTabsIntent = builder.build()
                     "检测到新版本".toast(LocalContext.current)
