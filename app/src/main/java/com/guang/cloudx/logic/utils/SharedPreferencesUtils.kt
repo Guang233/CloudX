@@ -20,7 +20,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getDownloadFileName() = sharedPreferences.getString("download_file_name", $$"${level}${name}-${artists}")
     fun getArtistsDelimiter() = sharedPreferences.getString("artists_delimiter", "、")
     fun getLrcEncoding() = sharedPreferences.getString("lrc_encoding", "UTF-8")
-    fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", true)
+    fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
 
     fun putMusicLevel(musicLevel: String) = sharedPreferences.edit { putString("music_level", musicLevel) }
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }
