@@ -240,7 +240,7 @@ class MainActivity : BaseActivity() {
                             if (!editText.text.isEmpty()) {
                                 val id = with(editText.text.toString()) {
                                     if (this.matches(Regex("[0-9]+"))) this
-                                    else """music\.163\.com.*?playlist*?id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                    else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                                         ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                                 }
                                 if (id != null)
@@ -267,7 +267,7 @@ class MainActivity : BaseActivity() {
                             if (!editText.text.isEmpty()) {
                                 val id = with(editText.text.toString()) {
                                     if (this.matches(Regex("[0-9]+"))) this
-                                    else """music\.163\.com.*?album*?id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                    else """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                                         ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                                 }
                                 if (id != null)
