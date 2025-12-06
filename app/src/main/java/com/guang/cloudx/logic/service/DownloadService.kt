@@ -103,12 +103,12 @@ class DownloadService : Service() {
                             targetDir
                         ) { music, progress ->
                             progressMap[id] = progress
-                            progressMap.size.d()
+//                            progressMap.size.d()
                             val avgProgress =
                                 if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
                             updateNotification(
-                                "音乐下载（$totalCompleted/${totalCompleted + downloadQueue.size + 1}）",
-                                "正在下载 ${music.name}（$progress%）",
+                                "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
+                                "正在下载 ${music.name} ($progress%)",
                                 avgProgress
                             )
 
@@ -124,6 +124,15 @@ class DownloadService : Service() {
                         }
 
                         totalCompleted++
+
+                        sendBroadcast(
+                            Intent("DOWNLOAD_COMPLETED")
+                                .setPackage(packageName)
+                                .apply {
+                                    putExtra("timeStamp", timestamp)
+                                    putExtra("musicJson", Gson().toJson(item))
+                                }
+                        )
 
                     } catch (e: Exception) {
                         sendBroadcast(

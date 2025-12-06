@@ -34,6 +34,7 @@ class MyApplication : Application() {
 
 
         val receiver = object : BroadcastReceiver() {
+            @SuppressLint("MissingPermission")
             override fun onReceive(context: Context?, intent: Intent?) {
                 viewModel.updateProgressById(intent) {
                     NotificationManagerCompat.from(applicationContext).notify(
@@ -53,6 +54,7 @@ class MyApplication : Application() {
 
         val filter = IntentFilter().apply {
             addAction("DOWNLOAD_PROGRESS")
+            addAction("DOWNLOAD_COMPLETED")
             addAction("DOWNLOAD_FAILED")
             addAction("DOWNLOAD_FINISHED")
         }

@@ -136,7 +136,7 @@ class DownloadViewModel(
         val music = Gson().fromJson(intent?.getStringExtra("musicJson"), Music::class.java)
         val progress = intent?.getIntExtra("progress", 0) ?: 0
         val timeStamp = intent?.getLongExtra("timeStamp", 0) ?: 0
-        val failedReason = intent?.getStringExtra("reason") ?: ""
+        val failedReason = intent?.getStringExtra("reason") ?: "未知原因"
         when (intent?.action) {
             "DOWNLOAD_PROGRESS" -> {
                 _downloading.update { list ->
@@ -147,20 +147,20 @@ class DownloadViewModel(
                         ) else it
                     }
                 }
+            }
 
-                if (progress == 100) {
-                    val finishedMusic =
-                        _downloading.value.find { it.music == music && it.timeStamp == timeStamp }?.music ?: return
-                    moveToCompleted(finishedMusic, timeStamp) { finished ->
-                        val typeOf = object : TypeToken<List<DownloadItemUi>>() {}.type
-                        val data = Gson().fromJson<List<DownloadItemUi>>(
-                            SharedPreferencesUtils(getApplication()).getCompletedMusic(),
-                            typeOf
-                        ) ?: listOf()
-                        SharedPreferencesUtils(getApplication()).putCompletedMusic(
-                            Gson().toJson(data + finished)
-                        )
-                    }
+            "DOWNLOAD_COMPLETED" -> {
+                val finishedMusic =
+                    _downloading.value.find { it.music == music && it.timeStamp == timeStamp }?.music ?: return
+                moveToCompleted(finishedMusic, timeStamp) { finished ->
+                    val typeOf = object : TypeToken<List<DownloadItemUi>>() {}.type
+                    val data = Gson().fromJson<List<DownloadItemUi>>(
+                        SharedPreferencesUtils(getApplication()).getCompletedMusic(),
+                        typeOf
+                    ) ?: listOf()
+                    SharedPreferencesUtils(getApplication()).putCompletedMusic(
+                        Gson().toJson(data + finished)
+                    )
                 }
             }
 
