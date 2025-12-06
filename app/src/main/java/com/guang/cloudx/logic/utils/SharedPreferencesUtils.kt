@@ -16,7 +16,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getIsSaveYrc() = sharedPreferences.getBoolean("is_save_yrc", false)
     fun getUserId() = sharedPreferences.getString("user_id", "").toString()
     fun getSafUri() = sharedPreferences.getString("saf_uri", null).run { this }
-    fun getDownloadFileName() = sharedPreferences.getString("download_file_name", "\${name}-\${artists}")
+    fun getDownloadFileName() = sharedPreferences.getString("download_file_name", $$"${level}${name}-${artists}")
     fun getArtistsDelimiter() = sharedPreferences.getString("artists_delimiter", "、")
     fun getLrcEncoding() = sharedPreferences.getString("lrc_encoding", "UTF-8")
     fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
