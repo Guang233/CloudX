@@ -7,6 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("kotlin-parcelize")
+    id("kotlin-kapt")
 }
 
 val appVersion = "1.2.1-${getGitCommitHash()}"
@@ -69,6 +70,11 @@ android {
 }
 
 dependencies {
+    val roomVersion = "2.7.0-rc01"
+
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
 
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.appcompat:appcompat:1.7.1")

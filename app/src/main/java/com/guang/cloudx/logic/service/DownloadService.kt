@@ -10,11 +10,12 @@ import androidx.documentfile.provider.DocumentFile
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.guang.cloudx.R
+import com.guang.cloudx.logic.database.AppDatabase
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
-import com.guang.cloudx.util.ext.d
+import com.guang.cloudx.ui.downloadManager.TaskStatus
 import kotlinx.coroutines.*
 import java.util.*
 
@@ -22,6 +23,8 @@ class DownloadService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val repository = MusicDownloadRepository(maxParallel = 3)
     private lateinit var notificationManager: NotificationManager
+    private val downloadDao by lazy { AppDatabase.getDatabase(this).downloadDao() }
+
 
     private val queueLock = Any()
     private val downloadQueue = LinkedList<Music>() // 队列
@@ -103,7 +106,6 @@ class DownloadService : Service() {
                             targetDir
                         ) { music, progress ->
                             progressMap[id] = progress
-//                            progressMap.size.d()
                             val avgProgress =
                                 if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
                             updateNotification(
@@ -124,6 +126,11 @@ class DownloadService : Service() {
                         }
 
                         totalCompleted++
+                        val downloads = downloadDao.getAllDownloads()
+                        val downloadInfo = downloads.find { it.music == item && it.timeStamp == timestamp }
+                        if (downloadInfo != null) {
+                            downloadDao.update(downloadInfo.copy(status = TaskStatus.COMPLETED, progress = 100))
+                        }
 
                         sendBroadcast(
                             Intent("DOWNLOAD_COMPLETED")
@@ -135,6 +142,11 @@ class DownloadService : Service() {
                         )
 
                     } catch (e: Exception) {
+                        val downloads = downloadDao.getAllDownloads()
+                        val downloadInfo = downloads.find { it.music == item && it.timeStamp == timestamp }
+                        if (downloadInfo != null) {
+                            downloadDao.update(downloadInfo.copy(status = TaskStatus.FAILED, failureReason = e.localizedMessage))
+                        }
                         sendBroadcast(
                             Intent("DOWNLOAD_FAILED")
                                 .setPackage(packageName)

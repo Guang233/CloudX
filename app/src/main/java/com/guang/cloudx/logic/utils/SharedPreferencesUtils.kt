@@ -16,8 +16,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getIsSaveYrc() = sharedPreferences.getBoolean("is_save_yrc", false)
     fun getUserId() = sharedPreferences.getString("user_id", "").toString()
     fun getSafUri() = sharedPreferences.getString("saf_uri", null).run { this }
-    fun getCompletedMusic() = sharedPreferences.getString("completed_music", "")
-    fun getDownloadFileName() = sharedPreferences.getString("download_file_name", $$"${level}${name}-${artists}")
+    fun getDownloadFileName() = sharedPreferences.getString("download_file_name", "\${name}-\${artists}")
     fun getArtistsDelimiter() = sharedPreferences.getString("artists_delimiter", "、")
     fun getLrcEncoding() = sharedPreferences.getString("lrc_encoding", "UTF-8")
     fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
@@ -31,7 +30,6 @@ class SharedPreferencesUtils(context: Context) {
     fun putIsSaveYrc(value: Boolean) = sharedPreferences.edit { putBoolean("is_save_yrc", value) }
     fun putUserId(userId: String) = sharedPreferences.edit { putString("user_id", userId) }
     fun putSafUri(value: String) = sharedPreferences.edit { putString("saf_uri", value) }
-    fun putCompletedMusic(value: String) = sharedPreferences.edit { putString("completed_music", value) }
     fun putDownloadFileName(value: String) = sharedPreferences.edit { putString("download_file_name", value) }
     fun putArtistsDelimiter(value: String) = sharedPreferences.edit { putString("artists_delimiter", value) }
     fun putLrcEncoding(value: String) = sharedPreferences.edit { putString("lrc_encoding", value) }

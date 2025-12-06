@@ -14,8 +14,6 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.MusicDownloadRules
@@ -57,9 +55,7 @@ class DownloadManagerActivity : BaseActivity() {
                         .setTitle("提示")
                         .setMessage("真的要删除全部记录吗？")
                         .setPositiveButton("确定"){ _, _ ->
-                            viewModel.deleteAllCompleted {
-                                SharedPreferencesUtils(this).putCompletedMusic("")
-                            }
+                            viewModel.deleteAllCompleted {}
                         }
                         .setNegativeButton("取消", null)
                         .show()
@@ -138,12 +134,7 @@ class CompletedFragment : Fragment(R.layout.fragment_download_list) {
         recycler = view.findViewById(R.id.recycler)
         recycler.layoutManager = LinearLayoutManager(requireContext())
         val adapter = CompletedAdapter(
-            onDelete = { item -> viewModel.deleteCompleted(item) {
-                val typeOf = object: TypeToken<List<DownloadItemUi>>(){}.type
-                val data = Gson().fromJson<List<DownloadItemUi>>(SharedPreferencesUtils(requireContext()).getCompletedMusic(), typeOf)
-                data.filterNot { it.timeStamp == item.timeStamp && it.music == item.music }
-                SharedPreferencesUtils(requireContext()).putCompletedMusic(Gson().toJson(data))
-            } },
+            onDelete = { item -> viewModel.deleteCompleted(item) {} },
             onClick = { item ->
                 val message = with(item) {
                     """
@@ -176,5 +167,3 @@ class CompletedFragment : Fragment(R.layout.fragment_download_list) {
         }
     }
 }
-
-

@@ -5,15 +5,17 @@ import android.content.Context
 import android.content.Intent
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.guang.cloudx.logic.database.AppDatabase
+import com.guang.cloudx.logic.database.DownloadInfo
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.service.DownloadService
-import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 enum class TaskStatus { DOWNLOADING, FAILED, COMPLETED }
 
@@ -29,19 +31,26 @@ class DownloadViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
+    private val downloadDao = AppDatabase.getDatabase(application).downloadDao()
+
     private val _downloading = MutableStateFlow<List<DownloadItemUi>>(emptyList())
     val downloading: StateFlow<List<DownloadItemUi>> = _downloading
 
-    private val _completed: MutableStateFlow<List<DownloadItemUi>> by lazy {
-        val typeOf = object : TypeToken<List<DownloadItemUi>>() {}.type
-        val data = Gson().fromJson<List<DownloadItemUi>>(
-            SharedPreferencesUtils(application).getCompletedMusic(),
-            typeOf
-        ) ?: emptyList()
-        MutableStateFlow(data)
+    private val _completed = MutableStateFlow<List<DownloadItemUi>>(emptyList())
+    val completed: StateFlow<List<DownloadItemUi>> = _completed
+
+    init {
+        loadAllTasks()
     }
 
-    val completed: StateFlow<List<DownloadItemUi>> = _completed
+    private fun loadAllTasks() {
+        viewModelScope.launch {
+            _downloading.value = downloadDao.getDownloadsByStatus(TaskStatus.DOWNLOADING)
+                .map { it.toDownloadItemUi() }
+            _completed.value = downloadDao.getDownloadsByStatus(TaskStatus.COMPLETED)
+                .map { it.toDownloadItemUi() }
+        }
+    }
 
     /** 启动下载 */
     fun startDownloads(
@@ -53,32 +62,33 @@ class DownloadViewModel(
         rules: MusicDownloadRules
     ) {
         val timeStampList = mutableListOf<Long>()
+        viewModelScope.launch {
+            musics.forEach { music ->
+                val timeStamp = System.currentTimeMillis()
+                val newTask = DownloadItemUi(
+                    music = music,
+                    progress = 0,
+                    status = TaskStatus.DOWNLOADING,
+                    timeStamp = timeStamp,
+                )
+                downloadDao.insert(newTask.toDownloadInfo())
+                timeStampList.add(timeStamp)
+                _downloading.update { it + newTask }
+            }
 
-        musics.forEach { music ->
-            // 我这个结构还是有点问题的，暂且单独传一个列表
-            val timeStamp = System.currentTimeMillis()
-            val newTask = DownloadItemUi(
-                music = music,
-                progress = 0,
-                status = TaskStatus.DOWNLOADING,
-                timeStamp = timeStamp,
-            )
-            timeStampList.add(timeStamp)
-            _downloading.update { it + newTask }
-
-        }
-        val intent = Intent(context, DownloadService::class.java).apply {
-            putExtra("musicsJson", Gson().toJson(musics))
-            putExtra("rulesJson", Gson().toJson(rules))
-            putExtra("timeStampList", Gson().toJson(timeStampList))
-            putExtra("cookie", cookie)
-            putExtra("level", level)
-            putExtra("targetUri", targetDir.uri)
-        }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
+            val intent = Intent(context, DownloadService::class.java).apply {
+                putExtra("musicsJson", Gson().toJson(musics))
+                putExtra("rulesJson", Gson().toJson(rules))
+                putExtra("timeStampList", Gson().toJson(timeStampList))
+                putExtra("cookie", cookie)
+                putExtra("level", level)
+                putExtra("targetUri", targetDir.uri)
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
         }
     }
 
@@ -91,44 +101,64 @@ class DownloadViewModel(
         targetDir: DocumentFile,
         rules: MusicDownloadRules
     ) {
-        _downloading.update { it.filterNot { t -> t.music == item.music } }
-        startDownloads(context, listOf(item.music), level, cookie, targetDir, rules)
+        viewModelScope.launch {
+            downloadDao.delete(item.toDownloadInfo())
+            _downloading.update { it.filterNot { t -> t.music == item.music } }
+            startDownloads(context, listOf(item.music), level, cookie, targetDir, rules)
+        }
     }
 
     /** 删除失败任务 */
     fun deleteFailed(item: DownloadItemUi) {
-        _downloading.update { it.filterNot { t -> t.timeStamp == item.timeStamp } }
+        viewModelScope.launch {
+            downloadDao.delete(item.toDownloadInfo())
+            _downloading.update { it.filterNot { t -> t.timeStamp == item.timeStamp } }
+        }
     }
 
     /** 删除已完成任务 */
     fun deleteCompleted(item: DownloadItemUi, deletedSavedData: () -> Unit) {
-        _completed.update { it.filterNot { t -> t.timeStamp == item.timeStamp && t.music == item.music } }
-        deletedSavedData()
+        viewModelScope.launch {
+            downloadDao.delete(item.toDownloadInfo())
+            _completed.update { it.filterNot { t -> t.timeStamp == item.timeStamp && t.music == item.music } }
+            deletedSavedData()
+        }
     }
 
     /** 删除全部已完成 */
     fun deleteAllCompleted(deletedSavedData: () -> Unit) {
-        _completed.value = emptyList()
-        deletedSavedData()
+        viewModelScope.launch {
+            downloadDao.deleteAll()
+            _completed.value = emptyList()
+            deletedSavedData()
+        }
     }
 
     /** 下载完成 → 移动到 completed */
-    private fun moveToCompleted(music: Music, timeStamp: Long, savedCompletedMusic: (DownloadItemUi) -> Unit) {
-        val finished = DownloadItemUi(
-            music = music,
-            progress = 100,
-            status = TaskStatus.COMPLETED
-        )
-        _downloading.update { it -> it.filterNot { it.music == music && it.timeStamp == timeStamp } }
-        _completed.update { it + finished }
-        savedCompletedMusic(finished)
+    private fun moveToCompleted(music: Music, timeStamp: Long) {
+         viewModelScope.launch {
+            val task = _downloading.value.find { it.music == music && it.timeStamp == timeStamp }
+            if (task != null) {
+                val finished = task.copy(status = TaskStatus.COMPLETED, progress = 100)
+                downloadDao.update(finished.toDownloadInfo())
+                _downloading.update { it.filterNot { it.music == music && it.timeStamp == timeStamp } }
+                _completed.update { it + finished }
+            }
+        }
     }
 
     /** 标记失败 */
     private fun markAsFailed(music: Music, reason: String? = null) {
-        _downloading.update { list ->
-            list.map {
-                if (it.music == music) it.copy(status = TaskStatus.FAILED, progress = 0, failureReason = reason) else it
+        viewModelScope.launch {
+            val task = _downloading.value.find { it.music == music }
+            if (task != null) {
+                val failedTask = task.copy(status = TaskStatus.FAILED, progress = 0, failureReason = reason)
+                downloadDao.update(failedTask.toDownloadInfo())
+                _downloading.update { list ->
+                    list.map {
+                        if (it.music == music) failedTask else it
+                    }
+                }
             }
         }
     }
@@ -153,16 +183,7 @@ class DownloadViewModel(
             "DOWNLOAD_COMPLETED" -> {
                 val finishedMusic =
                     _downloading.value.find { it.music == music && it.timeStamp == timeStamp }?.music ?: return
-                moveToCompleted(finishedMusic, timeStamp) { finished ->
-                    val typeOf = object : TypeToken<List<DownloadItemUi>>() {}.type
-                    val data = Gson().fromJson<List<DownloadItemUi>>(
-                        SharedPreferencesUtils(getApplication()).getCompletedMusic(),
-                        typeOf
-                    ) ?: listOf()
-                    SharedPreferencesUtils(getApplication()).putCompletedMusic(
-                        Gson().toJson(data + finished)
-                    )
-                }
+                moveToCompleted(finishedMusic, timeStamp)
             }
 
             "DOWNLOAD_FINISHED" -> {
@@ -175,4 +196,23 @@ class DownloadViewModel(
         }
     }
 
+    private fun DownloadInfo.toDownloadItemUi(): DownloadItemUi {
+        return DownloadItemUi(
+            music = this.music,
+            progress = this.progress,
+            status = this.status,
+            timeStamp = this.timeStamp,
+            failureReason = this.failureReason
+        )
+    }
+
+    private fun DownloadItemUi.toDownloadInfo(): DownloadInfo {
+        return DownloadInfo(
+            music = this.music,
+            progress = this.progress,
+            status = this.status,
+            timeStamp = this.timeStamp,
+            failureReason = this.failureReason
+        )
+    }
 }
