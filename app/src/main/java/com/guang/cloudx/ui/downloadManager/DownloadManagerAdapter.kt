@@ -13,6 +13,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.guang.cloudx.R
+import com.guang.cloudx.logic.utils.SystemUtils
 
 class InProgressAdapter(
     private val onRetry: (DownloadItemUi) -> Unit,
@@ -61,8 +62,13 @@ class InProgressVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
             TaskStatus.FAILED -> {
                 progress.visibility = View.GONE
                 tvError.visibility = View.VISIBLE
+                tvError.text = "下载失败：${item.failureReason}"
                 btnDelete.visibility = View.VISIBLE
                 itemView.setOnClickListener { onRetry(item) }     // 点整卡片重试
+                itemView.setOnLongClickListener {
+                    SystemUtils.copyToClipboard(itemView.context, "Error Message", item.failureReason!!)
+                    true
+                }
                 btnDelete.setOnClickListener { onDeleteFailed(item) } // 允许删除失败任务
             }
             else -> Unit

@@ -72,7 +72,9 @@
                     android:layout_height="wrap_content"
                     android:text="下载失败"
                     android:textColor="?attr/colorError"
-                    android:visibility="gone"/>
+                    android:visibility="gone"
+                    android:maxLines="1"
+                    android:ellipsize="end"/>
         </LinearLayout>
 
         <!-- 删除按钮：正在下载时不可见；失败时可见 -->

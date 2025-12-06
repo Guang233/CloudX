@@ -21,7 +21,8 @@ data class DownloadItemUi(
     val music: Music,
     val progress: Int,
     val status: TaskStatus,
-    val timeStamp: Long = System.currentTimeMillis()
+    val timeStamp: Long = System.currentTimeMillis(),
+    val failureReason: String? = null
 )
 
 class DownloadViewModel(
@@ -124,10 +125,10 @@ class DownloadViewModel(
     }
 
     /** 标记失败 */
-    private fun markAsFailed(music: Music) {
+    private fun markAsFailed(music: Music, reason: String? = null) {
         _downloading.update { list ->
             list.map {
-                if (it.music == music) it.copy(status = TaskStatus.FAILED, progress = 0) else it
+                if (it.music == music) it.copy(status = TaskStatus.FAILED, progress = 0, failureReason = reason) else it
             }
         }
     }
@@ -169,7 +170,7 @@ class DownloadViewModel(
             }
 
             "DOWNLOAD_FAILED" -> {
-                markAsFailed(music)
+                markAsFailed(music, failedReason)
             }
         }
     }
