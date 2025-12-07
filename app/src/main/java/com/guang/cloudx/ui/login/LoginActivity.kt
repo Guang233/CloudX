@@ -310,7 +310,7 @@ class LoginActivity : BaseActivity() {
                     is LoginViewModel.UiState.Success<*> -> {
                         val data = loginState.data as UserData
                         prefs.putUserId(data.id)
-                        prefs.putCookie("os=pc; osver=Microsoft-Windows-11-Home-China-build-26100-64bit; appver=3.1.11.203994; channel=netease; mode=83NN; MUSIC_U=${data.token}")
+                        prefs.putCookie("os=pc; osver=Microsoft-Windows-11-Home-China-build-26100-64bit; appver=3.1.23.204750; channel=netease; mode=83NN; MUSIC_U=${data.token}")
                         finish()
                     }
                 }

@@ -1,12 +1,10 @@
 package com.guang.cloudx.logic.network
 
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
-import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.brotli.BrotliInterceptor
 import org.brotli.dec.BrotliInputStream
@@ -16,14 +14,17 @@ import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
 
 object ServiceCreator {
-    private const val BASE_URL = "https://interface.music.163.com/"
+    private const val BASE_URL = "https://interfacepc.music.163.com/"
 
     val fuckNeteaseMusicClient = OkHttpClient.Builder()
         .addInterceptor(BrotliInterceptor) // 这个 Brotli 卡了我很长时间，网易云你为什么不用gzip
         .addInterceptor(HexResponseInterceptor())
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.11.203994")
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.23.204750"
+                )
                 .build()
             chain.proceed(request)
         }
@@ -33,7 +34,8 @@ object ServiceCreator {
         .client(fuckNeteaseMusicClient)
         .addConverterFactory(ScalarsConverterFactory.create())
         .build()
-    fun <S> createService(serviceClass: Class<S>): S =  retrofit.create(serviceClass)
+
+    fun <S> createService(serviceClass: Class<S>): S = retrofit.create(serviceClass)
     inline fun <reified T> createService(): T = createService(T::class.java)
 }
 
@@ -51,8 +53,8 @@ class HexResponseInterceptor : Interceptor {
         // 根据内容编码解压
         val encoding = response.header("Content-Encoding", "")
         val decompressedBytes = when {
-            encoding?.contains("br") == true  -> decompressBrotli(rawBytes)
-            encoding?.contains("gzip") == true  -> decompressGzip(rawBytes)
+            encoding?.contains("br") == true -> decompressBrotli(rawBytes)
+            encoding?.contains("gzip") == true -> decompressGzip(rawBytes)
             else -> rawBytes
         }
 
