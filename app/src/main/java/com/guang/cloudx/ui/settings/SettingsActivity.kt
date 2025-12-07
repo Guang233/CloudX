@@ -198,6 +198,18 @@ class SettingsActivity : BaseActivity() {
                 }
 
                 item {
+                    MenuListItem(
+                        icon = Icons.Outlined.Sync,
+                        title = "并发下载数",
+                        options = listOf("1", "2", "3", "4", "6", "8", "12", "16", "24", "32"),
+                        selectedOption = prefs.getConcurrentDownloads().toString(),
+                        onOptionSelected = {
+                            prefs.putConcurrentDownloads(it.toInt())
+                        }
+                    )
+                }
+
+                item {
                     SwitchListItem(
                         icon = Icons.Outlined.Lyrics,
                         title = "额外导出歌词",
@@ -282,12 +294,12 @@ class SettingsActivity : BaseActivity() {
 
                     var isFileNameFocused by remember { mutableStateOf(false) }
                     val variableList = listOf(
-                        $$"${name}" to "歌曲名称",
-                        $$"${id}" to "歌曲id",
-                        $$"${album}" to "专辑名称",
-                        $$"${albumId}" to "专辑id",
-                        $$"${artists}" to "艺术家",
-                        $$"${level}" to "实际下载音质 (格式为 [音质] ，若为标准音质则为空)"
+                        "\${name}" to "歌曲名称",
+                        "\${id}" to "歌曲id",
+                        "\${album}" to "专辑名称",
+                        "\${albumId}" to "专辑id",
+                        "\${artists}" to "艺术家",
+                        "\${level}" to "实际下载音质 (格式为 [音质] ，若为标准音质则为空)"
                     )
 
                     // 用 AnnotatedString 构建带点击区域的 Text
@@ -331,7 +343,7 @@ class SettingsActivity : BaseActivity() {
 
                     if (openFileNameDialog) {
                         var fileName by remember { mutableStateOf(TextFieldValue(text = prefs.getDownloadFileName()!!)) }
-                        var delimiter by remember { mutableStateOf(prefs.getArtistsDelimiter()) }
+                        var delimiter by remember { mutableStateOf(prefs.getArtistsDelimiter()!!) }
                         AlertDialog(
                             title = { Text("命名规则") },
                             onDismissRequest = { openFileNameDialog = false },
@@ -351,7 +363,7 @@ class SettingsActivity : BaseActivity() {
                                     )
                                     OutlinedTextField(
                                         label = { Text("艺术家分隔符") },
-                                        value = delimiter!!,
+                                        value = delimiter,
                                         onValueChange = { delimiter = it },
                                         keyboardOptions = KeyboardOptions(
                                             imeAction = ImeAction.Done
@@ -390,7 +402,7 @@ class SettingsActivity : BaseActivity() {
                                 TextButton(
                                     onClick = {
                                         prefs.putDownloadFileName(fileName.text)
-                                        prefs.putArtistsDelimiter(delimiter!!)
+                                        prefs.putArtistsDelimiter(delimiter)
                                         openFileNameDialog = false
                                         scope.launch {
                                             snackbarHostState.showSnackbar("已保存")

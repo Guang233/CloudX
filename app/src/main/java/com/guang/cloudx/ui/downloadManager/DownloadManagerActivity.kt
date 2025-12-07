@@ -100,13 +100,15 @@ class DownloadingFragment : Fragment(R.layout.fragment_download_list) {
                         prefs.getMusicLevel(),
                         prefs.getCookie(),
                         it,
-                        MusicDownloadRules(prefs.getIsSaveLrc(),
-                            prefs.getIsSaveTlLrc(),
-                            prefs.getIsSaveRomaLrc(),
-                            prefs.getIsSaveYrc(),
-                            prefs.getDownloadFileName()!!,
-                            prefs.getArtistsDelimiter()!!,
-                            prefs.getLrcEncoding()!!,
+                        MusicDownloadRules(
+                            isSaveLrc = prefs.getIsSaveLrc(),
+                            isSaveTlLrc = prefs.getIsSaveTlLrc(),
+                            isSaveRomaLrc = prefs.getIsSaveRomaLrc(),
+                            isSaveYrc = prefs.getIsSaveYrc(),
+                            fileName = prefs.getDownloadFileName()!!,
+                            delimiter = prefs.getArtistsDelimiter()!!,
+                            encoding = prefs.getLrcEncoding()!!,
+                            concurrentDownloads = prefs.getConcurrentDownloads()
                         )
                     ) }
                 },

@@ -21,7 +21,7 @@ import java.util.*
 
 class DownloadService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val repository = MusicDownloadRepository(maxParallel = 3)
+    private val repository = MusicDownloadRepository()
     private lateinit var notificationManager: NotificationManager
     private val downloadDao by lazy { AppDatabase.getDatabase(this).downloadDao() }
 

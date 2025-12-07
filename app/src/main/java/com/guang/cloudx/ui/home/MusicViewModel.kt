@@ -14,7 +14,7 @@ class MusicViewModel : ViewModel() {
     fun cacheMusic(music: Music, parent: File, cookie: String) {
         viewModelScope.launch {
             runCatching {
-                MusicDownloadRepository(maxParallel = 1).cacheMusic(music, parent, cookie)
+                MusicDownloadRepository().cacheMusic(music, parent, cookie)
             }.onSuccess {
                 musicFile.postValue(it)
             }.onFailure {
