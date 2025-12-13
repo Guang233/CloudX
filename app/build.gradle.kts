@@ -100,7 +100,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.retrofit2:converter-scalars:3.0.0")
-    implementation("com.squareup.okhttp3:okhttp-brotli:5.3.0")
+    implementation("com.squareup.okhttp3:okhttp-brotli:5.3.2")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("com.github.bumptech.glide:glide:5.0.5")
     implementation("androidx.activity:activity:1.11.0")
