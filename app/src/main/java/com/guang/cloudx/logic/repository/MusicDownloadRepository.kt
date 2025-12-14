@@ -43,11 +43,12 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 else -> ""
             }
             val baseFileName = rules.fileName.replace("\${level}", quality)
-                .replace("\${name}", music.name.replace(Regex("[\\\\/:*?\"<>|]"), " "))
+                .replace("\${name}", music.name)
                 .replace("\${id}", music.id.toString())
                 .replace("\${artists}", music.artists.joinToString(rules.delimiter) { it.name })
-                .replace("\${album}", music.album.name.replace(Regex("[\\\\/:*?\"<>|]"), " "))
+                .replace("\${album}", music.album.name)
                 .replace("\${albumId}", music.album.id.toString())
+                .replace(Regex("[\\\\/:*?\"<>|]"), " ")
 
             // 2. 执行分块下载
             if (rules.concurrentDownloads > 1) {
