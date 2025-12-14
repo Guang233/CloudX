@@ -329,7 +329,7 @@ class SettingsActivity : BaseActivity() {
                             if (index != variableList.lastIndex) append("\n")
                         }
 
-                        append("\n\n艺术家分隔符：若有多个艺术家则在多个艺术家间添加分隔符")
+                        append("\n\n艺术家分隔符：\n若有多个艺术家则在多个艺术家间添加分隔符 (同时在写入的 ID3 标签中生效)")
                     }
 
                     ActionListItem(
