@@ -1,3 +1,5 @@
+package com.guang.cloudx.logic.utils
+
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper

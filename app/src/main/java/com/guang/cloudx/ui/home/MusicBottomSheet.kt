@@ -1,6 +1,5 @@
 package com.guang.cloudx.ui.home
 
-import AudioPlayer
 import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.os.Bundle
@@ -23,6 +22,7 @@ import com.google.android.material.slider.Slider
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.utils.AudioPlayer
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.showSnackBar

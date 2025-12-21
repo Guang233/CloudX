@@ -1,95 +1,65 @@
 package com.guang.cloudx.ui.home
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.text.TextUtils
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
-import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.widget.EditText
-import android.widget.TextView
 import androidx.activity.addCallback
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.GravityCompat
-import androidx.core.widget.addTextChangedListener
-import androidx.drawerlayout.widget.DrawerLayout
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.bumptech.glide.Glide
-import com.google.android.material.appbar.AppBarLayout
-import com.google.android.material.appbar.MaterialToolbar
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.imageview.ShapeableImageView
-import com.google.android.material.navigation.NavigationView
 import com.google.android.material.textfield.TextInputLayout
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
-import com.guang.cloudx.logic.utils.showSnackBar
+import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
 import com.guang.cloudx.ui.login.LoginActivity
 import com.guang.cloudx.ui.playList.PlayListActivity
 import com.guang.cloudx.ui.settings.SettingsActivity
-import com.guang.cloudx.util.ext.d
+import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import com.guang.cloudx.util.ext.e
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import java.io.File
 
 class MainActivity : BaseActivity() {
-    private val searchMusicList = mutableListOf<Music>()
-    private var isLastPage = false
-    private var lastSearchText: String = ""
-    private lateinit var userId: String
-    private val adapter by lazy {
-        MusicAdapter(
-            searchMusicList,
-            { music -> startDownloadMusic(music = music, view = recyclerView) },
-            { music -> showBottomSheet(music = music) },
-            { num ->
-                multiSelectToolbar.title = "已选 $num 项"
-                multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled =
-                    !(num == 0 && multiSelectToolbar.menu.findItem(R.id.action_download)?.isEnabled == true)
-            },
-            { enterMultiSelectMode() })
-    }
-
-    private val appBarLayout by lazy { findViewById<AppBarLayout>(R.id.appBarLayout) }
-    private val toolbar by lazy { findViewById<MaterialToolbar>(R.id.topAppBar) }
-    private val drawerLayout by lazy { findViewById<DrawerLayout>(R.id.drawer_layout) }
-    private val navigationView by lazy { findViewById<NavigationView>(R.id.navigation_view) }
-    private val recyclerView by lazy { findViewById<RecyclerView>(R.id.mainRecyclerView) }
-
-    private val searchToolbar by lazy { findViewById<MaterialToolbar>(R.id.searchToolbar) }
-    private val searchEditText by lazy { findViewById<EditText>(R.id.searchEditText) }
-
-    private val multiSelectToolbar by lazy { findViewById<MaterialToolbar>(R.id.selectToolbar) }
-
-    private val swipeRefresh by lazy { findViewById<SwipeRefreshLayout>(R.id.swipeRefresh) }
-    private val tipText by lazy { findViewById<TextView>(R.id.searchTipText) }
-
-    val navView by lazy { navigationView.getHeaderView(0) }
-    val headImage: ShapeableImageView by lazy { navView.findViewById(R.id.headImage) }
-    val nicknameText: TextView by lazy { navView.findViewById(R.id.nicknameText) }
-    val userIdText: TextView by lazy { navView.findViewById(R.id.emailText) }
-
     private val viewModel: MainViewModel by viewModels()
+    private val playerViewModel: MusicPlayerViewModel by viewModels()
+    private lateinit var userId: String
 
-    @SuppressLint("NotifyDataSetChanged")
+    // Compose 状态
+    private val searchMusicList = mutableStateListOf<Music>()
+    private var isLastPage by mutableStateOf(false)
+    private var lastSearchText: String = ""
+    private val snackbarChannel = Channel<String>(Channel.BUFFERED)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        applyTopInsets(appBarLayout)
-        applyTopInsets(navigationView)
+        // 让内容延伸到系统栏后
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        // 权限检查
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -104,70 +74,258 @@ class MainActivity : BaseActivity() {
             }
         }
 
-
-        swipeRefresh.setOnRefreshListener {
-            if (adapter.itemCount == 0) swipeRefresh.isRefreshing = false
-            if (viewModel.isMultiSelectionMode) swipeRefresh.isRefreshing = false
-            else if (!TextUtils.isEmpty(viewModel.searchText)) {
-                searchMusicList.clear()
-                isLastPage = false
-                viewModel.searchMusic(viewModel.searchText, 0, 20, prefs.getCookie())
-            }
-        }
-
-        onBackPressedDispatcher.addCallback(this) {
-            if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.close()
-            else if (viewModel.isMultiSelectionMode) exitMultiSelectMode()
-            else if (viewModel.isSearchMode) exitSearchMode()
-            else moveTaskToBack(true)
-        }
-
         userId = prefs.getUserId()
 
-        setupToolbar()
-        initRecyclerView()
-        initNavigationView()
-        setupSearchToolbar()
-
-        if (viewModel.isMultiSelectionMode) {
-            toolbar.visibility = View.GONE
-            searchToolbar.visibility = View.GONE
-            multiSelectToolbar.visibility = View.VISIBLE
-            adapter.enterMultiSelectMode()
-        } else if (viewModel.isSearchMode) {
-            toolbar.visibility = View.GONE
-            searchToolbar.visibility = View.VISIBLE
+        setContent {
+            CloudXTheme {
+                MainActivityContent()
+            }
         }
 
-        viewModel.searchResults.observe(this) { result ->
-            swipeRefresh.isRefreshing = false
+        // 处理返回键
+        onBackPressedDispatcher.addCallback(this) {
+            when {
+                viewModel.isMultiSelectionMode -> exitMultiSelectMode()
+                viewModel.isSearchMode -> exitSearchMode()
+                else -> moveTaskToBack(true)
+            }
+        }
 
-            val musicList = result.getOrNull()
-            if (musicList != null) {
-                searchMusicList.addAll(musicList)
-                tipText.visibility = View.GONE
-                // adapter.notifyItemInserted(searchMusicList.size - musicList.size)
-            } else {
-                if (searchMusicList.isEmpty()) {
-                    searchMusicList.clear()
-                    recyclerView.showSnackBar("未搜到")
-                } else {
-                    recyclerView.showSnackBar("没有更多了")
-                    isLastPage = true
+        // 观察搜索结果
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.searchResultsFlow.collectLatest { result ->
+                    if (result == null) return@collectLatest
+
+                    if (viewModel.searchText.isEmpty()) {
+                        viewModel.setRefreshing(false)
+                        return@collectLatest
+                    }
+
+                    viewModel.setRefreshing(false)
+                    val musicList = result.getOrNull()
+                    if (musicList != null) {
+                        searchMusicList.addAll(musicList)
+                    } else {
+                        if (searchMusicList.isEmpty()) {
+                            showSnackbar("未搜到")
+                        } else {
+                            showSnackbar("没有更多了")
+                            isLastPage = true
+                        }
+                    }
+                    // 处理完结果后立即清除，防止重新进入页面时重复触发
+                    viewModel.clearSearchResults()
                 }
             }
-            adapter.notifyDataSetChanged()
         }
 
-        viewModel.userDetail.observe(this) { result ->
-            val user = result.getOrNull()
-            if (user != null) {
-                nicknameText.text = user.name
-                Glide.with(this).load(user.avatarUrl).into(headImage)
-            } else {
-                nicknameText.text = "获取失败"
-                Glide.with(this).load(R.drawable.person_48px).into(headImage)
+        // 初始化用户信息
+        initNavHeader()
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun MainActivityContent() {
+        val scope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
+        val context = LocalContext.current
+
+        LaunchedEffect(snackbarHostState) {
+            snackbarChannel.receiveAsFlow().collect { message ->
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    duration = SnackbarDuration.Short
+                )
             }
+        }
+
+        val isRefreshing by viewModel.isRefreshing.collectAsState()
+        val userDetail by viewModel.userDetailFlow.collectAsState()
+
+        var isSearchMode by remember { mutableStateOf(viewModel.isSearchMode) }
+        var isMultiSelectMode by remember { mutableStateOf(viewModel.isMultiSelectionMode) }
+        var inputText by remember { mutableStateOf(viewModel.inputText) }
+        var selectedItems by remember { mutableStateOf(setOf<Music>()) }
+
+        // 同步状态
+        LaunchedEffect(viewModel.isSearchMode) {
+            isSearchMode = viewModel.isSearchMode
+            if (!isSearchMode) {
+                inputText = ""
+            }
+        }
+        LaunchedEffect(viewModel.isMultiSelectionMode) {
+            isMultiSelectMode = viewModel.isMultiSelectionMode
+        }
+
+        // 底部弹窗状态
+        var showBottomSheet by remember { mutableStateOf(false) }
+        var selectedMusic by remember { mutableStateOf<Music?>(null) }
+        val sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true
+        )
+
+        val state = MainScreenState(
+            searchMusicList = searchMusicList.toList(),
+            isSearchMode = isSearchMode,
+            isMultiSelectMode = isMultiSelectMode,
+            selectedItems = selectedItems,
+            inputText = inputText,
+            searchText = viewModel.searchText,
+            isRefreshing = isRefreshing,
+            isLastPage = isLastPage,
+            userInfo = userDetail?.getOrNull(),
+            userId = prefs.getUserId(),
+            cookie = prefs.getCookie(),
+            isLoggedIn = prefs.getCookie().isNotEmpty()
+        )
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            MainScreen(
+                state = state,
+                onSearchTextChange = { text ->
+                    inputText = text
+                    viewModel.inputText = text
+                },
+                onSearch = { text ->
+                    if (lastSearchText != text) {
+                        viewModel.searchText = text
+                        viewModel.setRefreshing(true)
+                        searchMusicList.clear()
+                        isLastPage = false
+                        viewModel.searchMusicFlow(text, 0, 20, prefs.getCookie())
+                        lastSearchText = text
+                    }
+                },
+                onRefresh = {
+                    if (searchMusicList.isEmpty()) {
+                        viewModel.setRefreshing(false)
+                        return@MainScreen
+                    }
+                    if (isMultiSelectMode) {
+                        viewModel.setRefreshing(false)
+                        return@MainScreen
+                    }
+                    if (viewModel.searchText.isNotEmpty()) {
+                        searchMusicList.clear()
+                        isLastPage = false
+                        viewModel.searchMusicFlow(viewModel.searchText, 0, 20, prefs.getCookie())
+                    }
+                },
+                onLoadMore = {
+                    if (!isLastPage && viewModel.searchText.isNotEmpty() && !isRefreshing && !isMultiSelectMode) {
+                        viewModel.setRefreshing(true)
+                        viewModel.searchMusicFlow(
+                            viewModel.searchText,
+                            searchMusicList.size,
+                            20,
+                            prefs.getCookie()
+                        )
+                    }
+                },
+                onDownloadClick = { music ->
+                    startDownloadMusicWrapper(music)
+                },
+                onMusicClick = { music ->
+                    playerViewModel.reset()
+                    selectedMusic = music
+                    showBottomSheet = true
+                },
+                onMusicLongClick = { music ->
+                    if (!isMultiSelectMode) {
+                        enterMultiSelectMode()
+                        isMultiSelectMode = true
+                        selectedItems = selectedItems + music
+                    }
+                },
+                onEnterSearchMode = {
+                    viewModel.isSearchMode = true
+                    isSearchMode = true
+                },
+                onExitSearchMode = {
+                    exitSearchMode()
+                    isSearchMode = false
+                },
+                onEnterMultiSelectMode = {
+                    enterMultiSelectMode()
+                    isMultiSelectMode = true
+                },
+                onExitMultiSelectMode = {
+                    exitMultiSelectMode()
+                    isMultiSelectMode = false
+                    selectedItems = emptySet()
+                },
+                onSelectAll = {
+                    selectedItems = searchMusicList.toSet()
+                },
+                onInvertSelection = {
+                    val newSelection = searchMusicList.filter { !selectedItems.contains(it) }.toSet()
+                    selectedItems = newSelection
+                },
+                onDownloadSelected = {
+                    if (selectedItems.isNotEmpty()) {
+                        startDownloadMusicWrapper(musics = selectedItems.toList())
+                        exitMultiSelectMode()
+                        isMultiSelectMode = false
+                        selectedItems = emptySet()
+                    }
+                },
+                onToggleSelection = { music ->
+                    selectedItems = if (selectedItems.contains(music)) {
+                        selectedItems - music
+                    } else {
+                        selectedItems + music
+                    }
+                },
+                onNavItemClick = { navItem ->
+                    handleNavItemClick(navItem)
+                },
+                onHeadImageClick = {
+                    startActivity<LoginActivity>()
+                }
+            )
+
+            // 底部弹窗
+            if (showBottomSheet && selectedMusic != null) {
+                ModalBottomSheet(
+                    onDismissRequest = {
+                        showBottomSheet = false
+                        selectedMusic = null
+                    },
+                    sheetState = sheetState
+                ) {
+                    MusicBottomSheetContent(
+                        music = selectedMusic!!,
+                        defaultLevel = prefs.getMusicLevel(),
+                        isPreviewEnabled = prefs.getIsPreviewMusic(),
+                        onDismiss = {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                if (!sheetState.isVisible) {
+                                    showBottomSheet = false
+                                    selectedMusic = null
+                                }
+                            }
+                        },
+                        onDownload = { music, level ->
+                            startDownloadMusicWrapper(music = music, level = level)
+                            if (prefs.getIsAutoLevel()) {
+                                prefs.putMusicLevel(level)
+                            }
+                        },
+                        onLongClickText = { SystemUtils.copyToClipboard(context, "music", it) },
+                        playerViewModel = playerViewModel,
+                        cookie = prefs.getCookie()
+                    )
+                }
+            }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
+            )
         }
     }
 
@@ -179,386 +337,158 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    private fun showBottomSheet(music: Music) {
-        val bottomSheet = MusicBottomSheet(music) { music, level ->
-            startDownloadMusic(level = level, music = music, view = recyclerView)
-        }
-        bottomSheet.show(supportFragmentManager, "MusicBottomSheet")
-
-    }
-
-    private fun initRecyclerView() {
-        val layoutManager = LinearLayoutManager(this)
-        recyclerView.layoutManager = layoutManager
-        recyclerView.adapter = adapter
-        recyclerView.setHasFixedSize(true)
-        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(recyclerView, dx, dy)
-
-                val visibleItemCount = layoutManager.childCount              // 屏幕上可见的 item 数
-                val totalItemCount = layoutManager.itemCount                 // 总的 item 数
-                val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition() // 第一个可见 item 的位置
-
-                if (!isLastPage
-                    && !TextUtils.isEmpty(searchEditText.text)
-                    && !swipeRefresh.isRefreshing
-                    && !viewModel.isMultiSelectionMode
-                    && (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 5
-                ) {
-                    "musicList size = $totalItemCount".d()
-                    swipeRefresh.isRefreshing = true
-                    viewModel.searchMusic(
-                        searchEditText.text.toString(),
-                        layoutManager.itemCount,
-                        20,
-                        prefs.getCookie()
-                    )
-
-                }
-
-            }
-        })
-    }
-
-    private fun initNavigationView() {
-        navigationView.setNavigationItemSelectedListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.nav_download_manager -> {
-                    startActivity<DownloadManagerActivity>()
-                    true
-                }
-
-                R.id.nav_add_playlist -> {
-                    val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle("解析歌单")
-                        .setView(view)
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("确定") { _, _ ->
-                            val editText = view.findViewById<EditText>(R.id.playListIdEditText)
-                            if (!editText.text.isEmpty()) {
-                                val id = with(editText.text.toString()) {
-                                    if (this.matches(Regex("[0-9]+"))) this
-                                    else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                                        ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                                }
-                                if (id != null)
-                                    startActivity<PlayListActivity> {
-                                        putExtra("type", "playlist")
-                                        putExtra("id", id)
-                                    }
-                                else navigationView.showSnackBar("请输入正确的歌单ID或链接")
-                            }
-                        }
-                        .show()
-                    true
-                }
-
-                R.id.nav_add_album -> {
-                    val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
-                    view.findViewById<TextInputLayout>(R.id.playListIdInputLayout).hint = "专辑ID或链接"
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle("解析专辑")
-                        .setView(view)
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("确定") { _, _ ->
-                            val editText = view.findViewById<EditText>(R.id.playListIdEditText)
-                            if (!editText.text.isEmpty()) {
-                                val id = with(editText.text.toString()) {
-                                    if (this.matches(Regex("[0-9]+"))) this
-                                    else """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                                        ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                                }
-                                if (id != null)
-                                    startActivity<PlayListActivity> {
-                                        putExtra("type", "album")
-                                        putExtra("id", id)
-                                    }
-                                else navigationView.showSnackBar("请输入正确的专辑ID或链接")
-                            }
-                        }
-                        .show()
-                    true
-                }
-
-                R.id.nav_settings -> {
-                    startActivity<SettingsActivity>()
-                    true
-                }
-
-                R.id.nav_support -> {
-                    val view = layoutInflater.inflate(R.layout.dialog_support_me, null)
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle("赞助")
-                        .setMessage("如果能赞助一下就更好了喵！谢谢老板喵！")
-                        .setView(view)
-                        .show()
-                    true
-                }
-
-                R.id.nav_log_out -> {
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle("提示")
-                        .setMessage("真的要退出登录吗？")
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("确定") { _, _ ->
-                            prefs.putCookie("")
-                            prefs.putUserId("")
-
-                            CookieManager.getInstance().removeAllCookies(null)
-                            CookieManager.getInstance().flush()
-                            WebStorage.getInstance().deleteAllData()
-                            try {
-                                File(dataDir, "app_webview").deleteRecursively()
-                                File(cacheDir, "webviewCache").deleteRecursively()
-                            } catch (e: Exception) {
-                                e.e()
-                            }
-
-                            navigationView.showSnackBar("已退出登录")
-                            userId = ""
-                            initNavHeader()
-                        }
-                        .show()
-                    true
-                }
-
-                else -> false
-            }
-        }
-
-        val view = navigationView.getHeaderView(0)
-        val headImage: ShapeableImageView = view.findViewById(R.id.headImage)
-        headImage.setOnClickListener { startActivity<LoginActivity>() }
-        initNavHeader()
-    }
-
     private fun initNavHeader() {
-        if (prefs.getUserId() != "") {
-            userIdText.text = prefs.getUserId()
-            viewModel.getUserDetail(prefs.getUserId(), prefs.getCookie())
-        } else if (prefs.getCookie() != "") {
-            nicknameText.text = "已登录"
-            userIdText.text = "输入用户ID以获取头像昵称"
-            Glide.with(this).load(R.drawable.person_48px).into(headImage)
-        } else {
-            nicknameText.text = "未登录"
-            userIdText.text = "点按头像以登录"
-            Glide.with(this).load(R.drawable.person_48px).into(headImage)
-        }
-    }
-
-    private fun setupToolbar() {
-        setSupportActionBar(toolbar)
-
-        // 导航图标点击事件（打开侧边栏）
-        toolbar.setNavigationOnClickListener {
-            if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                drawerLayout.closeDrawer(GravityCompat.START)
-            } else {
-                drawerLayout.openDrawer(GravityCompat.START)
-            }
-        }
-
-        multiSelectToolbar.setNavigationOnClickListener {
-            exitMultiSelectMode()
-        }
-
-        multiSelectToolbar.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.action_select_all -> {
-                    adapter.selectAll()
-                    true
-                }
-
-                R.id.action_invert_selection -> {
-                    adapter.invertSelection()
-                    true
-                }
-
-                R.id.action_download -> {
-                    if (adapter.getSelectedMusic().isNotEmpty()) {
-                        startDownloadMusic(musics = adapter.getSelectedMusic(), view = recyclerView)
-                        exitMultiSelectMode()
-                    }
-                    true
-                }
-
-                else -> false
-            }
-        }
-    }
-
-    @SuppressLint("NotifyDataSetChanged")
-    private fun setupSearchToolbar() {
-
-        searchEditText.setText(viewModel.inputText)
-        // 搜索Toolbar的返回按钮
-        searchToolbar.setNavigationOnClickListener {
-            exitSearchMode()
-        }
-
-        searchEditText.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                if (!TextUtils.isEmpty(searchEditText.text)) {
-                    if (lastSearchText != searchEditText.text.toString()) {
-                        viewModel.searchText = searchEditText.text.toString()
-                        swipeRefresh.isRefreshing = true
-                        searchMusicList.clear()
-                        isLastPage = false
-                        viewModel.searchMusic(searchEditText.text.toString(), 0, 20, prefs.getCookie())
-                        lastSearchText = searchEditText.text.toString()
-                        recyclerView.scrollToPosition(0)
-                    }
-                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                    imm.hideSoftInputFromWindow(searchEditText.windowToken, 0)
-                    searchEditText.clearFocus()
-                } else {
-                    exitSearchMode()
-                    searchMusicList.clear()
-                    viewModel.searchText = ""
-                    lastSearchText = ""
-                    adapter.notifyDataSetChanged()
-                    tipText.visibility = View.VISIBLE
-                }
-                true
-            } else {
-                false
-            }
-        }
-
-        searchEditText.addTextChangedListener { editable ->
-            viewModel.inputText = editable.toString()
-        }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.top_app_bar, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_search -> {
-                enterSearchMode()
-                true
-            }
-
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    private fun enterSearchMode() {
-        if (!viewModel.isSearchMode) {
-            viewModel.isSearchMode = true
-
-            searchEditText.setText(viewModel.inputText)
-            // 使用淡入淡出动画切换Toolbar
-            toolbar.animate()
-                .alpha(0f)
-                .setDuration(150)
-                .withEndAction {
-                    toolbar.visibility = View.GONE
-                    searchToolbar.visibility = View.VISIBLE
-                    searchToolbar.alpha = 0f
-                    searchToolbar.animate()
-                        .alpha(1f)
-                        .setDuration(150)
-                        .start()
-
-                    // 自动聚焦并显示键盘
-                    searchEditText.requestFocus()
-                    searchEditText.setSelection(searchEditText.text?.length ?: 0)
-                    searchEditText.postDelayed({
-                        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                        imm.showSoftInput(searchEditText, InputMethodManager.SHOW_IMPLICIT)
-                    }, 200)
-                }
-                .start()
-        }
-    }
-
-    private fun exitSearchMode() {
-        if (viewModel.isSearchMode) {
-            viewModel.isSearchMode = false
-
-            // 隐藏键盘
-            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.hideSoftInputFromWindow(searchEditText.windowToken, 0)
-
-            // 使用淡入淡出动画切换回正常Toolbar
-            searchToolbar.animate()
-                .alpha(0f)
-                .setDuration(150)
-                .withEndAction {
-                    searchToolbar.visibility = View.GONE
-                    toolbar.visibility = View.VISIBLE
-                    toolbar.alpha = 0f
-                    toolbar.animate()
-                        .alpha(1f)
-                        .setDuration(150)
-                        .start()
-                }
-                .start()
+        if (prefs.getUserId().isNotEmpty()) {
+            viewModel.getUserDetailFlow(prefs.getUserId(), prefs.getCookie())
         }
     }
 
     private fun enterMultiSelectMode() {
-        if (viewModel.isSearchMode) {
-            searchToolbar.animate()
-                .alpha(0f)
-                .setDuration(100)
-                .withEndAction {
-                    searchToolbar.visibility = View.GONE
-                    multiSelectToolbar.visibility = View.VISIBLE
-                    multiSelectToolbar.alpha = 0f
-                    multiSelectToolbar.animate()
-                        .alpha(1f)
-                        .setDuration(100)
-                        .start()
-                }.start()
-        } else {
-            toolbar.animate()
-                .alpha(0f)
-                .setDuration(100)
-                .withEndAction {
-                    toolbar.visibility = View.GONE
-                    multiSelectToolbar.visibility = View.VISIBLE
-                    multiSelectToolbar.alpha = 0f
-                    multiSelectToolbar.animate()
-                        .alpha(1f)
-                        .setDuration(100)
-                        .start()
-                }.start()
-        }
-        adapter.enterMultiSelectMode()
         viewModel.isMultiSelectionMode = true
     }
 
     private fun exitMultiSelectMode() {
-        adapter.exitMultiSelectMode()
-        multiSelectToolbar.animate()
-            .alpha(0f)
-            .setDuration(100)
-            .withEndAction {
-                multiSelectToolbar.visibility = View.GONE
-                if (viewModel.isSearchMode) {
-                    searchToolbar.visibility = View.VISIBLE
-                    searchToolbar.alpha = 0f
-                    searchToolbar.animate()
-                        .alpha(1f)
-                        .setDuration(100)
-                        .start()
-                } else {
-                    toolbar.visibility = View.VISIBLE
-                    toolbar.alpha = 0f
-                    toolbar.animate()
-                        .alpha(1f)
-                        .setDuration(100)
-                        .start()
-                }
-            }.start()
         viewModel.isMultiSelectionMode = false
     }
+
+    private fun exitSearchMode() {
+        viewModel.isSearchMode = false
+        searchMusicList.clear()
+        viewModel.searchText = ""
+        viewModel.inputText = ""
+        isLastPage = false
+        viewModel.clearSearchResults()
+        viewModel.setRefreshing(false)
+    }
+
+    private fun handleNavItemClick(navItem: NavItem) {
+        when (navItem) {
+            NavItem.DOWNLOAD_MANAGER -> {
+                startActivity<DownloadManagerActivity>()
+            }
+            NavItem.ADD_PLAYLIST -> {
+                showPlaylistDialog()
+            }
+            NavItem.ADD_ALBUM -> {
+                showAlbumDialog()
+            }
+            NavItem.SETTINGS -> {
+                startActivity<SettingsActivity>()
+            }
+            NavItem.SUPPORT -> {
+                showSupportDialog()
+            }
+            NavItem.LOG_OUT -> {
+                showLogoutDialog()
+            }
+        }
+    }
+
+    private fun showPlaylistDialog() {
+        val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("解析歌单")
+            .setView(view)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定") { _, _ ->
+                val editText = view.findViewById<EditText>(R.id.playListIdEditText)
+                if (editText.text.isNotEmpty()) {
+                    val id = with(editText.text.toString()) {
+                        if (this.matches(Regex("[0-9]+"))) this
+                        else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                            ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                    }
+                    if (id != null)
+                        startActivity<PlayListActivity> {
+                            putExtra("type", "playlist")
+                            putExtra("id", id)
+                        }
+                    else showSnackbar("请输入正确的歌单ID或链接")
+                }
+            }
+            .show()
+    }
+
+    private fun showAlbumDialog() {
+        val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
+        view.findViewById<TextInputLayout>(R.id.playListIdInputLayout).hint = "专辑ID或链接"
+        MaterialAlertDialogBuilder(this)
+            .setTitle("解析专辑")
+            .setView(view)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定") { _, _ ->
+                val editText = view.findViewById<EditText>(R.id.playListIdEditText)
+                if (editText.text.isNotEmpty()) {
+                    val id = with(editText.text.toString()) {
+                        if (this.matches(Regex("[0-9]+"))) this
+                        else """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                            ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                    }
+                    if (id != null)
+                        startActivity<PlayListActivity> {
+                            putExtra("type", "album")
+                            putExtra("id", id)
+                        }
+                    else showSnackbar("请输入正确的专辑ID或链接")
+                }
+            }
+            .show()
+    }
+
+    private fun showSupportDialog() {
+        val view = layoutInflater.inflate(R.layout.dialog_support_me, null)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("赞助")
+            .setMessage("如果能赞助一下就更好了喵！谢谢老板喵！")
+            .setView(view)
+            .show()
+    }
+
+    private fun showLogoutDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("提示")
+            .setMessage("真的要退出登录吗？")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定") { _, _ ->
+                prefs.putCookie("")
+                prefs.putUserId("")
+
+                CookieManager.getInstance().removeAllCookies(null)
+                CookieManager.getInstance().flush()
+                WebStorage.getInstance().deleteAllData()
+                try {
+                    File(dataDir, "app_webview").deleteRecursively()
+                    File(cacheDir, "webviewCache").deleteRecursively()
+                } catch (e: Exception) {
+                    e.e()
+                }
+
+                showSnackbar("已退出登录")
+                userId = ""
+                initNavHeader()
+            }
+            .show()
+    }
+
+    private fun showSnackbar(message: String) {
+        lifecycleScope.launch {
+            snackbarChannel.send(message)
+        }
+    }
+
+    // 下载音乐的包装方法
+    private fun startDownloadMusicWrapper(
+        music: Music? = null,
+        musics: List<Music> = emptyList(),
+        level: String = prefs.getMusicLevel()
+    ) {
+        // 创建一个临时 View 用于显示 Snackbar
+        val rootView = window.decorView.findViewById<View>(android.R.id.content)
+        if (music != null) {
+            startDownloadMusic(level = level, music = music, view = rootView)
+        } else if (musics.isNotEmpty()) {
+            startDownloadMusic(level = level, musics = musics, view = rootView)
+        }
+    }
+
 }
