@@ -3,20 +3,9 @@ package com.guang.cloudx.ui.home
 import android.annotation.SuppressLint
 import android.app.Activity
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +20,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -41,12 +33,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -203,12 +194,15 @@ fun MainScreen(
             drawerState.isOpen -> {
                 scope.launch { drawerState.close() }
             }
+
             state.isMultiSelectMode -> {
                 onExitMultiSelectMode()
             }
+
             state.isSearchMode -> {
                 onExitSearchMode()
             }
+
             else -> {
                 activity?.moveTaskToBack(true)
             }
@@ -331,26 +325,33 @@ fun MainTopBar(
                 TopAppBar(
                     title = { Text("已选 $selectedCount 项") },
                     navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(Icons.Default.Close, contentDescription = "关闭")
-                        }
+                        TooltipIconButton(
+                            onClick = onBackClick,
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "关闭"
+                        )
                     },
                     actions = {
-                        IconButton(onClick = onSelectAll) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "全选")
-                        }
-                        IconButton(onClick = onInvertSelection) {
-                            Icon(Icons.Default.FlipToFront, contentDescription = "反选")
-                        }
-                        IconButton(
+                        TooltipIconButton(
+                            onClick = onSelectAll,
+                            imageVector = Icons.Default.SelectAll,
+                            contentDescription = "全选"
+                        )
+                        TooltipIconButton(
+                            onClick = onInvertSelection,
+                            imageVector = Icons.Default.FlipToFront,
+                            contentDescription = "反选"
+                        )
+                        TooltipIconButton(
                             onClick = onDownloadSelected,
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "下载",
                             enabled = selectedCount > 0
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = "下载")
-                        }
+                        )
                     }
                 )
             }
+
             TopBarState.Search -> {
                 // 进入搜索模式时请求焦点并移动光标到末尾
                 LaunchedEffect(Unit) {
@@ -380,21 +381,19 @@ fun MainTopBar(
                             },
                             trailingIcon = {
                                 if (inputText.isNotEmpty()) {
-                                    IconButton(onClick = { onSearchTextChange("") }) {
-                                        Icon(Icons.Default.Close, contentDescription = "清除")
-                                    }
+                                    TooltipIconButton(
+                                        onClick = { onSearchTextChange("") },
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "清除"
+                                    )
                                 }
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(
                                 onSearch = {
-                                    if (inputText.isNotEmpty()) {
-                                        onSearch(inputText)
-                                        keyboardController?.hide()
-                                        focusManager.clearFocus()
-                                    } else {
-                                        onBackClick()
-                                    }
+                                    onSearch(inputText)
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
                                 }
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -405,25 +404,32 @@ fun MainTopBar(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
+                        TooltipIconButton(
+                            onClick = onBackClick,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
                     },
                     actions = {}
                 )
             }
+
             TopBarState.Normal -> {
                 TopAppBar(
                     title = { Text("CloudX") },
                     navigationIcon = {
-                        IconButton(onClick = onMenuClick) {
-                            Icon(Icons.Default.Menu, contentDescription = "打开侧边栏")
-                        }
+                        TooltipIconButton(
+                            onClick = onMenuClick,
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "打开侧边栏"
+                        )
                     },
                     actions = {
-                        IconButton(onClick = onSearchClick) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索")
-                        }
+                        TooltipIconButton(
+                            onClick = onSearchClick,
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜索"
+                        )
                     }
                 )
             }
@@ -595,6 +601,7 @@ fun MusicList(
             items(musicList, key = { it.id }) { music ->
                 MusicItem(
                     music = music,
+                    modifier = Modifier.animateItem(),
                     isMultiSelectMode = isMultiSelectMode,
                     isSelected = selectedItems.contains(music),
                     onDownloadClick = { onDownloadClick(music) },
@@ -610,6 +617,7 @@ fun MusicList(
 @Composable
 fun MusicItem(
     music: Music,
+    modifier: Modifier = Modifier,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
     onDownloadClick: () -> Unit,
@@ -617,9 +625,9 @@ fun MusicItem(
     onLongClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(12.dp)
-    
+
     ElevatedCard(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
             .animateContentSize()
@@ -696,7 +704,8 @@ fun MusicItem(
 }
 
 // 底部弹窗内容 - 用于选择音质并下载
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
+@OptIn(
+    ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
     ExperimentalLayoutApi::class
 )
 @Composable
@@ -731,184 +740,184 @@ fun MusicBottomSheetContent(
                 .padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // 专辑封面
-        AsyncImage(
-            model = music.album.picUrl,
-            contentDescription = "专辑封面",
-            modifier = Modifier
-                .size(120.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(16.dp),
-                    clip = true
-                )
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable { showCoverDialog = true },
-            contentScale = ContentScale.Crop
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 歌曲名称
-        Text(
-            text = music.name,
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 1,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .basicMarquee()
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                    onLongClick = { onLongClickText(music.name) }
-                ),
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // 艺术家
-        Text(
-            text = music.artists.joinToString("/") { it.name },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .basicMarquee()
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                    onLongClick = { onLongClickText(music.artists.joinToString("/") { it.name }) }
-                )
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = music.album.name.ifEmpty { "未知专辑" },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .basicMarquee()
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                    onLongClick = { onLongClickText(music.album.name) }
-                )
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (isPreviewEnabled) {
-            // 播放控制区域
-            Column(
+            // 专辑封面
+            AsyncImage(
+                model = music.album.picUrl,
+                contentDescription = "专辑封面",
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 播放按钮
-                    FilledIconButton(
-                        onClick = {
-                            if (playerState.isPlaying) {
-                                playerViewModel.pause()
-                            } else {
-                                playerViewModel.cacheMusic(music, context.externalCacheDir!!, cookie)
-                            }
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        if (playerState.isBuffering) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (playerState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    // 进度条
-                    Slider(
-                        value = playerState.currentPosition.toFloat(),
-                        onValueChange = { playerViewModel.seekTo(it.toLong()) },
-                        valueRange = 0f..(playerState.totalDuration.toFloat().takeIf { it > 0 } ?: 1f),
-                        modifier = Modifier.weight(1f),
-                        thumb = {
-                            SliderDefaults.Thumb(
-                                interactionSource = remember { MutableInteractionSource() },
-                                thumbSize = DpSize(16.dp, 16.dp)
-                            )
-                        },
-                        track = {
-                            SliderDefaults.Track(
-                                sliderState = it,
-                                modifier = Modifier.height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                colors = SliderDefaults.colors(
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            )
-                        }
+                    .size(120.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        clip = true
                     )
-                }
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { showCoverDialog = true },
+                contentScale = ContentScale.Crop
+            )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 歌曲名称
+            Text(
+                text = music.name,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .basicMarquee()
+                    .combinedClickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                        onLongClick = { onLongClickText(music.name) }
+                    ),
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 艺术家
+            Text(
+                text = music.artists.joinToString("/") { it.name },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .basicMarquee()
+                    .combinedClickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                        onLongClick = { onLongClickText(music.artists.joinToString("/") { it.name }) }
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = music.album.name.ifEmpty { "未知专辑" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .basicMarquee()
+                    .combinedClickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                        onLongClick = { onLongClickText(music.album.name) }
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isPreviewEnabled) {
+                // 播放控制区域
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
                 ) {
-                    // 48.dp (按钮) + 12.dp (间距) = 60.dp，确保时间文本与 Slider 对齐
-                    Spacer(modifier = Modifier.width(60.dp))
                     Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = formatDuration(playerState.currentPosition),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatDuration(playerState.totalDuration),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        // 播放按钮
+                        FilledIconButton(
+                            onClick = {
+                                if (playerState.isPlaying) {
+                                    playerViewModel.pause()
+                                } else {
+                                    playerViewModel.cacheMusic(music, context.externalCacheDir!!, cookie)
+                                }
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            if (playerState.isBuffering) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (playerState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // 进度条
+                        Slider(
+                            value = playerState.currentPosition.toFloat(),
+                            onValueChange = { playerViewModel.seekTo(it.toLong()) },
+                            valueRange = 0f..(playerState.totalDuration.toFloat().takeIf { it > 0 } ?: 1f),
+                            modifier = Modifier.weight(1f),
+                            thumb = {
+                                SliderDefaults.Thumb(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    thumbSize = DpSize(16.dp, 16.dp)
+                                )
+                            },
+                            track = {
+                                SliderDefaults.Track(
+                                    sliderState = it,
+                                    modifier = Modifier.height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                )
+                            }
                         )
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // 48.dp (按钮) + 12.dp (间距) = 60.dp，确保时间文本与 Slider 对齐
+                        Spacer(modifier = Modifier.width(60.dp))
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatDuration(playerState.currentPosition),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = formatDuration(playerState.totalDuration),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // 音质选择
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        ) {
+            // 音质选择
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            ) {
                 val levels = listOf("standard" to "标准", "exhigh" to "极高", "lossless" to "无损", "hires" to "Hi-Res")
                 levels.forEach { (level, label) ->
                     FilterChip(
@@ -926,73 +935,73 @@ fun MusicBottomSheetContent(
                         } else null
                     )
                 }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 按钮行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            OutlinedButton(onClick = onDismiss) {
-                Text("取消")
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Button(onClick = {
-                onDownload(music, selectedLevel)
-                onDismiss()
-            }) {
-                Text("下载")
-            }
-        }
 
-        if (showCoverDialog) {
-            Dialog(onDismissRequest = { showCoverDialog = false }) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column {
-                        AsyncImage(
-                            model = music.album.picUrl,
-                            contentDescription = "Cover",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f),
-                            contentScale = ContentScale.Crop
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(8.dp),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            TextButton(onClick = { showCoverDialog = false }) {
-                                Text("取消")
-                            }
-                            TextButton(onClick = {
-                                scope.launch {
-                                    saveCoverToDir(context, music.album.picUrl, "${music.name}_cover") {
-                                        scope.launch { snackbarHostState.showSnackbar(it) }
-                                    }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 按钮行
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                OutlinedButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Button(onClick = {
+                    onDownload(music, selectedLevel)
+                    onDismiss()
+                }) {
+                    Text("下载")
+                }
+            }
+
+            if (showCoverDialog) {
+                Dialog(onDismissRequest = { showCoverDialog = false }) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            AsyncImage(
+                                model = music.album.picUrl,
+                                contentDescription = "Cover",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f),
+                                contentScale = ContentScale.Crop
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { showCoverDialog = false }) {
+                                    Text("取消")
                                 }
-                                showCoverDialog = false
-                            }) {
-                                Text("保存")
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        saveCoverToDir(context, music.album.picUrl, "${music.name}_cover") {
+                                            scope.launch { snackbarHostState.showSnackbar(it) }
+                                        }
+                                    }
+                                    showCoverDialog = false
+                                }) {
+                                    Text("保存")
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier.align(Alignment.BottomCenter)
-    )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
@@ -1002,7 +1011,12 @@ private fun formatDuration(millis: Long): String {
     return String.format("%02d:%02d", minutes, seconds)
 }
 
-private suspend fun saveCoverToDir(context: android.content.Context, url: String, fileName: String, onShowSnackbar: (String) -> Unit) {
+private suspend fun saveCoverToDir(
+    context: android.content.Context,
+    url: String,
+    fileName: String,
+    onShowSnackbar: (String) -> Unit
+) {
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
             val activity = context.findBaseActivity()
@@ -1038,5 +1052,25 @@ private tailrec fun android.content.Context.findBaseActivity(): BaseActivity? {
         is BaseActivity -> this
         is android.content.ContextWrapper -> baseContext.findBaseActivity()
         else -> null
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TooltipIconButton(
+    onClick: () -> Unit,
+    imageVector: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(contentDescription) } },
+        state = rememberTooltipState()
+    ) {
+        IconButton(onClick = onClick, modifier = modifier, enabled = enabled) {
+            Icon(imageVector, contentDescription = contentDescription)
+        }
     }
 }

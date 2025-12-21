@@ -151,9 +151,6 @@ class MainActivity : BaseActivity() {
         // 同步状态
         LaunchedEffect(viewModel.isSearchMode) {
             isSearchMode = viewModel.isSearchMode
-            if (!isSearchMode) {
-                inputText = ""
-            }
         }
         LaunchedEffect(viewModel.isMultiSelectionMode) {
             isMultiSelectMode = viewModel.isMultiSelectionMode
@@ -189,7 +186,16 @@ class MainActivity : BaseActivity() {
                     viewModel.inputText = text
                 },
                 onSearch = { text ->
-                    if (lastSearchText != text) {
+                    if (text.isEmpty()) {
+                        searchMusicList.clear()
+                        viewModel.searchText = ""
+                        viewModel.inputText = ""
+                        isLastPage = false
+                        viewModel.clearSearchResults()
+                        viewModel.setRefreshing(false)
+                        lastSearchText = ""
+                        exitSearchMode()
+                    } else if (lastSearchText != text) {
                         viewModel.searchText = text
                         viewModel.setRefreshing(true)
                         searchMusicList.clear()
@@ -353,12 +359,6 @@ class MainActivity : BaseActivity() {
 
     private fun exitSearchMode() {
         viewModel.isSearchMode = false
-        searchMusicList.clear()
-        viewModel.searchText = ""
-        viewModel.inputText = ""
-        isLastPage = false
-        viewModel.clearSearchResults()
-        viewModel.setRefreshing(false)
     }
 
     private fun handleNavItemClick(navItem: NavItem) {
