@@ -6,7 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -127,9 +127,10 @@ fun PlayListScreen(
                             PlayListHeader(state.playList!!)
                         }
 
-                        items(state.musicList, key = { it.id }) { music ->
+                        itemsIndexed(state.musicList, key = { _, music -> music.id }) { index, music ->
                             MusicItem(
                                 music = music,
+                                displayIndex = if (type == "album") index + 1 else null,
                                 isMultiSelectMode = state.isMultiSelectMode,
                                 isSelected = state.selectedItems.contains(music),
                                 onDownloadClick = { onDownloadClick(music, defaultLevel) },

@@ -618,6 +618,7 @@ fun MusicList(
 fun MusicItem(
     music: Music,
     modifier: Modifier = Modifier,
+    displayIndex: Int? = null,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
     onDownloadClick: () -> Unit,
@@ -651,15 +652,30 @@ fun MusicItem(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 专辑封面
-            AsyncImage(
-                model = music.album.picUrl,
-                contentDescription = "专辑封面",
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
+            if (displayIndex != null) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = displayIndex.toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else {
+                // 专辑封面
+                AsyncImage(
+                    model = music.album.picUrl,
+                    contentDescription = "专辑封面",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
