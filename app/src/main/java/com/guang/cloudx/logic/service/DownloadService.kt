@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -14,8 +15,6 @@ import com.guang.cloudx.logic.database.AppDatabase
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
-import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
-import com.guang.cloudx.ui.downloadManager.TaskStatus
 import kotlinx.coroutines.*
 import java.util.*
 
@@ -166,7 +165,7 @@ class DownloadService : Service() {
     }
 
     private fun buildNotification(title: String, content: String, progress: Int): Notification {
-        val intent = Intent(this, DownloadManagerActivity::class.java).apply {
+        val intent = Intent(Intent.ACTION_VIEW, "app://cloudx/download_manager".toUri()).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)

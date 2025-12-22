@@ -10,8 +10,8 @@ import android.content.IntentFilter
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import com.guang.cloudx.logic.utils.applicationViewModels
-import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
 import com.guang.cloudx.ui.downloadManager.DownloadViewModel
 
 class MyApplication : Application() {
@@ -27,7 +27,7 @@ class MyApplication : Application() {
 
         val viewModel by applicationViewModels<DownloadViewModel>(this)
 
-        val intent = Intent(this, DownloadManagerActivity::class.java).apply {
+        val intent = Intent(Intent.ACTION_VIEW, "app://cloudx/download_manager".toUri()).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)

@@ -30,9 +30,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
@@ -45,7 +45,8 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DownloadManagerScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    downloadDir: DocumentFile?
 ) {
     val viewModel: DownloadViewModel = viewModel()
     val downloadingList by viewModel.downloading.collectAsState()
@@ -107,8 +108,7 @@ fun DownloadManagerScreen(
                         if (hasFailedTasks) {
                             TooltipIconButton(
                                 onClick = {
-                                    val baseActivity = context as? BaseActivity
-                                    baseActivity?.dir?.let { dir ->
+                                    downloadDir?.let { dir ->
                                         viewModel.retryAllFailed(
                                             context,
                                             prefs.getMusicLevel(),
@@ -170,7 +170,8 @@ fun DownloadManagerScreen(
                 if (page == 0) {
                     DownloadingList(
                         list = downloadingList,
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        downloadDir = downloadDir
                     )
                 } else {
                     CompletedList(
@@ -275,7 +276,8 @@ fun DownloadManagerScreen(
 @Composable
 fun DownloadingList(
     list: List<DownloadItemUi>,
-    viewModel: DownloadViewModel
+    viewModel: DownloadViewModel,
+    downloadDir: DocumentFile?
 ) {
     val context = LocalContext.current
     val prefs = remember { SharedPreferencesUtils(context) }
@@ -289,8 +291,7 @@ fun DownloadingList(
                 item = item,
                 modifier = Modifier.animateItem(),
                 onRetry = {
-                    val baseActivity = context as? BaseActivity
-                    baseActivity?.dir?.let { dir ->
+                    downloadDir?.let { dir ->
                         viewModel.retryDownload(
                             context,
                             item,
