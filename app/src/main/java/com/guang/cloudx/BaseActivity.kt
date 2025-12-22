@@ -44,12 +44,6 @@ open class BaseActivity : ComponentActivity() {
         controller.isAppearanceLightStatusBars = !isDarkMode
     }
 
-    inline fun <reified T> startActivity(block: Intent.() -> Unit = {}) {
-        val intent = Intent(this, T::class.java)
-        intent.block()
-        startActivity(intent)
-    }
-
     // 新的 Compose 友好方法
     fun startDownloadMusic(
         level: String = prefs.getMusicLevel(),

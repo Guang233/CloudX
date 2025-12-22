@@ -9,6 +9,10 @@ import android.webkit.WebStorage
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -81,7 +85,26 @@ class MainActivity : BaseActivity() {
         setContent {
             CloudXTheme {
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = Screen.Home.route) {
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Home.route,
+                    enterTransition = {
+                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
+                                fadeIn(tween(300))
+                    },
+                    exitTransition = {
+                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
+                                fadeOut(tween(300))
+                    },
+                    popEnterTransition = {
+                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
+                                fadeIn(tween(300))
+                    },
+                    popExitTransition = {
+                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
+                                fadeOut(tween(300))
+                    }
+                ) {
                     composable(Screen.Home.route) {
                         MainActivityContent(
                             onNavigateToLogin = { navController.navigate(Screen.Login.route) },
@@ -517,8 +540,6 @@ class MainActivity : BaseActivity() {
     private fun exitMultiSelectMode() {
         viewModel.isMultiSelectionMode = false
     }
-
-
 
     private fun exitSearchMode() {
         viewModel.isSearchMode = false
