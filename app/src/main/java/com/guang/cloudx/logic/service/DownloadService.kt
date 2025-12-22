@@ -27,14 +27,18 @@ class DownloadService : Service() {
 
 
     private val queueLock = Any()
-    private val downloadQueue = LinkedList<Music>() // 队列
+    private val downloadQueue = LinkedList<Pair<Music, Long>>() // Pair of Music and its DB ID
     private var isDownloading = false
     private var totalCompleted = 0
-    private val musicTimeStampMap = mutableMapOf<Music, Long>()
     private val progressMap = mutableMapOf<Long, Int>()
+
+    companion object {
+        var isRunning = false
+    }
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         createNotificationChannel()
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         startForeground(1, buildNotification("正在准备下载…", "", 0))
@@ -43,12 +47,11 @@ class DownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val musicsJson = intent?.getStringExtra("musicsJson") ?: return START_NOT_STICKY
         val rulesJson = intent.getStringExtra("rulesJson") ?: return START_NOT_STICKY
+        val musicIdToDbIdMapJson = intent.getStringExtra("musicIdToDbIdMapJson") ?: return START_NOT_STICKY
+
         val musics = Gson().fromJson<List<Music>>(musicsJson, object : TypeToken<List<Music>>() {}.type)
         val rules = Gson().fromJson(rulesJson, MusicDownloadRules::class.java)
-        val timeStampList = Gson().fromJson<List<Long>>(
-            intent.getStringExtra("timeStampList"),
-            object : TypeToken<List<Long>>() {}.type
-        )
+        val musicIdToDbIdMap = Gson().fromJson<Map<Long, Long>>(musicIdToDbIdMapJson, object : TypeToken<Map<Long, Long>>() {}.type)
         val cookie = intent.getStringExtra("cookie") ?: ""
         val level = intent.getStringExtra("level") ?: "standard"
         val uri = intent.getParcelableExtra<Uri>("targetUri") ?: return START_NOT_STICKY
@@ -57,12 +60,14 @@ class DownloadService : Service() {
         updateNotification("正在准备下载…", "", 0)
 
         synchronized(queueLock) {
-            musics.forEachIndexed { index, music ->
-                if (!downloadQueue.contains(music)) {
-                    downloadQueue.add(music)
-                    val ts = timeStampList.getOrNull(index) ?: System.currentTimeMillis()
-                    musicTimeStampMap[music] = ts
-                    progressMap.putIfAbsent(ts + music.id, 0)
+            musics.forEach { music ->
+                val dbId = musicIdToDbIdMap[music.id]
+                if (dbId != null) {
+                    val task = Pair(music, dbId)
+                    if (!downloadQueue.contains(task)) {
+                        downloadQueue.add(task)
+                        progressMap.putIfAbsent(dbId, 0)
+                    }
                 }
             }
         }
@@ -73,10 +78,10 @@ class DownloadService : Service() {
             scope.launch {
 
                 while (isActive) {
-                    val item = synchronized(queueLock) { downloadQueue.poll() }
+                    val task = synchronized(queueLock) { downloadQueue.poll() }
 
                     // 如果队列为空则检查是否应退出
-                    if (item == null) {
+                    if (task == null) {
                         if (synchronized(queueLock) { downloadQueue.isEmpty() }) {
                             sendBroadcast(
                                 Intent("DOWNLOAD_FINISHED")
@@ -93,19 +98,18 @@ class DownloadService : Service() {
                         }
                     }
 
-                    val timestamp = musicTimeStampMap[item] ?: System.currentTimeMillis()
-                    val id = timestamp + item.id
+                    val (music, dbId) = task
 
                     try {
                         repository.downloadMusic(
                             this@DownloadService,
                             rules,
-                            item,
+                            music,
                             level,
                             cookie,
                             targetDir
-                        ) { music, progress ->
-                            progressMap[id] = progress
+                        ) { _, progress ->
+                            progressMap[dbId] = progress
                             val avgProgress =
                                 if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
                             updateNotification(
@@ -118,42 +122,29 @@ class DownloadService : Service() {
                                 Intent("DOWNLOAD_PROGRESS")
                                     .setPackage(packageName)
                                     .apply {
-                                        putExtra("musicJson", Gson().toJson(music))
-                                        putExtra("timeStamp", timestamp)
+                                        putExtra("dbId", dbId)
                                         putExtra("progress", progress)
                                     }
                             )
                         }
 
                         totalCompleted++
-                        val downloads = downloadDao.getAllDownloads()
-                        val downloadInfo = downloads.find { it.music == item && it.timeStamp == timestamp }
-                        if (downloadInfo != null) {
-                            downloadDao.update(downloadInfo.copy(status = TaskStatus.COMPLETED, progress = 100))
-                        }
-
+                        
                         sendBroadcast(
                             Intent("DOWNLOAD_COMPLETED")
                                 .setPackage(packageName)
                                 .apply {
-                                    putExtra("timeStamp", timestamp)
-                                    putExtra("musicJson", Gson().toJson(item))
+                                    putExtra("dbId", dbId)
                                 }
                         )
 
                     } catch (e: Exception) {
-                        val downloads = downloadDao.getAllDownloads()
-                        val downloadInfo = downloads.find { it.music == item && it.timeStamp == timestamp }
-                        if (downloadInfo != null) {
-                            downloadDao.update(downloadInfo.copy(status = TaskStatus.FAILED, failureReason = e.localizedMessage))
-                        }
                         sendBroadcast(
                             Intent("DOWNLOAD_FAILED")
                                 .setPackage(packageName)
                                 .apply {
+                                    putExtra("dbId", dbId)
                                     putExtra("reason", e.localizedMessage)
-                                    putExtra("timeStamp", timestamp)
-                                    putExtra("musicJson", Gson().toJson(item))
                                 }
                         )
                     }
@@ -197,6 +188,7 @@ class DownloadService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         scope.cancel()
         super.onDestroy()
     }

@@ -11,9 +11,9 @@ data class DownloadInfo(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val music: Music,
     val progress: Int,
-    val status: TaskStatus,
+    var status: TaskStatus,
     val timeStamp: Long,
-    val failureReason: String? = null
+    var failureReason: String? = null
 )
 
 class Converters {
