@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebStorage
-import android.widget.EditText
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -25,10 +24,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.textfield.TextInputLayout
 import com.guang.cloudx.BaseActivity
-import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.ui.downloadManager.DownloadManagerActivity
@@ -147,6 +143,12 @@ class MainActivity : BaseActivity() {
         var isMultiSelectMode by remember { mutableStateOf(viewModel.isMultiSelectionMode) }
         var inputText by remember { mutableStateOf(viewModel.inputText) }
         var selectedItems by remember { mutableStateOf(setOf<Music>()) }
+
+        // Dialog states
+        var showPlaylistDialog by remember { mutableStateOf(false) }
+        var showAlbumDialog by remember { mutableStateOf(false) }
+        var showSupportDialog by remember { mutableStateOf(false) }
+        var showLogoutDialog by remember { mutableStateOf(false) }
 
         // 同步状态
         LaunchedEffect(viewModel.isSearchMode) {
@@ -285,7 +287,26 @@ class MainActivity : BaseActivity() {
                     }
                 },
                 onNavItemClick = { navItem ->
-                    handleNavItemClick(navItem)
+                    when (navItem) {
+                        NavItem.DOWNLOAD_MANAGER -> {
+                            startActivity<DownloadManagerActivity>()
+                        }
+                        NavItem.ADD_PLAYLIST -> {
+                            showPlaylistDialog = true
+                        }
+                        NavItem.ADD_ALBUM -> {
+                            showAlbumDialog = true
+                        }
+                        NavItem.SETTINGS -> {
+                            startActivity<SettingsActivity>()
+                        }
+                        NavItem.SUPPORT -> {
+                            showSupportDialog = true
+                        }
+                        NavItem.LOG_OUT -> {
+                            showLogoutDialog = true
+                        }
+                    }
                 },
                 onHeadImageClick = {
                     startActivity<LoginActivity>()
@@ -326,6 +347,75 @@ class MainActivity : BaseActivity() {
                 }
             }
 
+            // Dialogs
+            if (showPlaylistDialog) {
+                PlaylistDialog(
+                    onDismiss = { showPlaylistDialog = false },
+                    onConfirm = { text ->
+                        val id = with(text) {
+                            if (this.matches(Regex("[0-9]+"))) this
+                            else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                        }
+                        if (id != null)
+                            startActivity<PlayListActivity> {
+                                putExtra("type", "playlist")
+                                putExtra("id", id)
+                            }
+                        else showSnackbar("请输入正确的歌单ID或链接")
+                    }
+                )
+            }
+
+            if (showAlbumDialog) {
+                AlbumDialog(
+                    onDismiss = { showAlbumDialog = false },
+                    onConfirm = { text ->
+                        val id = with(text) {
+                            if (this.matches(Regex("[0-9]+"))) this
+                            else """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                        }
+                        if (id != null)
+                            startActivity<PlayListActivity> {
+                                putExtra("type", "album")
+                                putExtra("id", id)
+                            }
+                        else showSnackbar("请输入正确的专辑ID或链接")
+                    }
+                )
+            }
+
+            if (showSupportDialog) {
+                SupportDialog(
+                    onDismiss = { showSupportDialog = false }
+                )
+            }
+
+            if (showLogoutDialog) {
+                LogoutDialog(
+                    onDismiss = { showLogoutDialog = false },
+                    onConfirm = {
+                        prefs.putCookie("")
+                        prefs.putUserId("")
+
+                        CookieManager.getInstance().removeAllCookies(null)
+                        CookieManager.getInstance().flush()
+                        WebStorage.getInstance().deleteAllData()
+                        try {
+                            File(dataDir, "app_webview").deleteRecursively()
+                            File(cacheDir, "webviewCache").deleteRecursively()
+                        } catch (e: Exception) {
+                            e.e()
+                        }
+
+                        showSnackbar("已退出登录")
+                        userId = ""
+                        initNavHeader()
+                    }
+                )
+            }
+
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
@@ -359,115 +449,6 @@ class MainActivity : BaseActivity() {
 
     private fun exitSearchMode() {
         viewModel.isSearchMode = false
-    }
-
-    private fun handleNavItemClick(navItem: NavItem) {
-        when (navItem) {
-            NavItem.DOWNLOAD_MANAGER -> {
-                startActivity<DownloadManagerActivity>()
-            }
-            NavItem.ADD_PLAYLIST -> {
-                showPlaylistDialog()
-            }
-            NavItem.ADD_ALBUM -> {
-                showAlbumDialog()
-            }
-            NavItem.SETTINGS -> {
-                startActivity<SettingsActivity>()
-            }
-            NavItem.SUPPORT -> {
-                showSupportDialog()
-            }
-            NavItem.LOG_OUT -> {
-                showLogoutDialog()
-            }
-        }
-    }
-
-    private fun showPlaylistDialog() {
-        val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
-        MaterialAlertDialogBuilder(this)
-            .setTitle("解析歌单")
-            .setView(view)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("确定") { _, _ ->
-                val editText = view.findViewById<EditText>(R.id.playListIdEditText)
-                if (editText.text.isNotEmpty()) {
-                    val id = with(editText.text.toString()) {
-                        if (this.matches(Regex("[0-9]+"))) this
-                        else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                            ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                    }
-                    if (id != null)
-                        startActivity<PlayListActivity> {
-                            putExtra("type", "playlist")
-                            putExtra("id", id)
-                        }
-                    else showSnackbar("请输入正确的歌单ID或链接")
-                }
-            }
-            .show()
-    }
-
-    private fun showAlbumDialog() {
-        val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
-        view.findViewById<TextInputLayout>(R.id.playListIdInputLayout).hint = "专辑ID或链接"
-        MaterialAlertDialogBuilder(this)
-            .setTitle("解析专辑")
-            .setView(view)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("确定") { _, _ ->
-                val editText = view.findViewById<EditText>(R.id.playListIdEditText)
-                if (editText.text.isNotEmpty()) {
-                    val id = with(editText.text.toString()) {
-                        if (this.matches(Regex("[0-9]+"))) this
-                        else """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                            ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                    }
-                    if (id != null)
-                        startActivity<PlayListActivity> {
-                            putExtra("type", "album")
-                            putExtra("id", id)
-                        }
-                    else showSnackbar("请输入正确的专辑ID或链接")
-                }
-            }
-            .show()
-    }
-
-    private fun showSupportDialog() {
-        val view = layoutInflater.inflate(R.layout.dialog_support_me, null)
-        MaterialAlertDialogBuilder(this)
-            .setTitle("赞助")
-            .setMessage("如果能赞助一下就更好了喵！谢谢老板喵！")
-            .setView(view)
-            .show()
-    }
-
-    private fun showLogoutDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("提示")
-            .setMessage("真的要退出登录吗？")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("确定") { _, _ ->
-                prefs.putCookie("")
-                prefs.putUserId("")
-
-                CookieManager.getInstance().removeAllCookies(null)
-                CookieManager.getInstance().flush()
-                WebStorage.getInstance().deleteAllData()
-                try {
-                    File(dataDir, "app_webview").deleteRecursively()
-                    File(cacheDir, "webviewCache").deleteRecursively()
-                } catch (e: Exception) {
-                    e.e()
-                }
-
-                showSnackbar("已退出登录")
-                userId = ""
-                initNavHeader()
-            }
-            .show()
     }
 
     private fun showSnackbar(message: String) {

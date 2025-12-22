@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -49,6 +50,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil3.compose.AsyncImage
 import com.guang.cloudx.BaseActivity
+import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.User
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
@@ -473,8 +475,11 @@ fun DrawerContent(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             AsyncImage(
-                model = userInfo?.avatarUrl ?: "",
+                model = userInfo?.avatarUrl,
                 contentDescription = "头像",
+                placeholder = painterResource(R.drawable.person_48px),
+                error = painterResource(R.drawable.person_48px),
+                fallback = painterResource(R.drawable.person_48px),
                 modifier = Modifier
                     .size(76.dp)
                     .clip(CircleShape)
@@ -1021,6 +1026,7 @@ fun MusicBottomSheetContent(
     }
 }
 
+@SuppressLint("DefaultLocale")
 private fun formatDuration(millis: Long): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(millis)
     val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60

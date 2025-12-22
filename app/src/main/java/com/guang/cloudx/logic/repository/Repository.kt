@@ -33,16 +33,6 @@ object Repository {
     }.flowOn(Dispatchers.IO)
 
     // 保留原有的 LiveData 版本供其他地方使用
-    fun searchMusic(keyword:String, offset: Int, limit: Int, cookie: String) = liveData(Dispatchers.IO) {
-        try {
-            val musicList = MusicNetwork.searchMusic(keyword, offset, limit, cookie)
-            emit(Result.success(musicList))
-        } catch (e: Exception) {
-            emit(Result.failure<List<Music>>(e))
-            e.e()
-        }
-    }
-
     fun getPlayList(id: String, cookie: String) = liveData(Dispatchers.IO) {
         try {
             val playList = MusicNetwork.getPlayList(id, cookie)
@@ -57,16 +47,6 @@ object Repository {
         try {
             val album = MusicNetwork.getAlbum(id, cookie)
             emit(Result.success(album))
-        } catch (e: Exception) {
-            emit(Result.failure(e))
-            e.e()
-        }
-    }
-
-    fun getUserDetail(id: String, cookie: String) = liveData {
-        try {
-            val userDetail = MusicNetwork.getUserDetail(id, cookie)
-            emit(Result.success(userDetail))
         } catch (e: Exception) {
             emit(Result.failure(e))
             e.e()
