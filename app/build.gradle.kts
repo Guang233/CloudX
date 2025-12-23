@@ -70,7 +70,7 @@ android {
 }
 
 dependencies {
-    val roomVersion = "2.7.0-rc01"
+    val roomVersion = "2.8.4"
 
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
