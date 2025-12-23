@@ -36,12 +36,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.bumptech.glide.Glide
+import coil3.SingletonImageLoader
 import com.guang.cloudx.BuildConfig
 import com.guang.cloudx.logic.repository.UpdateResult
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.toast
+import com.guang.cloudx.ui.ui.theme.SeedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,7 +52,8 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onThemeChanged: (String, String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val prefs = remember { SharedPreferencesUtils(context) }
@@ -96,15 +98,15 @@ fun SettingsScreen(
             }
 
             item {
+                val themeOptions = listOf("跟随系统") + SeedColors.keys.toList()
                 MenuListItem(
                     icon = Icons.Outlined.Palette,
                     title = "主题颜色",
-                    options = listOf("跟随系统", "青色", "粉色"),
-                    selectedOption = "跟随系统",
+                    options = themeOptions,
+                    selectedOption = prefs.getThemeColor(),
                     onOptionSelected = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
-                        }
+                        prefs.putThemeColor(it)
+                        onThemeChanged(it, prefs.getDarkMode())
                     }
                 )
             }
@@ -114,11 +116,10 @@ fun SettingsScreen(
                     icon = Icons.Outlined.DarkMode,
                     title = "深色模式",
                     options = listOf("跟随系统", "启用", "关闭"),
-                    selectedOption = "跟随系统",
+                    selectedOption = prefs.getDarkMode(),
                     onOptionSelected = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("前面的区域，以后再来探索吧")
-                        }
+                        prefs.putDarkMode(it)
+                        onThemeChanged(prefs.getThemeColor(), it)
                     }
                 )
             }
@@ -492,7 +493,9 @@ fun SettingsScreen(
                     description = "清除歌曲封面和试听缓存",
                     onClick = {
                         scope.launch(Dispatchers.IO) {
-                            Glide.get(context).clearDiskCache()
+                            // 清除 Coil 缓存
+                            SingletonImageLoader.get(context).diskCache?.clear()
+                            SingletonImageLoader.get(context).memoryCache?.clear()
 
                             val cacheDir = context.externalCacheDir!!
                             if (cacheDir.exists() && cacheDir.isDirectory) {

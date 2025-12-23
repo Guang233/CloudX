@@ -13,6 +13,7 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -83,7 +84,19 @@ class MainActivity : BaseActivity() {
         userId = prefs.getUserId()
 
         setContent {
-            CloudXTheme {
+            var currentThemeColor by remember { mutableStateOf(prefs.getThemeColor()) }
+            var currentDarkMode by remember { mutableStateOf(prefs.getDarkMode()) }
+            
+            val isDark = when (currentDarkMode) {
+                "启用" -> true
+                "关闭" -> false
+                else -> isSystemInDarkTheme()
+            }
+
+            CloudXTheme(
+                darkTheme = isDark,
+                themeColor = currentThemeColor
+            ) {
                 val navController = rememberNavController()
                 NavHost(
                     navController = navController,
@@ -136,7 +149,11 @@ class MainActivity : BaseActivity() {
                     }
                     composable(Screen.Settings.route) {
                         SettingsScreen(
-                            onBackClick = { navController.popBackStack() }
+                            onBackClick = { navController.popBackStack() },
+                            onThemeChanged = { color, mode ->
+                                currentThemeColor = color
+                                currentDarkMode = mode
+                            }
                         )
                     }
                     composable(
