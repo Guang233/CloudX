@@ -13,6 +13,7 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,26 +99,27 @@ class MainActivity : BaseActivity() {
                 themeColor = currentThemeColor
             ) {
                 val navController = rememberNavController()
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Home.route,
-                    enterTransition = {
-                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
-                                fadeIn(tween(300))
-                    },
-                    exitTransition = {
-                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
-                                fadeOut(tween(300))
-                    },
-                    popEnterTransition = {
-                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
-                                fadeIn(tween(300))
-                    },
-                    popExitTransition = {
-                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
-                                fadeOut(tween(300))
-                    }
-                ) {
+                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Home.route,
+                        enterTransition = {
+                            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
+                                    fadeIn(tween(300))
+                        },
+                        exitTransition = {
+                            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
+                                    fadeOut(tween(300))
+                        },
+                        popEnterTransition = {
+                            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
+                                    fadeIn(tween(300))
+                        },
+                        popExitTransition = {
+                            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
+                                    fadeOut(tween(300))
+                        }
+                    ) {
                     composable(Screen.Home.route) {
                         MainActivityContent(
                             onNavigateToLogin = { navController.navigate(Screen.Login.route) },
@@ -186,6 +188,7 @@ class MainActivity : BaseActivity() {
                             playerViewModel = playerViewModel
                         )
                     }
+                }
                 }
             }
         }
