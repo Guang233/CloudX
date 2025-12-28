@@ -57,7 +57,7 @@ interface DownloadDao {
     suspend fun getAllDownloads(): List<DownloadInfo>
 }
 
-@Database(entities = [DownloadInfo::class], version = 1)
+@Database(entities = [DownloadInfo::class], version = 1, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
