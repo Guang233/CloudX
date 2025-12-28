@@ -77,7 +77,7 @@ class MusicPlayerViewModel : ViewModel() {
 
     private var audioPlayer: AudioPlayer? = null
 
-    fun cacheMusic(music: Music, parent: File, cookie: String) {
+    fun cacheMusic(music: Music, parent: File, cookie: String, onError: (String) -> Unit = {}) {
         if (audioPlayer != null) {
             play()
             return
@@ -91,6 +91,7 @@ class MusicPlayerViewModel : ViewModel() {
                 playAudio(file)
             }.onFailure {
                 _playerState.value = _playerState.value.copy(isBuffering = false)
+                onError("音乐缓存失败：${it.localizedMessage}")
             }
         }
     }
@@ -514,21 +515,27 @@ fun DrawerContent(
             label = { Text("解析歌单", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.ADD_PLAYLIST) },
-            modifier = Modifier.padding(horizontal = 12.dp).height(48.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.Album, contentDescription = null) },
             label = { Text("解析专辑", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.ADD_ALBUM) },
-            modifier = Modifier.padding(horizontal = 12.dp).height(48.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.Download, contentDescription = null) },
             label = { Text("下载管理", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.DOWNLOAD_MANAGER) },
-            modifier = Modifier.padding(horizontal = 12.dp).height(48.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp))
@@ -538,21 +545,27 @@ fun DrawerContent(
             label = { Text("设置", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.SETTINGS) },
-            modifier = Modifier.padding(horizontal = 12.dp).height(48.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.VolunteerActivism, contentDescription = null) },
             label = { Text("赞助作者", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.SUPPORT) },
-            modifier = Modifier.padding(horizontal = 12.dp).height(48.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },
             label = { Text("退出登录", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.LOG_OUT) },
-            modifier = Modifier.padding(horizontal = 12.dp).height(48.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
         )
     }
 }
@@ -853,7 +866,15 @@ fun MusicBottomSheetContent(
                                 if (playerState.isPlaying) {
                                     playerViewModel.pause()
                                 } else {
-                                    playerViewModel.cacheMusic(music, context.externalCacheDir!!, cookie)
+                                    playerViewModel.cacheMusic(
+                                        music = music,
+                                        parent = context.externalCacheDir!!,
+                                        cookie = cookie
+                                    ) { errorMessage ->
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(errorMessage)
+                                        }
+                                    }
                                 }
                             },
                             modifier = Modifier.size(48.dp)
@@ -890,7 +911,9 @@ fun MusicBottomSheetContent(
                             track = {
                                 SliderDefaults.Track(
                                     sliderState = it,
-                                    modifier = Modifier.height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    modifier = Modifier
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp)),
                                     colors = SliderDefaults.colors(
                                         activeTrackColor = MaterialTheme.colorScheme.primary,
                                         inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -996,7 +1019,9 @@ fun MusicBottomSheetContent(
                                 contentScale = ContentScale.Crop
                             )
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = { showCoverDialog = false }) {
