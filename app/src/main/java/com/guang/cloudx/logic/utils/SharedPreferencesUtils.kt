@@ -23,6 +23,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", 4)
     fun getThemeColor() = sharedPreferences.getString("theme_color", "跟随系统").toString()
     fun getDarkMode() = sharedPreferences.getString("dark_mode", "跟随系统").toString()
+    fun getIsFirstLaunch() = sharedPreferences.getBoolean("is_first_launch", true)
 
     fun putMusicLevel(musicLevel: String) = sharedPreferences.edit { putString("music_level", musicLevel) }
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }
@@ -40,4 +41,5 @@ class SharedPreferencesUtils(context: Context) {
     fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value) }
     fun putThemeColor(value: String) = sharedPreferences.edit { putString("theme_color", value) }
     fun putDarkMode(value: String) = sharedPreferences.edit { putString("dark_mode", value) }
+    fun putIsFirstLaunch(value: Boolean) = sharedPreferences.edit { putBoolean("is_first_launch", value) }
 }

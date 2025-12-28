@@ -6,8 +6,11 @@ import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.WebStorage
+import androidx.documentfile.provider.DocumentFile
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
+import android.content.Intent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
@@ -38,6 +41,7 @@ import androidx.navigation.navDeepLink
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.utils.SystemUtils
+import com.guang.cloudx.logic.utils.toast
 import com.guang.cloudx.ui.Screen
 import com.guang.cloudx.ui.downloadManager.DownloadManagerScreen
 import com.guang.cloudx.ui.login.LoginScreen
@@ -55,6 +59,18 @@ class MainActivity : BaseActivity() {
     private val viewModel: MainViewModel by viewModels()
     private val playerViewModel: MusicPlayerViewModel by viewModels()
     private lateinit var userId: String
+
+    private val safLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            contentResolver.takePersistableUriPermission(uri, takeFlags)
+
+            prefs.putSafUri(uri.toString())
+            dir = DocumentFile.fromTreeUri(this, uri)
+
+            prefs.putIsFirstLaunch(false)
+        }
+    }
 
     // Compose 状态
     private val searchMusicList = mutableStateListOf<Music>()
@@ -83,6 +99,13 @@ class MainActivity : BaseActivity() {
         }
 
         userId = prefs.getUserId()
+
+        // 首次打开应用且未设置下载目录时，自动启动SAF文件选择器
+        if (prefs.getIsFirstLaunch() && prefs.getSafUri().isNullOrEmpty()) {
+            "请选择一个目录来保存音乐".toast(this)
+
+            safLauncher.launch(null)
+        }
 
         setContent {
             var currentThemeColor by remember { mutableStateOf(prefs.getThemeColor()) }
