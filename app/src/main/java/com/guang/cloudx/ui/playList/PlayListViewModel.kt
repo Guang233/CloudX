@@ -33,36 +33,36 @@ class PlayListViewModel : ViewModel() {
         currentId = id
         currentCookie = cookie
         currentType = type
-        
+
         _uiState.update { it.copy(isLoading = true, isRefreshing = true) }
-        
+
         viewModelScope.launch {
             val liveData = if (type == "playlist") {
                 Repository.getPlayList(id, cookie)
             } else {
                 Repository.getAlbum(id, cookie)
             }
-            
+
             // Convert LiveData to Flow or collect it
             liveData.asFlow().collect { result ->
                 val playList = result.getOrNull()
                 if (playList != null) {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             playList = playList,
                             musicList = playList.musics,
                             isLoading = false,
                             isRefreshing = false,
                             error = null
-                        ) 
+                        )
                     }
                 } else {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
-                            isLoading = false, 
+                            isLoading = false,
                             isRefreshing = false,
                             error = "获取失败"
-                        ) 
+                        )
                     }
                 }
             }

@@ -244,6 +244,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     context!!.contentResolver.openOutputStream(documentFile.uri)
                         ?: throw Exception("无法打开 OutputStream")
                 }
+
                 else -> throw IllegalStateException()
             }
 
@@ -267,31 +268,38 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
-    private suspend fun copyToSaf(context: Context, sourceFile: File, targetDir: DocumentFile, finalFileName: String) = withContext(Dispatchers.IO) {
-        val existing = targetDir.findFile(finalFileName)
-        if (existing != null) {
-            try {
-                context.contentResolver.openFileDescriptor(existing.uri, "w")?.use { pfd ->
-                    FileOutputStream(pfd.fileDescriptor).use { out ->
+    private suspend fun copyToSaf(context: Context, sourceFile: File, targetDir: DocumentFile, finalFileName: String) =
+        withContext(Dispatchers.IO) {
+            val existing = targetDir.findFile(finalFileName)
+            if (existing != null) {
+                try {
+                    context.contentResolver.openFileDescriptor(existing.uri, "w")?.use { pfd ->
+                        FileOutputStream(pfd.fileDescriptor).use { out ->
+                            sourceFile.inputStream().use { input -> input.copyTo(out) }
+                        }
+                    } ?: throw Exception("无法打开现有文件")
+                } catch (e: Exception) {
+                    context.contentResolver.delete(existing.uri, null, null)
+                    val newDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
+                    context.contentResolver.openOutputStream(newDoc.uri)?.use { out ->
                         sourceFile.inputStream().use { input -> input.copyTo(out) }
-                    }
-                } ?: throw Exception("无法打开现有文件")
-            } catch (e: Exception) {
-                context.contentResolver.delete(existing.uri, null, null)
-                val newDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
-                context.contentResolver.openOutputStream(newDoc.uri)?.use { out ->
+                    } ?: throw Exception("无法打开新文件")
+                }
+            } else {
+                val musicDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
+                context.contentResolver.openOutputStream(musicDoc.uri)?.use { out ->
                     sourceFile.inputStream().use { input -> input.copyTo(out) }
-                } ?: throw Exception("无法打开新文件")
+                } ?: throw Exception("无法打开目标输出流")
             }
-        } else {
-            val musicDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
-            context.contentResolver.openOutputStream(musicDoc.uri)?.use { out ->
-                sourceFile.inputStream().use { input -> input.copyTo(out) }
-            } ?: throw Exception("无法打开目标输出流")
         }
-    }
 
-    private suspend fun writeLrcToSaf(context: Context, lrcText: String, targetDir: DocumentFile, lrcName: String, encoding: String) = withContext(Dispatchers.IO) {
+    private suspend fun writeLrcToSaf(
+        context: Context,
+        lrcText: String,
+        targetDir: DocumentFile,
+        lrcName: String,
+        encoding: String
+    ) = withContext(Dispatchers.IO) {
         val existingLrc = targetDir.findFile(lrcName)
         if (existingLrc != null) {
             try {
@@ -350,8 +358,10 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
     private fun createLyrics(lyric: Lyric, music: Music, rules: MusicDownloadRules): String {
         val lrc = if (rules.isSaveYrc && lyric.yrc != "") lyric.yrc else lyric.lrc
-        val tlLrc = if (rules.isSaveTlLrc) if (rules.isSaveYrc && lyric.ytlrc != "") lyric.ytlrc else lyric.tlyric else ""
-        val romaLrc = if (rules.isSaveRomaLrc) if (rules.isSaveYrc && lyric.yromalrc != "") lyric.yromalrc else lyric.romalrc else ""
+        val tlLrc =
+            if (rules.isSaveTlLrc) if (rules.isSaveYrc && lyric.ytlrc != "") lyric.ytlrc else lyric.tlyric else ""
+        val romaLrc =
+            if (rules.isSaveRomaLrc) if (rules.isSaveYrc && lyric.yromalrc != "") lyric.yromalrc else lyric.romalrc else ""
         return """
 [ti:${music.name}]
 [ar:${music.artists.joinToString("、") { it.name }}]

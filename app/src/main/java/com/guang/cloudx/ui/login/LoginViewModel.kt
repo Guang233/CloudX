@@ -5,12 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.guang.cloudx.logic.repository.Repository
 import com.guang.cloudx.logic.model.UserData
+import com.guang.cloudx.logic.repository.Repository
 import kotlinx.coroutines.launch
 
 
-class LoginViewModel: ViewModel() {
+class LoginViewModel : ViewModel() {
     var captchaState by mutableStateOf<UiState<Boolean>>(UiState.Idle)
         private set
 

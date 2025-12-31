@@ -567,7 +567,7 @@ fun MenuListItem(
                 modifier = Modifier
                     .size(28.dp)
                     .wrapContentSize(align = Alignment.Center)
-                )
+            )
         },
         headlineContent = { Text(title) },
         supportingContent = { Text(currentOption) },

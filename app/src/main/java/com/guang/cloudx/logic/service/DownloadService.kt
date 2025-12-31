@@ -50,7 +50,8 @@ class DownloadService : Service() {
 
         val musics = Gson().fromJson<List<Music>>(musicsJson, object : TypeToken<List<Music>>() {}.type)
         val rules = Gson().fromJson(rulesJson, MusicDownloadRules::class.java)
-        val musicIdToDbIdMap = Gson().fromJson<Map<Long, Long>>(musicIdToDbIdMapJson, object : TypeToken<Map<Long, Long>>() {}.type)
+        val musicIdToDbIdMap =
+            Gson().fromJson<Map<Long, Long>>(musicIdToDbIdMapJson, object : TypeToken<Map<Long, Long>>() {}.type)
         val cookie = intent.getStringExtra("cookie") ?: ""
         val level = intent.getStringExtra("level") ?: "standard"
         val uri = intent.getParcelableExtra<Uri>("targetUri") ?: return START_NOT_STICKY
@@ -128,7 +129,7 @@ class DownloadService : Service() {
                         }
 
                         totalCompleted++
-                        
+
                         sendBroadcast(
                             Intent("DOWNLOAD_COMPLETED")
                                 .setPackage(packageName)

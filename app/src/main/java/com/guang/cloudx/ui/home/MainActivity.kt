@@ -1,15 +1,14 @@
 package com.guang.cloudx.ui.home
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.WebStorage
-import androidx.documentfile.provider.DocumentFile
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
-import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -29,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -110,7 +110,7 @@ class MainActivity : BaseActivity() {
         setContent {
             var currentThemeColor by remember { mutableStateOf(prefs.getThemeColor()) }
             var currentDarkMode by remember { mutableStateOf(prefs.getDarkMode()) }
-            
+
             val isDark = when (currentDarkMode) {
                 "启用" -> true
                 "关闭" -> false
@@ -122,7 +122,11 @@ class MainActivity : BaseActivity() {
                 themeColor = currentThemeColor
             ) {
                 val navController = rememberNavController()
-                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Home.route,
@@ -143,75 +147,75 @@ class MainActivity : BaseActivity() {
                                     fadeOut(tween(300))
                         }
                     ) {
-                    composable(Screen.Home.route) {
-                        MainActivityContent(
-                            onNavigateToLogin = { navController.navigate(Screen.Login.route) },
-                            onNavigateToDownloadManager = { navController.navigate(Screen.DownloadManager.route) },
-                            onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                            onNavigateToPlaylist = { type, id ->
-                                navController.navigate(Screen.Playlist.createRoute(type, id))
-                            }
-                        )
+                        composable(Screen.Home.route) {
+                            MainActivityContent(
+                                onNavigateToLogin = { navController.navigate(Screen.Login.route) },
+                                onNavigateToDownloadManager = { navController.navigate(Screen.DownloadManager.route) },
+                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                                onNavigateToPlaylist = { type, id ->
+                                    navController.navigate(Screen.Playlist.createRoute(type, id))
+                                }
+                            )
+                        }
+                        composable(Screen.Login.route) {
+                            LoginScreen(
+                                onBackClick = { navController.popBackStack() },
+                                onLoginSuccess = {
+                                    navController.popBackStack()
+                                    userId = prefs.getUserId()
+                                    initNavHeader()
+                                }
+                            )
+                        }
+                        composable(
+                            route = Screen.DownloadManager.route,
+                            deepLinks = listOf(navDeepLink { uriPattern = "app://cloudx/download_manager" })
+                        ) {
+                            DownloadManagerScreen(
+                                onBackClick = { navController.popBackStack() },
+                                downloadDir = dir
+                            )
+                        }
+                        composable(Screen.Settings.route) {
+                            SettingsScreen(
+                                onBackClick = { navController.popBackStack() },
+                                onThemeChanged = { color, mode ->
+                                    currentThemeColor = color
+                                    currentDarkMode = mode
+                                }
+                            )
+                        }
+                        composable(
+                            route = Screen.Playlist.route,
+                            arguments = listOf(
+                                navArgument("type") { type = NavType.StringType },
+                                navArgument("id") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val type = backStackEntry.arguments?.getString("type") ?: ""
+                            val id = backStackEntry.arguments?.getString("id") ?: ""
+                            PlayListScreen(
+                                playListId = id,
+                                type = type,
+                                cookie = prefs.getCookie(),
+                                defaultLevel = prefs.getMusicLevel(),
+                                isPreviewEnabled = prefs.getIsPreviewMusic(),
+                                isAutoLevel = prefs.getIsAutoLevel(),
+                                onBackClick = { navController.popBackStack() },
+                                onDownloadClick = { music, level ->
+                                    startDownloadMusic(level = level, music = music) { showSnackbar(it) }
+                                },
+                                onMusicLongClick = { /* 处理长按 */ },
+                                onDownloadSelected = { musics ->
+                                    startDownloadMusic(musics = musics) { showSnackbar(it) }
+                                },
+                                onSaveLevel = { level ->
+                                    prefs.putMusicLevel(level)
+                                },
+                                playerViewModel = playerViewModel
+                            )
+                        }
                     }
-                    composable(Screen.Login.route) {
-                        LoginScreen(
-                            onBackClick = { navController.popBackStack() },
-                            onLoginSuccess = {
-                                navController.popBackStack()
-                                userId = prefs.getUserId()
-                                initNavHeader()
-                            }
-                        )
-                    }
-                    composable(
-                        route = Screen.DownloadManager.route,
-                        deepLinks = listOf(navDeepLink { uriPattern = "app://cloudx/download_manager" })
-                    ) {
-                        DownloadManagerScreen(
-                            onBackClick = { navController.popBackStack() },
-                            downloadDir = dir
-                        )
-                    }
-                    composable(Screen.Settings.route) {
-                        SettingsScreen(
-                            onBackClick = { navController.popBackStack() },
-                            onThemeChanged = { color, mode ->
-                                currentThemeColor = color
-                                currentDarkMode = mode
-                            }
-                        )
-                    }
-                    composable(
-                        route = Screen.Playlist.route,
-                        arguments = listOf(
-                            navArgument("type") { type = NavType.StringType },
-                            navArgument("id") { type = NavType.StringType }
-                        )
-                    ) { backStackEntry ->
-                        val type = backStackEntry.arguments?.getString("type") ?: ""
-                        val id = backStackEntry.arguments?.getString("id") ?: ""
-                        PlayListScreen(
-                            playListId = id,
-                            type = type,
-                            cookie = prefs.getCookie(),
-                            defaultLevel = prefs.getMusicLevel(),
-                            isPreviewEnabled = prefs.getIsPreviewMusic(),
-                            isAutoLevel = prefs.getIsAutoLevel(),
-                            onBackClick = { navController.popBackStack() },
-                            onDownloadClick = { music, level ->
-                                startDownloadMusic(level = level, music = music) { showSnackbar(it) }
-                            },
-                            onMusicLongClick = { /* 处理长按 */ },
-                            onDownloadSelected = { musics ->
-                                startDownloadMusic(musics = musics) { showSnackbar(it) }
-                            },
-                            onSaveLevel = { level ->
-                                prefs.putMusicLevel(level)
-                            },
-                            playerViewModel = playerViewModel
-                        )
-                    }
-                }
                 }
             }
         }
@@ -434,18 +438,23 @@ class MainActivity : BaseActivity() {
                         NavItem.DOWNLOAD_MANAGER -> {
                             onNavigateToDownloadManager()
                         }
+
                         NavItem.ADD_PLAYLIST -> {
                             showPlaylistDialog = true
                         }
+
                         NavItem.ADD_ALBUM -> {
                             showAlbumDialog = true
                         }
+
                         NavItem.SETTINGS -> {
                             onNavigateToSettings()
                         }
+
                         NavItem.SUPPORT -> {
                             showSupportDialog = true
                         }
+
                         NavItem.LOG_OUT -> {
                             showLogoutDialog = true
                         }
@@ -497,7 +506,9 @@ class MainActivity : BaseActivity() {
                     onConfirm = { text ->
                         val id = with(text) {
                             if (this.matches(Regex("[0-9]+"))) this
-                            else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                            else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(
+                                1
+                            )
                                 ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
                         }
                         if (id != null)

@@ -102,6 +102,7 @@ fun LoginScreen(
                         prefs = prefs,
                         onSave = onLoginSuccess
                     )
+
                     Destination.PHONE_NUMBER -> PhoneNumberScreen(
                         viewModel = viewModel,
                         prefs = prefs,
@@ -112,6 +113,7 @@ fun LoginScreen(
                             }
                         }
                     )
+
                     Destination.WEB -> WebScreen(
                         prefs = prefs,
                         onTouchEvent = {
@@ -219,7 +221,12 @@ fun PhoneNumberScreen(
                 },
             label = { Text("手机号") },
             leadingIcon = { Text("+86") },
-            trailingIcon = { if (isError && !isFocused) Icon(imageVector = Icons.Outlined.Error, contentDescription = null) },
+            trailingIcon = {
+                if (isError && !isFocused) Icon(
+                    imageVector = Icons.Outlined.Error,
+                    contentDescription = null
+                )
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Next
@@ -262,6 +269,7 @@ fun PhoneNumberScreen(
                 is LoginViewModel.UiState.Error -> {
                     showSnackBar(captchaState.message)
                 }
+
                 LoginViewModel.UiState.Idle -> {}
                 LoginViewModel.UiState.Loading -> {}
                 is LoginViewModel.UiState.Success<*> -> {
