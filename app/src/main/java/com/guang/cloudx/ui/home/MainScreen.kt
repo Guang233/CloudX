@@ -448,6 +448,7 @@ private enum class TopBarState {
 enum class NavItem {
     ADD_PLAYLIST,
     ADD_ALBUM,
+    MY_PLAYLISTS,
     DOWNLOAD_MANAGER,
     SETTINGS,
     SUPPORT,
@@ -524,6 +525,15 @@ fun DrawerContent(
             label = { Text("解析专辑", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.ADD_ALBUM) },
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .height(48.dp)
+        )
+        NavigationDrawerItem(
+            icon = { Icon(Icons.AutoMirrored.Outlined.QueueMusic, contentDescription = null) },
+            label = { Text("我的歌单", style = MaterialTheme.typography.labelLarge) },
+            selected = false,
+            onClick = { onNavItemClick(NavItem.MY_PLAYLISTS) },
             modifier = Modifier
                 .padding(horizontal = 12.dp)
                 .height(48.dp)

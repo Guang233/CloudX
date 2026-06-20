@@ -56,5 +56,12 @@ interface MusicService {
         @Field("params") body: String,
         @Header("Cookie") cookie: String
     ): Call<String>
+
+    @FormUrlEncoded
+    @POST("eapi/user/playlist")
+    fun getUserPlayLists(
+        @Field("params") body: String,
+        @Header("Cookie") cookie: String
+    ): Call<String>
 }
 

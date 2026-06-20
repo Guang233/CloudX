@@ -198,6 +198,35 @@ object Decrypt {
         return PlayList(name, coverImgUrl, musics, id)
     }
 
+    fun decryptUserPlayLists(encryptedBody: String): List<PlayList> {
+        val decryptedJson = AESECBHelper.decrypt(encryptedBody)
+        val data = JSONObject(decryptedJson)
+
+        if (data.optInt("code") != 200) {
+            throw Exception("Invalid data: ${data.optString("message", "Unknown error")}")
+        }
+
+        return data.optJSONArray("playlist")?.let { playlist ->
+            List(playlist.length()) { i ->
+                val item = playlist.getJSONObject(i)
+                val trackCount = item.optInt("trackCount", 0)
+                PlayList(
+                    name = item.optString("name", ""),
+                    coverImgUrl = item.optString("coverImgUrl", ""),
+                    musics = List(trackCount) {
+                        Music(
+                            name = "",
+                            artists = emptyList(),
+                            album = Album("", 0, ""),
+                            id = 0
+                        )
+                    },
+                    id = item.optLong("id", 0)
+                )
+            }
+        } ?: emptyList()
+    }
+
     fun decryptUserDetail(encryptedBody: String): User {
         val decryptedJson = AESECBHelper.decrypt(encryptedBody)
         val data = JSONObject(decryptedJson).getJSONObject("profile")
