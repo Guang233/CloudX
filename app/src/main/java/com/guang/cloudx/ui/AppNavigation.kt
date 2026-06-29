@@ -5,6 +5,7 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object DownloadManager : Screen("download_manager")
     object Settings : Screen("settings")
+    object MyPlayLists : Screen("my_playlists")
     object Playlist : Screen("playlist/{type}/{id}") {
         fun createRoute(type: String, id: String) = "playlist/$type/$id"
     }

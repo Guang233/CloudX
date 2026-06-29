@@ -45,6 +45,7 @@ import com.guang.cloudx.logic.utils.toast
 import com.guang.cloudx.ui.Screen
 import com.guang.cloudx.ui.downloadManager.DownloadManagerScreen
 import com.guang.cloudx.ui.login.LoginScreen
+import com.guang.cloudx.ui.myPlayLists.MyPlayListsScreen
 import com.guang.cloudx.ui.playList.PlayListScreen
 import com.guang.cloudx.ui.settings.SettingsScreen
 import com.guang.cloudx.ui.ui.theme.CloudXTheme
@@ -150,6 +151,7 @@ class MainActivity : BaseActivity() {
                         composable(Screen.Home.route) {
                             MainActivityContent(
                                 onNavigateToLogin = { navController.navigate(Screen.Login.route) },
+                                onNavigateToMyPlayLists = { navController.navigate(Screen.MyPlayLists.route) },
                                 onNavigateToDownloadManager = { navController.navigate(Screen.DownloadManager.route) },
                                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                                 onNavigateToPlaylist = { type, id ->
@@ -182,6 +184,14 @@ class MainActivity : BaseActivity() {
                                 onThemeChanged = { color, mode ->
                                     currentThemeColor = color
                                     currentDarkMode = mode
+                                }
+                            )
+                        }
+                        composable(Screen.MyPlayLists.route) {
+                            MyPlayListsScreen(
+                                onBackClick = { navController.popBackStack() },
+                                onPlayListClick = { playList ->
+                                    navController.navigate(Screen.Playlist.createRoute("playlist", playList.id.toString()))
                                 }
                             )
                         }
@@ -266,6 +276,7 @@ class MainActivity : BaseActivity() {
     @Composable
     private fun MainActivityContent(
         onNavigateToLogin: () -> Unit,
+        onNavigateToMyPlayLists: () -> Unit,
         onNavigateToDownloadManager: () -> Unit,
         onNavigateToSettings: () -> Unit,
         onNavigateToPlaylist: (String, String) -> Unit
@@ -445,6 +456,10 @@ class MainActivity : BaseActivity() {
 
                         NavItem.ADD_ALBUM -> {
                             showAlbumDialog = true
+                        }
+
+                        NavItem.MY_PLAYLISTS -> {
+                            onNavigateToMyPlayLists()
                         }
 
                         NavItem.SETTINGS -> {

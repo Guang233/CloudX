@@ -53,6 +53,16 @@ object Repository {
         }
     }
 
+    fun getUserPlayListsFlow(userId: String, cookie: String, offset: Int = 0, limit: Int = 1000): Flow<Result<List<PlayList>>> = flow {
+        try {
+            val playLists = MusicNetwork.getUserPlayLists(userId, cookie, offset, limit)
+            emit(Result.success(playLists))
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+            e.e()
+        }
+    }.flowOn(Dispatchers.IO)
+
     suspend fun sendCaptcha(phone: String) = MusicNetwork.sendCaptcha(phone)
 
     suspend fun getLoginData(phone: String, captcha: String) = MusicNetwork.getLoginData(phone, captcha)

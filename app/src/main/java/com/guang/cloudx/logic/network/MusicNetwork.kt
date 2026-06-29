@@ -113,6 +113,17 @@ object MusicNetwork {
         )
     }
 
+    suspend fun getUserPlayLists(userId: String, cookie: String, offset: Int = 0, limit: Int = 1000): List<PlayList> {
+        val bodyJSON =
+            "{\"uid\":\"$userId\",\"offset\":\"$offset\",\"limit\":\"$limit\",\"e_r\":true,\"header\":\"\"}"
+        val query =
+            "/api/user/playlist-36cd479b6b5-$bodyJSON-36cd479b6b5-${MD5Helper.calculateMD5("nobody/api/user/playlistuse${bodyJSON}md5forencrypt")}"
+        return Decrypt.decryptUserPlayLists(
+            musicService.getUserPlayLists(AESECBHelper.encrypt(query), cookie)
+                .await()
+        )
+    }
+
     private suspend fun <T> Call<T>.await(): T {
 
         return suspendCoroutine { continuation ->
