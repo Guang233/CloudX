@@ -69,13 +69,20 @@ jobs:
             exit 1
           fi
 
-          if [ "${#apks[@]}" -eq 1 ]; then
-            cp "${apks[0]}" "dist/CloudX-${GITHUB_REF_NAME}.apk"
-          else
-            for apk in "${apks[@]}"; do
-              cp "$apk" "dist/CloudX-${GITHUB_REF_NAME}-$(basename "$apk")"
-            done
-          fi
+          for apk in "${apks[@]}"; do
+            filename="$(basename "$apk")"
+            abi="$filename"
+            abi="${abi#app-}"
+            abi="${abi%-release.apk}"
+
+            if [ "$abi" = "release.apk" ]; then
+              target="dist/CloudX-${GITHUB_REF_NAME}.apk"
+            else
+              target="dist/CloudX-${GITHUB_REF_NAME}-${abi}.apk"
+            fi
+
+            cp "$apk" "$target"
+          done
 
       - name: Generate release notes
         if: startsWith(github.ref, 'refs/tags/v')
