@@ -21,6 +21,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getLrcEncoding() = sharedPreferences.getString("lrc_encoding", "UTF-8")
     fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
     fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", 4)
+    fun getIsConvertM4aToMp3() = sharedPreferences.getBoolean("is_convert_m4a_to_mp3", false)
     fun getThemeColor() = sharedPreferences.getString("theme_color", "跟随系统").toString()
     fun getDarkMode() = sharedPreferences.getString("dark_mode", "跟随系统").toString()
     fun getIsFirstLaunch() = sharedPreferences.getBoolean("is_first_launch", true)
@@ -39,6 +40,7 @@ class SharedPreferencesUtils(context: Context) {
     fun putLrcEncoding(value: String) = sharedPreferences.edit { putString("lrc_encoding", value) }
     fun putIsPreviewMusic(value: Boolean) = sharedPreferences.edit { putBoolean("is_preview_music", value) }
     fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value) }
+    fun putIsConvertM4aToMp3(value: Boolean) = sharedPreferences.edit { putBoolean("is_convert_m4a_to_mp3", value) }
     fun putThemeColor(value: String) = sharedPreferences.edit { putString("theme_color", value) }
     fun putDarkMode(value: String) = sharedPreferences.edit { putString("dark_mode", value) }
     fun putIsFirstLaunch(value: Boolean) = sharedPreferences.edit { putBoolean("is_first_launch", value) }

@@ -8,6 +8,7 @@ import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.network.MusicNetwork
 import com.guang.cloudx.logic.utils.AudioTagWriter
+import com.guang.cloudx.logic.utils.Mp3Transcoder
 import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
@@ -31,6 +32,9 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
     ) {
         val cacheDir = context.externalCacheDir ?: context.cacheDir
         val tmpFile = File(cacheDir, music.id.toString())
+        var tmpWithExt: File? = null
+        var outputAudioFile: File? = null
+        var tmpCover: File? = null
 
         try {
             // 1. 获取音乐 URL 和文件信息
@@ -63,12 +67,27 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
             // 3. 检测类型并重命名
             val ext = detectFileTypeFromFile(tmpFile)
-            val tmpWithExt = File(cacheDir, "$baseFileName.$ext")
-            if (tmpWithExt.exists()) tmpWithExt.delete()
-            tmpFile.renameTo(tmpWithExt)
+            val downloadedAudioFile = File(cacheDir, "$baseFileName.$ext")
+            tmpWithExt = downloadedAudioFile
+            if (downloadedAudioFile.exists()) downloadedAudioFile.delete()
+            if (!tmpFile.renameTo(downloadedAudioFile)) {
+                throw Exception("无法重命名下载文件")
+            }
+
+            var finalExt = ext
+            var finalAudioFile = downloadedAudioFile
+
+            if (rules.convertM4aToMp3 && ext == "m4a") {
+                val tmpMp3 = File(cacheDir, "$baseFileName.mp3")
+                Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3)
+                downloadedAudioFile.delete()
+                finalAudioFile = tmpMp3
+                finalExt = "mp3"
+            }
+            outputAudioFile = finalAudioFile
 
             // 4. 下载封面
-            val tmpCover = File(cacheDir, "${music.id}.jpg")
+            tmpCover = File(cacheDir, "${music.id}.jpg")
             downloadFile(url = music.album.picUrl, file = tmpCover)
 
             // 5. 获取歌词
@@ -77,7 +96,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
             // 6. 写入元数据
             AudioTagWriter.writeTags(
-                tmpWithExt,
+                finalAudioFile,
                 AudioTagWriter.TagInfo(
                     title = music.name,
                     artist = music.artists.joinToString(rules.delimiter) { it.name },
@@ -89,7 +108,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             tmpCover.delete()
 
             // 7. 移动到最终位置
-            copyToSaf(context, tmpWithExt, targetDir, "$baseFileName.$ext")
+            copyToSaf(context, finalAudioFile, targetDir, "$baseFileName.$finalExt")
 
             // 8. 写入歌词文件
             if (rules.isSaveLrc && lrcText != null) {
@@ -97,10 +116,13 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             }
 
             // 9. 清理临时文件
-            tmpWithExt.delete()
+            finalAudioFile.delete()
 
         } catch (e: Exception) {
             tmpFile.delete()
+            tmpWithExt?.delete()
+            outputAudioFile?.delete()
+            tmpCover?.delete()
             // 清理可能存在的分块临时文件
             (0 until rules.concurrentDownloads).forEach {
                 File(cacheDir, "${music.id}.part$it").delete()

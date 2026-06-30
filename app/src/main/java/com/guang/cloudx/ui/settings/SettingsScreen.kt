@@ -62,6 +62,7 @@ fun SettingsScreen(
     var tlLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveTlLrc()) }
     var romaLrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveRomaLrc()) }
     var yrcEnabled by rememberSaveable { mutableStateOf(prefs.getIsSaveYrc()) }
+    var convertM4aToMp3Enabled by rememberSaveable { mutableStateOf(prefs.getIsConvertM4aToMp3()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -196,6 +197,19 @@ fun SettingsScreen(
                     selectedOption = prefs.getConcurrentDownloads().toString(),
                     onOptionSelected = {
                         prefs.putConcurrentDownloads(it.toInt())
+                    }
+                )
+            }
+
+            item {
+                SwitchListItem(
+                    icon = Icons.Outlined.AudioFile,
+                    title = "M4A 转 MP3",
+                    description = "下载到 m4a 文件时自动转码为 mp3",
+                    checked = convertM4aToMp3Enabled,
+                    onCheckedChange = { checked ->
+                        convertM4aToMp3Enabled = checked
+                        prefs.putIsConvertM4aToMp3(checked)
                     }
                 )
             }

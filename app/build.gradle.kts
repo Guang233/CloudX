@@ -97,6 +97,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.github.Adonai:jaudiotagger:2.3.15")
+    implementation("com.github.naman14:TAndroidLame:1.1") {
+        exclude(group = "com.android.support")
+    }
     implementation("androidx.activity:activity-compose:1.12.2")
     implementation(platform("androidx.compose:compose-bom:2025.12.01"))
     implementation("androidx.compose.ui:ui")

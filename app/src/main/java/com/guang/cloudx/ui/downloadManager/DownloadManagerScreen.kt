@@ -122,7 +122,8 @@ fun DownloadManagerScreen(
                                                 fileName = prefs.getDownloadFileName()!!,
                                                 delimiter = prefs.getArtistsDelimiter()!!,
                                                 encoding = prefs.getLrcEncoding()!!,
-                                                concurrentDownloads = prefs.getConcurrentDownloads()
+                                                concurrentDownloads = prefs.getConcurrentDownloads(),
+                                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
                                             )
                                         )
                                     }
@@ -306,7 +307,8 @@ fun DownloadingList(
                                 fileName = prefs.getDownloadFileName()!!,
                                 delimiter = prefs.getArtistsDelimiter()!!,
                                 encoding = prefs.getLrcEncoding()!!,
-                                concurrentDownloads = prefs.getConcurrentDownloads()
+                                concurrentDownloads = prefs.getConcurrentDownloads(),
+                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
                             )
                         )
                     }
