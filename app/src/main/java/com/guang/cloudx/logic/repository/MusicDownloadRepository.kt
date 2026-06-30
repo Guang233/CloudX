@@ -20,6 +20,7 @@ import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicLong
 
 class MusicDownloadRepository : ViewModelProvider.Factory {
+    private class RangeNotSupportedException(message: String) : Exception(message)
 
     suspend fun downloadMusic(
         context: Context,
@@ -28,7 +29,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         level: String,
         cookie: String,
         targetDir: DocumentFile,
-        onProgress: (Music, Int) -> Unit
+        onProgress: (Music, Int, String) -> Unit
     ) {
         val cacheDir = context.externalCacheDir ?: context.cacheDir
         val tmpFile = File(cacheDir, music.id.toString())
@@ -57,13 +58,14 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             // 2. 执行分块下载
             if (rules.concurrentDownloads > 1) {
                 downloadConcurrently(musicUrl.url, tmpFile, rules.concurrentDownloads) { progress ->
-                    onProgress(music, progress)
+                    onProgress(music, scaleProgress(progress, 0, 80), "正在下载")
                 }
             } else {
                 downloadFile(url = musicUrl.url, file = tmpFile) { progress ->
-                    onProgress(music, progress)
+                    onProgress(music, scaleProgress(progress, 0, 80), "正在下载")
                 }
             }
+            onProgress(music, 80, "正在处理")
 
             // 3. 检测类型并重命名
             val ext = detectFileTypeFromFile(tmpFile)
@@ -79,12 +81,15 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
             if (rules.convertM4aToMp3 && ext == "m4a") {
                 val tmpMp3 = File(cacheDir, "$baseFileName.mp3")
-                Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3)
+                Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
+                    onProgress(music, scaleProgress(progress, 80, 95), "正在转码")
+                }
                 downloadedAudioFile.delete()
                 finalAudioFile = tmpMp3
                 finalExt = "mp3"
             }
             outputAudioFile = finalAudioFile
+            onProgress(music, 95, "正在写入信息")
 
             // 4. 下载封面
             tmpCover = File(cacheDir, "${music.id}.jpg")
@@ -106,6 +111,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 )
             )
             tmpCover.delete()
+            onProgress(music, 98, "正在保存")
 
             // 7. 移动到最终位置
             copyToSaf(context, finalAudioFile, targetDir, "$baseFileName.$finalExt")
@@ -117,6 +123,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
             // 9. 清理临时文件
             finalAudioFile.delete()
+            onProgress(music, 100, "下载完成")
 
         } catch (e: Exception) {
             tmpFile.delete()
@@ -151,28 +158,33 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         val partFiles = (0 until parts).map { File(parentDir, "${outputFile.name}.part$it") }
 
         try {
-            coroutineScope {
-                (0 until parts).map { partIndex ->
-                    async {
-                        val start = partIndex * partSize
-                        val end = if (partIndex == parts - 1) contentLength - 1 else start + partSize - 1
-                        downloadChunk(url, partFiles[partIndex], start, end) { downloaded ->
-                            progressArray[partIndex] = downloaded
-                            val currentTotal = progressArray.sum()
-                            totalDownloaded.set(currentTotal)
-                            onProgress((currentTotal * 100 / contentLength).toInt())
+            try {
+                coroutineScope {
+                    (0 until parts).map { partIndex ->
+                        async {
+                            val start = partIndex * partSize
+                            val end = if (partIndex == parts - 1) contentLength - 1 else start + partSize - 1
+                            downloadChunk(url, partFiles[partIndex], start, end) { downloaded ->
+                                progressArray[partIndex] = downloaded
+                                val currentTotal = progressArray.sum()
+                                totalDownloaded.set(currentTotal)
+                                onProgress((currentTotal * 100 / contentLength).toInt())
+                            }
+                        }
+                    }.awaitAll()
+                }
+
+                // 合并文件
+                outputFile.outputStream().use { output ->
+                    partFiles.forEach { partFile ->
+                        partFile.inputStream().use { input ->
+                            input.copyTo(output)
                         }
                     }
-                }.awaitAll()
-            }
-
-            // 合并文件
-            outputFile.outputStream().use { output ->
-                partFiles.forEach { partFile ->
-                    partFile.inputStream().use { input ->
-                        input.copyTo(output)
-                    }
                 }
+            } catch (e: RangeNotSupportedException) {
+                outputFile.delete()
+                downloadFile(url = url, file = outputFile, progressCallback = onProgress)
             }
         } finally {
             // 清理分块文件
@@ -195,7 +207,10 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             conn.readTimeout = 20_000
             conn.connect()
 
-            if (conn.responseCode !in 200..299) {
+            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                throw RangeNotSupportedException("服务器不支持分块下载")
+            }
+            if (conn.responseCode != HttpURLConnection.HTTP_PARTIAL) {
                 throw Exception("HTTP error: ${conn.responseCode} for range $start-$end")
             }
 
@@ -216,6 +231,10 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         } finally {
             conn.disconnect()
         }
+    }
+
+    private fun scaleProgress(progress: Int, start: Int, end: Int): Int {
+        return (start + (progress.coerceIn(0, 100) * (end - start) / 100)).coerceIn(start, end)
     }
 
     private suspend fun getRemoteFileSize(url: String): Long = withContext(Dispatchers.IO) {

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -30,6 +31,8 @@ class DownloadService : Service() {
     private var isDownloading = false
     private var totalCompleted = 0
     private val progressMap = mutableMapOf<Long, Int>()
+    private val progressUpdateAtMap = mutableMapOf<Long, Long>()
+    private val stageMap = mutableMapOf<Long, String>()
 
     companion object {
         var isRunning = false
@@ -108,27 +111,42 @@ class DownloadService : Service() {
                             level,
                             cookie,
                             targetDir
-                        ) { _, progress ->
-                            progressMap[dbId] = progress
-                            val avgProgress =
-                                if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
-                            updateNotification(
-                                "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
-                                "正在下载 ${music.name} ($progress%)",
-                                avgProgress
-                            )
+                        ) { _, progress, stage ->
+                            val previousProgress = progressMap[dbId] ?: -1
+                            val previousStage = stageMap[dbId]
+                            val now = SystemClock.elapsedRealtime()
+                            val lastUpdateAt = progressUpdateAtMap[dbId] ?: 0L
+                            val shouldPublishProgress = progress == 100 ||
+                                    progress != previousProgress && now - lastUpdateAt >= 400 ||
+                                    stage != previousStage
 
-                            sendBroadcast(
-                                Intent("DOWNLOAD_PROGRESS")
-                                    .setPackage(packageName)
-                                    .apply {
-                                        putExtra("dbId", dbId)
-                                        putExtra("progress", progress)
-                                    }
-                            )
+                            progressMap[dbId] = progress
+                            stageMap[dbId] = stage
+
+                            if (shouldPublishProgress) {
+                                progressUpdateAtMap[dbId] = now
+                                val avgProgress =
+                                    if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
+                                updateNotification(
+                                    "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
+                                    "$stage ${music.name} ($progress%)",
+                                    avgProgress
+                                )
+
+                                sendBroadcast(
+                                    Intent("DOWNLOAD_PROGRESS")
+                                        .setPackage(packageName)
+                                        .apply {
+                                            putExtra("dbId", dbId)
+                                            putExtra("progress", progress)
+                                        }
+                                )
+                            }
                         }
 
                         totalCompleted++
+                        progressUpdateAtMap.remove(dbId)
+                        stageMap.remove(dbId)
 
                         sendBroadcast(
                             Intent("DOWNLOAD_COMPLETED")
@@ -139,6 +157,8 @@ class DownloadService : Service() {
                         )
 
                     } catch (e: Exception) {
+                        progressUpdateAtMap.remove(dbId)
+                        stageMap.remove(dbId)
                         sendBroadcast(
                             Intent("DOWNLOAD_FAILED")
                                 .setPackage(packageName)

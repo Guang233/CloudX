@@ -23,7 +23,8 @@ object Mp3Transcoder {
     suspend fun transcodeM4aToMp3(
         inputFile: File,
         outputFile: File,
-        bitrateKbps: Int = DEFAULT_BITRATE_KBPS
+        bitrateKbps: Int = DEFAULT_BITRATE_KBPS,
+        onProgress: (Int) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
         var extractor: MediaExtractor? = null
         var decoder: MediaCodec? = null
@@ -45,6 +46,11 @@ object Mp3Transcoder {
             val mime = inputFormat.getString(MediaFormat.KEY_MIME)
                 ?: throw IllegalArgumentException("无法识别音频编码")
             if (!mime.startsWith("audio/")) throw IllegalArgumentException("不是音频文件")
+            val durationUs = if (inputFormat.containsKey(MediaFormat.KEY_DURATION)) {
+                inputFormat.getLong(MediaFormat.KEY_DURATION)
+            } else {
+                -1L
+            }
 
             decoder = MediaCodec.createDecoderByType(mime).apply {
                 configure(inputFormat, null, null, 0)
@@ -57,6 +63,9 @@ object Mp3Transcoder {
                 var outputDone = false
                 var outputFormat = inputFormat
                 var mp3Buffer = ByteArray(8192)
+                var monoBuffer = ShortArray(0)
+                var stereoBuffer = ShortArray(0)
+                var lastProgress = -1
 
                 while (!outputDone) {
                     coroutineContext.ensureActive()
@@ -113,9 +122,9 @@ object Mp3Transcoder {
                                         lame = LameBuilder()
                                             .setInSampleRate(sampleRate)
                                             .setOutSampleRate(sampleRate)
-                                            .setOutChannels(2)
+                                            .setOutChannels(channelCount)
                                             .setOutBitrate(bitrateKbps)
-                                            .setMode(LameBuilder.Mode.JSTEREO)
+                                            .setMode(if (channelCount == 1) LameBuilder.Mode.MONO else LameBuilder.Mode.JSTEREO)
                                             .setQuality(5)
                                             .build()
                                     }
@@ -132,10 +141,24 @@ object Mp3Transcoder {
                                         channelCount = channelCount,
                                         samplesPerChannel = samplesPerChannel,
                                         lame = lame,
-                                        mp3Buffer = mp3Buffer
+                                        mp3Buffer = mp3Buffer,
+                                        monoBuffer = monoBuffer,
+                                        stereoBuffer = stereoBuffer,
+                                        onMonoBufferChanged = { monoBuffer = it },
+                                        onStereoBufferChanged = { stereoBuffer = it }
                                     )
                                     if (encodedSize > 0) {
                                         mp3Output.write(mp3Buffer, 0, encodedSize)
+                                    }
+
+                                    if (durationUs > 0) {
+                                        val progress = ((bufferInfo.presentationTimeUs * 100) / durationUs)
+                                            .toInt()
+                                            .coerceIn(0, 99)
+                                        if (progress != lastProgress) {
+                                            lastProgress = progress
+                                            onProgress(progress)
+                                        }
                                     }
                                 }
 
@@ -150,6 +173,7 @@ object Mp3Transcoder {
                 lame?.flush(mp3Buffer)?.takeIf { it > 0 }?.let { size ->
                     mp3Output.write(mp3Buffer, 0, size)
                 }
+                onProgress(100)
             }
 
             completed = true
@@ -197,20 +221,24 @@ object Mp3Transcoder {
         channelCount: Int,
         samplesPerChannel: Int,
         lame: AndroidLame?,
-        mp3Buffer: ByteArray
+        mp3Buffer: ByteArray,
+        monoBuffer: ShortArray,
+        stereoBuffer: ShortArray,
+        onMonoBufferChanged: (ShortArray) -> Unit,
+        onStereoBufferChanged: (ShortArray) -> Unit
     ): Int {
         if (lame == null || samplesPerChannel <= 0) return 0
 
         val shortCount = samplesPerChannel * channelCount
         return if (channelCount == 1) {
-            val mono = ShortArray(shortCount)
-            for (i in mono.indices) {
+            val mono = if (monoBuffer.size >= shortCount) monoBuffer else ShortArray(shortCount).also(onMonoBufferChanged)
+            for (i in 0 until shortCount) {
                 mono[i] = pcmBuffer.getShort()
             }
             lame.encode(mono, mono, samplesPerChannel, mp3Buffer)
         } else {
-            val stereo = ShortArray(shortCount)
-            for (i in stereo.indices) {
+            val stereo = if (stereoBuffer.size >= shortCount) stereoBuffer else ShortArray(shortCount).also(onStereoBufferChanged)
+            for (i in 0 until shortCount) {
                 stereo[i] = pcmBuffer.getShort()
             }
             lame.encodeBufferInterLeaved(stereo, samplesPerChannel, mp3Buffer)
