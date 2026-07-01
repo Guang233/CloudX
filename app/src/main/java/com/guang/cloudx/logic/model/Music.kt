@@ -19,3 +19,12 @@ data class MusicDownloadRules(
     val fileName: String, val delimiter: String,
     val encoding: String, val concurrentDownloads: Int = 1, val convertM4aToMp3: Boolean = false
 )
+
+enum class DownloadStage {
+    DOWNLOADING,
+    PROCESSING,
+    TRANSCODING,
+    WRITING_TAGS,
+    SAVING,
+    COMPLETED
+}

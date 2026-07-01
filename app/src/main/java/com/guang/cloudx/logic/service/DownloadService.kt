@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.database.AppDatabase
+import com.guang.cloudx.logic.model.DownloadStage
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
@@ -20,6 +21,15 @@ import kotlinx.coroutines.*
 import java.util.*
 
 class DownloadService : Service() {
+    private data class DownloadTask(
+        val music: Music,
+        val dbId: Long,
+        val rules: MusicDownloadRules,
+        val level: String,
+        val cookie: String,
+        val targetDir: DocumentFile
+    )
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val repository = MusicDownloadRepository()
     private lateinit var notificationManager: NotificationManager
@@ -27,12 +37,12 @@ class DownloadService : Service() {
 
 
     private val queueLock = Any()
-    private val downloadQueue = LinkedList<Pair<Music, Long>>() // Pair of Music and its DB ID
+    private val downloadQueue = LinkedList<DownloadTask>()
     private var isDownloading = false
     private var totalCompleted = 0
     private val progressMap = mutableMapOf<Long, Int>()
     private val progressUpdateAtMap = mutableMapOf<Long, Long>()
-    private val stageMap = mutableMapOf<Long, String>()
+    private val stageMap = mutableMapOf<Long, DownloadStage>()
 
     companion object {
         var isRunning = false
@@ -66,8 +76,15 @@ class DownloadService : Service() {
             musics.forEach { music ->
                 val dbId = musicIdToDbIdMap[music.id]
                 if (dbId != null) {
-                    val task = Pair(music, dbId)
-                    if (!downloadQueue.contains(task)) {
+                    if (downloadQueue.none { it.dbId == dbId }) {
+                        val task = DownloadTask(
+                            music = music,
+                            dbId = dbId,
+                            rules = rules,
+                            level = level,
+                            cookie = cookie,
+                            targetDir = targetDir
+                        )
                         downloadQueue.add(task)
                         progressMap.putIfAbsent(dbId, 0)
                     }
@@ -101,35 +118,33 @@ class DownloadService : Service() {
                         }
                     }
 
-                    val (music, dbId) = task
-
                     try {
                         repository.downloadMusic(
                             this@DownloadService,
-                            rules,
-                            music,
-                            level,
-                            cookie,
-                            targetDir
+                            task.rules,
+                            task.music,
+                            task.level,
+                            task.cookie,
+                            task.targetDir
                         ) { _, progress, stage ->
-                            val previousProgress = progressMap[dbId] ?: -1
-                            val previousStage = stageMap[dbId]
+                            val previousProgress = progressMap[task.dbId] ?: -1
+                            val previousStage = stageMap[task.dbId]
                             val now = SystemClock.elapsedRealtime()
-                            val lastUpdateAt = progressUpdateAtMap[dbId] ?: 0L
+                            val lastUpdateAt = progressUpdateAtMap[task.dbId] ?: 0L
                             val shouldPublishProgress = progress == 100 ||
                                     progress != previousProgress && now - lastUpdateAt >= 400 ||
                                     stage != previousStage
 
-                            progressMap[dbId] = progress
-                            stageMap[dbId] = stage
+                            progressMap[task.dbId] = progress
+                            stageMap[task.dbId] = stage
 
                             if (shouldPublishProgress) {
-                                progressUpdateAtMap[dbId] = now
+                                progressUpdateAtMap[task.dbId] = now
                                 val avgProgress =
                                     if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
                                 updateNotification(
                                     "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
-                                    "$stage ${music.name} ($progress%)",
+                                    "${stage.toDisplayText()} ${task.music.name} ($progress%)",
                                     avgProgress
                                 )
 
@@ -137,7 +152,7 @@ class DownloadService : Service() {
                                     Intent("DOWNLOAD_PROGRESS")
                                         .setPackage(packageName)
                                         .apply {
-                                            putExtra("dbId", dbId)
+                                            putExtra("dbId", task.dbId)
                                             putExtra("progress", progress)
                                         }
                                 )
@@ -145,25 +160,25 @@ class DownloadService : Service() {
                         }
 
                         totalCompleted++
-                        progressUpdateAtMap.remove(dbId)
-                        stageMap.remove(dbId)
+                        progressUpdateAtMap.remove(task.dbId)
+                        stageMap.remove(task.dbId)
 
                         sendBroadcast(
                             Intent("DOWNLOAD_COMPLETED")
                                 .setPackage(packageName)
                                 .apply {
-                                    putExtra("dbId", dbId)
+                                    putExtra("dbId", task.dbId)
                                 }
                         )
 
                     } catch (e: Exception) {
-                        progressUpdateAtMap.remove(dbId)
-                        stageMap.remove(dbId)
+                        progressUpdateAtMap.remove(task.dbId)
+                        stageMap.remove(task.dbId)
                         sendBroadcast(
                             Intent("DOWNLOAD_FAILED")
                                 .setPackage(packageName)
                                 .apply {
-                                    putExtra("dbId", dbId)
+                                    putExtra("dbId", task.dbId)
                                     putExtra("reason", e.localizedMessage)
                                 }
                         )
@@ -205,6 +220,15 @@ class DownloadService : Service() {
 
     private fun updateNotification(title: String, content: String, progress: Int) {
         notificationManager.notify(1, buildNotification(title, content, progress))
+    }
+
+    private fun DownloadStage.toDisplayText(): String = when (this) {
+        DownloadStage.DOWNLOADING -> "正在下载"
+        DownloadStage.PROCESSING -> "正在处理"
+        DownloadStage.TRANSCODING -> "正在转码"
+        DownloadStage.WRITING_TAGS -> "正在写入信息"
+        DownloadStage.SAVING -> "正在保存"
+        DownloadStage.COMPLETED -> "下载完成"
     }
 
     override fun onDestroy() {

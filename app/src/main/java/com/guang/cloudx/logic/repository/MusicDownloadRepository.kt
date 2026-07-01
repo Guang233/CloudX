@@ -3,6 +3,7 @@ package com.guang.cloudx.logic.repository
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModelProvider
+import com.guang.cloudx.logic.model.DownloadStage
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
@@ -29,7 +30,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         level: String,
         cookie: String,
         targetDir: DocumentFile,
-        onProgress: (Music, Int, String) -> Unit
+        onProgress: (Music, Int, DownloadStage) -> Unit
     ) {
         val cacheDir = context.externalCacheDir ?: context.cacheDir
         val tmpFile = File(cacheDir, music.id.toString())
@@ -58,14 +59,14 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             // 2. 执行分块下载
             if (rules.concurrentDownloads > 1) {
                 downloadConcurrently(musicUrl.url, tmpFile, rules.concurrentDownloads) { progress ->
-                    onProgress(music, scaleProgress(progress, 0, 80), "正在下载")
+                    onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
                 }
             } else {
                 downloadFile(url = musicUrl.url, file = tmpFile) { progress ->
-                    onProgress(music, scaleProgress(progress, 0, 80), "正在下载")
+                    onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
                 }
             }
-            onProgress(music, 80, "正在处理")
+            onProgress(music, 80, DownloadStage.PROCESSING)
 
             // 3. 检测类型并重命名
             val ext = detectFileTypeFromFile(tmpFile)
@@ -82,14 +83,14 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             if (rules.convertM4aToMp3 && ext == "m4a") {
                 val tmpMp3 = File(cacheDir, "$baseFileName.mp3")
                 Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
-                    onProgress(music, scaleProgress(progress, 80, 95), "正在转码")
+                    onProgress(music, scaleProgress(progress, 80, 95), DownloadStage.TRANSCODING)
                 }
                 downloadedAudioFile.delete()
                 finalAudioFile = tmpMp3
                 finalExt = "mp3"
             }
             outputAudioFile = finalAudioFile
-            onProgress(music, 95, "正在写入信息")
+            onProgress(music, 95, DownloadStage.WRITING_TAGS)
 
             // 4. 下载封面
             tmpCover = File(cacheDir, "${music.id}.jpg")
@@ -111,7 +112,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 )
             )
             tmpCover.delete()
-            onProgress(music, 98, "正在保存")
+            onProgress(music, 98, DownloadStage.SAVING)
 
             // 7. 移动到最终位置
             copyToSaf(context, finalAudioFile, targetDir, "$baseFileName.$finalExt")
@@ -123,7 +124,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
             // 9. 清理临时文件
             finalAudioFile.delete()
-            onProgress(music, 100, "下载完成")
+            onProgress(music, 100, DownloadStage.COMPLETED)
 
         } catch (e: Exception) {
             tmpFile.delete()
