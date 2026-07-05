@@ -85,6 +85,7 @@ open class BaseActivity : ComponentActivity() {
                 prefs.getDownloadFileName()!!,
                 prefs.getArtistsDelimiter()!!,
                 prefs.getLrcEncoding()!!,
+                concurrentDownloads = prefs.getConcurrentDownloads(),
                 convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
             )
         )

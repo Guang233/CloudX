@@ -11,17 +11,33 @@ import com.guang.cloudx.logic.network.MusicNetwork
 import com.guang.cloudx.logic.utils.AudioTagWriter
 import com.guang.cloudx.logic.utils.Mp3Transcoder
 import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.charset.Charset
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLongArray
 
 class MusicDownloadRepository : ViewModelProvider.Factory {
     private class RangeNotSupportedException(message: String) : Exception(message)
+    private data class RemoteFileInfo(val contentLength: Long, val supportsRange: Boolean)
+
+    private companion object {
+        const val BUFFER_SIZE = 64 * 1024
+        const val MAX_CONCURRENT_PARTS = 8
+        const val MIN_PARALLEL_DOWNLOAD_BYTES = 4L * 1024 * 1024
+        const val MIN_PART_SIZE_BYTES = 2L * 1024 * 1024
+
+        val downloadClient: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
 
     suspend fun downloadMusic(
         context: Context,
@@ -56,75 +72,97 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 .replace("\${albumId}", music.album.id.toString())
                 .replace(Regex("[\\\\/:*?\"<>|]"), " ")
 
-            // 2. 执行分块下载
-            if (rules.concurrentDownloads > 1) {
-                downloadConcurrently(musicUrl.url, tmpFile, rules.concurrentDownloads) { progress ->
-                    onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
-                }
-            } else {
-                downloadFile(url = musicUrl.url, file = tmpFile) { progress ->
-                    onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
-                }
-            }
-            onProgress(music, 80, DownloadStage.PROCESSING)
-
-            // 3. 检测类型并重命名
-            val ext = detectFileTypeFromFile(tmpFile)
-            val downloadedAudioFile = File(cacheDir, "$baseFileName.$ext")
-            tmpWithExt = downloadedAudioFile
-            if (downloadedAudioFile.exists()) downloadedAudioFile.delete()
-            if (!tmpFile.renameTo(downloadedAudioFile)) {
-                throw Exception("无法重命名下载文件")
-            }
-
-            var finalExt = ext
-            var finalAudioFile = downloadedAudioFile
-
-            if (rules.convertM4aToMp3 && ext == "m4a") {
-                val tmpMp3 = File(cacheDir, "$baseFileName.mp3")
-                Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
-                    onProgress(music, scaleProgress(progress, 80, 95), DownloadStage.TRANSCODING)
-                }
-                downloadedAudioFile.delete()
-                finalAudioFile = tmpMp3
-                finalExt = "mp3"
-            }
-            outputAudioFile = finalAudioFile
-            onProgress(music, 95, DownloadStage.WRITING_TAGS)
-
-            // 4. 下载封面
             tmpCover = File(cacheDir, "${music.id}.jpg")
-            downloadFile(url = music.album.picUrl, file = tmpCover)
+            val coverFile = tmpCover!!
 
-            // 5. 获取歌词
-            val lrc = MusicNetwork.getLyrics(music.id.toString(), cookie)
-            val lrcText = lrc.let { if (it.lrc != "") createLyrics(lrc, music, rules) else null }
+            coroutineScope {
+                val coverDeferred = async(Dispatchers.IO) {
+                    try {
+                        downloadFile(url = music.album.picUrl, file = coverFile)
+                        coverFile.takeIf { it.exists() && it.length() > 0 }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                val lyricDeferred = async {
+                    try {
+                        MusicNetwork.getLyrics(music.id.toString(), cookie)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
 
-            // 6. 写入元数据
-            AudioTagWriter.writeTags(
-                finalAudioFile,
-                AudioTagWriter.TagInfo(
-                    title = music.name,
-                    artist = music.artists.joinToString(rules.delimiter) { it.name },
-                    album = music.album.name,
-                    coverFile = tmpCover,
-                    lyrics = lrcText
+                // 2. 执行分块下载
+                if (rules.concurrentDownloads > 1) {
+                    downloadConcurrently(musicUrl.url, tmpFile, rules.concurrentDownloads) { progress ->
+                        onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
+                    }
+                } else {
+                    downloadFile(url = musicUrl.url, file = tmpFile) { progress ->
+                        onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
+                    }
+                }
+                onProgress(music, 80, DownloadStage.PROCESSING)
+
+                // 3. 检测类型并重命名
+                val ext = detectFileTypeFromFile(tmpFile)
+                val downloadedAudioFile = File(cacheDir, "$baseFileName.$ext")
+                tmpWithExt = downloadedAudioFile
+                if (downloadedAudioFile.exists()) downloadedAudioFile.delete()
+                if (!tmpFile.renameTo(downloadedAudioFile)) {
+                    throw Exception("无法重命名下载文件")
+                }
+
+                var finalExt = ext
+                var finalAudioFile = downloadedAudioFile
+
+                if (rules.convertM4aToMp3 && ext == "m4a") {
+                    val tmpMp3 = File(cacheDir, "$baseFileName.mp3")
+                    Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
+                        onProgress(music, scaleProgress(progress, 80, 95), DownloadStage.TRANSCODING)
+                    }
+                    downloadedAudioFile.delete()
+                    finalAudioFile = tmpMp3
+                    finalExt = "mp3"
+                }
+                outputAudioFile = finalAudioFile
+                onProgress(music, 95, DownloadStage.WRITING_TAGS)
+
+                // 4. 等待预取结果
+                val coverForTags = coverDeferred.await()
+                val lrc = lyricDeferred.await()
+                val lrcText = lrc?.let { if (it.lrc != "") createLyrics(it, music, rules) else null }
+
+                // 5. 写入元数据
+                AudioTagWriter.writeTags(
+                    finalAudioFile,
+                    AudioTagWriter.TagInfo(
+                        title = music.name,
+                        artist = music.artists.joinToString(rules.delimiter) { it.name },
+                        album = music.album.name,
+                        coverFile = coverForTags,
+                        lyrics = lrcText
+                    )
                 )
-            )
-            tmpCover.delete()
-            onProgress(music, 98, DownloadStage.SAVING)
+                coverFile.delete()
+                onProgress(music, 98, DownloadStage.SAVING)
 
-            // 7. 移动到最终位置
-            copyToSaf(context, finalAudioFile, targetDir, "$baseFileName.$finalExt")
+                // 6. 移动到最终位置
+                copyToSaf(context, finalAudioFile, targetDir, "$baseFileName.$finalExt")
 
-            // 8. 写入歌词文件
-            if (rules.isSaveLrc && lrcText != null) {
-                writeLrcToSaf(context, lrcText, targetDir, "$baseFileName.lrc", rules.encoding)
+                // 7. 写入歌词文件
+                if (rules.isSaveLrc && lrcText != null) {
+                    writeLrcToSaf(context, lrcText, targetDir, "$baseFileName.lrc", rules.encoding)
+                }
+
+                // 8. 清理临时文件
+                finalAudioFile.delete()
+                onProgress(music, 100, DownloadStage.COMPLETED)
             }
-
-            // 9. 清理临时文件
-            finalAudioFile.delete()
-            onProgress(music, 100, DownloadStage.COMPLETED)
 
         } catch (e: Exception) {
             tmpFile.delete()
@@ -145,51 +183,45 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         parts: Int,
         onProgress: (Int) -> Unit
     ) = withContext(Dispatchers.IO) {
-        val contentLength = getRemoteFileSize(url)
-        if (contentLength <= 0) { // 如果无法获取文件大小，则回退到单线程下载
+        val remoteFileInfo = getRemoteFileInfo(url)
+        val contentLength = remoteFileInfo.contentLength
+        val partCount = choosePartCount(contentLength, parts)
+
+        if (!remoteFileInfo.supportsRange || contentLength <= 0 || partCount <= 1) {
             downloadFile(url = url, file = outputFile, progressCallback = onProgress)
             return@withContext
         }
 
-        val partSize = contentLength / parts
-        val totalDownloaded = AtomicLong(0)
-        val progressArray = LongArray(parts)
-
-        val parentDir = outputFile.parentFile!!
-        val partFiles = (0 until parts).map { File(parentDir, "${outputFile.name}.part$it") }
+        outputFile.parentFile?.mkdirs()
+        if (outputFile.exists()) outputFile.delete()
+        RandomAccessFile(outputFile, "rw").use { it.setLength(contentLength) }
 
         try {
-            try {
-                coroutineScope {
-                    (0 until parts).map { partIndex ->
-                        async {
-                            val start = partIndex * partSize
-                            val end = if (partIndex == parts - 1) contentLength - 1 else start + partSize - 1
-                            downloadChunk(url, partFiles[partIndex], start, end) { downloaded ->
-                                progressArray[partIndex] = downloaded
-                                val currentTotal = progressArray.sum()
-                                totalDownloaded.set(currentTotal)
-                                onProgress((currentTotal * 100 / contentLength).toInt())
-                            }
-                        }
-                    }.awaitAll()
-                }
+            val partSize = contentLength / partCount
+            val progressArray = AtomicLongArray(partCount)
 
-                // 合并文件
-                outputFile.outputStream().use { output ->
-                    partFiles.forEach { partFile ->
-                        partFile.inputStream().use { input ->
-                            input.copyTo(output)
+            coroutineScope {
+                (0 until partCount).map { partIndex ->
+                    async {
+                        val start = partIndex * partSize
+                        val end = if (partIndex == partCount - 1) contentLength - 1 else start + partSize - 1
+                        downloadChunk(url, outputFile, start, end) { downloaded ->
+                            progressArray.set(partIndex, downloaded)
+                            onProgress(calculateProgress(progressArray, contentLength))
                         }
                     }
-                }
-            } catch (e: RangeNotSupportedException) {
-                outputFile.delete()
-                downloadFile(url = url, file = outputFile, progressCallback = onProgress)
+                }.awaitAll()
             }
-        } finally {
-            // 清理分块文件
-            partFiles.forEach { it.delete() }
+            if (outputFile.length() != contentLength) {
+                throw Exception("文件大小校验失败")
+            }
+            onProgress(100)
+        } catch (e: RangeNotSupportedException) {
+            outputFile.delete()
+            downloadFile(url = url, file = outputFile, progressCallback = onProgress)
+        } catch (e: Exception) {
+            outputFile.delete()
+            throw e
         }
     }
 
@@ -200,25 +232,26 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         end: Long,
         onProgress: (Long) -> Unit
     ) = withContext(Dispatchers.IO) {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("Range", "bytes=$start-$end")
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 20_000
-            conn.connect()
+        val request = Request.Builder()
+            .url(url)
+            .header("Range", "bytes=$start-$end")
+            .header("Accept-Encoding", "identity")
+            .build()
 
-            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+        downloadClient.newCall(request).execute().use { response ->
+            if (response.code == HttpURLConnection.HTTP_OK) {
                 throw RangeNotSupportedException("服务器不支持分块下载")
             }
-            if (conn.responseCode != HttpURLConnection.HTTP_PARTIAL) {
-                throw Exception("HTTP error: ${conn.responseCode} for range $start-$end")
+            if (response.code != HttpURLConnection.HTTP_PARTIAL) {
+                throw Exception("HTTP error: ${response.code} for range $start-$end")
             }
 
             var downloaded = 0L
-            val buffer = ByteArray(8 * 1024)
-            conn.inputStream.use { input ->
-                outputFile.outputStream().use { output ->
+            val expectedLength = end - start + 1
+            val buffer = ByteArray(BUFFER_SIZE)
+            response.body.byteStream().use { input ->
+                RandomAccessFile(outputFile, "rw").use { output ->
+                    output.seek(start)
                     var bytes = input.read(buffer)
                     while (bytes != -1) {
                         ensureActive()
@@ -229,8 +262,9 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     }
                 }
             }
-        } finally {
-            conn.disconnect()
+            if (downloaded != expectedLength) {
+                throw Exception("分块大小校验失败: $start-$end")
+            }
         }
     }
 
@@ -238,23 +272,55 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         return (start + (progress.coerceIn(0, 100) * (end - start) / 100)).coerceIn(start, end)
     }
 
-    private suspend fun getRemoteFileSize(url: String): Long = withContext(Dispatchers.IO) {
-        var conn: HttpURLConnection? = null
-        try {
-            conn = URL(url).openConnection() as HttpURLConnection
-            conn.requestMethod = "HEAD"
-            conn.connectTimeout = 5_000
-            conn.readTimeout = 5_000
-            conn.connect()
-            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                return@withContext conn.contentLengthLong
-            }
-        } catch (e: Exception) {
-            // Ignore
-        } finally {
-            conn?.disconnect()
+    private fun choosePartCount(contentLength: Long, requestedParts: Int): Int {
+        if (contentLength < MIN_PARALLEL_DOWNLOAD_BYTES) return 1
+
+        val cappedRequest = requestedParts.coerceIn(1, MAX_CONCURRENT_PARTS)
+        val partsBySize = (contentLength / MIN_PART_SIZE_BYTES).coerceAtLeast(1L).toInt()
+        return minOf(cappedRequest, partsBySize)
+    }
+
+    private fun calculateProgress(progressArray: AtomicLongArray, total: Long): Int {
+        var downloaded = 0L
+        for (i in 0 until progressArray.length()) {
+            downloaded += progressArray.get(i)
         }
-        return@withContext -1L
+        return ((downloaded * 100) / total).toInt().coerceIn(0, 100)
+    }
+
+    private fun parseTotalLength(contentRange: String?): Long {
+        val total = contentRange
+            ?.substringAfter('/', missingDelimiterValue = "")
+            ?.takeUnless { it == "*" }
+
+        return total?.toLongOrNull() ?: -1L
+    }
+
+    private suspend fun getRemoteFileInfo(url: String): RemoteFileInfo = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .header("Range", "bytes=0-0")
+            .header("Accept-Encoding", "identity")
+            .build()
+
+        return@withContext runCatching {
+            downloadClient.newCall(request).execute().use { response ->
+                when (response.code) {
+                    HttpURLConnection.HTTP_PARTIAL -> {
+                        val totalLength = parseTotalLength(response.header("Content-Range"))
+                        RemoteFileInfo(totalLength, totalLength > 0)
+                    }
+
+                    HttpURLConnection.HTTP_OK -> {
+                        RemoteFileInfo(response.body.contentLength(), false)
+                    }
+
+                    else -> RemoteFileInfo(-1L, false)
+                }
+            }
+        }.getOrElse {
+            RemoteFileInfo(-1L, false)
+        }
     }
 
     suspend fun downloadFile(
@@ -266,19 +332,20 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
     ) = withContext(Dispatchers.IO) {
         require(file != null || documentFile != null) { "必须提供 file 或 documentFile" }
 
-        val conn = URL(url).openConnection() as HttpURLConnection
-        try {
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 20_000
-            conn.requestMethod = "GET"
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept-Encoding", "identity")
+            .build()
 
-            if (conn.responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("HTTP error: ${conn.responseCode}")
+        downloadClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw Exception("HTTP error: ${response.code}")
             }
 
-            val total: Long = conn.contentLengthLong
+            val body = response.body
+            val total: Long = body.contentLength()
             var downloaded: Long = 0
-            val buffer = ByteArray(8 * 1024)
+            val buffer = ByteArray(BUFFER_SIZE)
 
             val output: OutputStream = when {
                 file != null -> file.outputStream()
@@ -290,7 +357,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 else -> throw IllegalStateException()
             }
 
-            conn.inputStream.use { input: InputStream ->
+            body.byteStream().use { input: InputStream ->
                 output.use { out ->
                     var bytes = input.read(buffer)
                     while (bytes != -1) {
@@ -305,8 +372,9 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     out.flush()
                 }
             }
-        } finally {
-            conn.disconnect()
+            if (total <= 0) {
+                progressCallback(100)
+            }
         }
     }
 
@@ -317,20 +385,20 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 try {
                     context.contentResolver.openFileDescriptor(existing.uri, "w")?.use { pfd ->
                         FileOutputStream(pfd.fileDescriptor).use { out ->
-                            sourceFile.inputStream().use { input -> input.copyTo(out) }
+                            sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
                         }
                     } ?: throw Exception("无法打开现有文件")
                 } catch (e: Exception) {
                     context.contentResolver.delete(existing.uri, null, null)
                     val newDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
                     context.contentResolver.openOutputStream(newDoc.uri)?.use { out ->
-                        sourceFile.inputStream().use { input -> input.copyTo(out) }
+                        sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
                     } ?: throw Exception("无法打开新文件")
                 }
             } else {
                 val musicDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
                 context.contentResolver.openOutputStream(musicDoc.uri)?.use { out ->
-                    sourceFile.inputStream().use { input -> input.copyTo(out) }
+                    sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
                 } ?: throw Exception("无法打开目标输出流")
             }
         }

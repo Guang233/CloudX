@@ -20,7 +20,7 @@ class SharedPreferencesUtils(context: Context) {
     fun getArtistsDelimiter() = sharedPreferences.getString("artists_delimiter", "、")
     fun getLrcEncoding() = sharedPreferences.getString("lrc_encoding", "UTF-8")
     fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
-    fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", 4)
+    fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", 4).coerceIn(1, 8)
     fun getIsConvertM4aToMp3() = sharedPreferences.getBoolean("is_convert_m4a_to_mp3", false)
     fun getThemeColor() = sharedPreferences.getString("theme_color", "跟随系统").toString()
     fun getDarkMode() = sharedPreferences.getString("dark_mode", "跟随系统").toString()
@@ -39,7 +39,7 @@ class SharedPreferencesUtils(context: Context) {
     fun putArtistsDelimiter(value: String) = sharedPreferences.edit { putString("artists_delimiter", value) }
     fun putLrcEncoding(value: String) = sharedPreferences.edit { putString("lrc_encoding", value) }
     fun putIsPreviewMusic(value: Boolean) = sharedPreferences.edit { putBoolean("is_preview_music", value) }
-    fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value) }
+    fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value.coerceIn(1, 8)) }
     fun putIsConvertM4aToMp3(value: Boolean) = sharedPreferences.edit { putBoolean("is_convert_m4a_to_mp3", value) }
     fun putThemeColor(value: String) = sharedPreferences.edit { putString("theme_color", value) }
     fun putDarkMode(value: String) = sharedPreferences.edit { putString("dark_mode", value) }

@@ -193,7 +193,7 @@ fun SettingsScreen(
                 MenuListItem(
                     icon = Icons.Outlined.Sync,
                     title = "并发下载数",
-                    options = listOf("1", "2", "3", "4", "6", "8", "12", "16", "24", "32"),
+                    options = listOf("1", "2", "3", "4", "6", "8"),
                     selectedOption = prefs.getConcurrentDownloads().toString(),
                     onOptionSelected = {
                         prefs.putConcurrentDownloads(it.toInt())
