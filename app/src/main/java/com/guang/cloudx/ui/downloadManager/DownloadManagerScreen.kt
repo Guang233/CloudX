@@ -104,9 +104,11 @@ fun DownloadManagerScreen(
                     )
                 },
                 actions = {
-                    // 正在下载页：如果有失败任务，显示全部重试和全部删除
+                    // 正在下载页：失败任务可重试，失败或暂停任务可批量删除
                     if (pagerState.currentPage == 0) {
                         val hasFailedTasks = downloadingList.any { it.status == TaskStatus.FAILED }
+                        val hasDeletableTasks =
+                            downloadingList.any { it.status == TaskStatus.FAILED || it.status == TaskStatus.PAUSED }
                         if (hasFailedTasks) {
                             TooltipIconButton(
                                 onClick = {
@@ -133,10 +135,12 @@ fun DownloadManagerScreen(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "全部重试"
                             )
+                        }
+                        if (hasDeletableTasks) {
                             TooltipIconButton(
                                 onClick = { showDeleteAllFailedDialog = true },
                                 imageVector = Icons.Default.DeleteSweep,
-                                contentDescription = "删除所有失败任务"
+                                contentDescription = "删除所有失败或暂停任务"
                             )
                         }
                     }
@@ -211,12 +215,12 @@ fun DownloadManagerScreen(
         )
     }
 
-    // 删除所有失败任务确认弹窗
+    // 删除所有失败或暂停任务确认弹窗
     if (showDeleteAllFailedDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAllFailedDialog = false },
             title = { Text("提示") },
-            text = { Text("真的要删除全部失败记录吗？") },
+            text = { Text("真的要删除全部失败或暂停记录吗？") },
             confirmButton = {
                 TextButton(
                     onClick = {

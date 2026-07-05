@@ -190,12 +190,15 @@ class DownloadViewModel(
         }
     }
 
-    /** 删除所有失败任务 */
+    /** 删除所有失败或暂停任务 */
     fun deleteAllFailed() {
         viewModelScope.launch {
-            val failedTasks = _downloading.value.filter { it.status == TaskStatus.FAILED }
-            failedTasks.forEach { downloadDao.delete(it.toDownloadInfo()) }
-            _downloading.update { it.filterNot { t -> t.status == TaskStatus.FAILED } }
+            val deletableTasks =
+                _downloading.value.filter { it.status == TaskStatus.FAILED || it.status == TaskStatus.PAUSED }
+            deletableTasks.forEach { downloadDao.delete(it.toDownloadInfo()) }
+            _downloading.update { list ->
+                list.filterNot { it.status == TaskStatus.FAILED || it.status == TaskStatus.PAUSED }
+            }
         }
     }
 
