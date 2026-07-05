@@ -17,8 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -460,23 +458,7 @@ fun DownloadingItem(
                 }
             }
 
-            if (item.status == TaskStatus.DOWNLOADING || item.status == TaskStatus.PAUSED) {
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = if (item.status == TaskStatus.DOWNLOADING) onPause else onResumeDownload,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = if (item.status == TaskStatus.DOWNLOADING) {
-                            Icons.Default.Pause
-                        } else {
-                            Icons.Default.PlayArrow
-                        },
-                        contentDescription = if (item.status == TaskStatus.DOWNLOADING) "暂停" else "继续",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            } else if (item.status == TaskStatus.FAILED) {
+            if (item.status == TaskStatus.PAUSED || item.status == TaskStatus.FAILED) {
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onDelete,
