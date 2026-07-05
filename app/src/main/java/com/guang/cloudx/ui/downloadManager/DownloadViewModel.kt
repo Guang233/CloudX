@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class TaskStatus { DOWNLOADING, FAILED, COMPLETED }
+enum class TaskStatus { DOWNLOADING, PAUSED, FAILED, COMPLETED }
 
 data class DownloadItemUi(
     val id: Long = 0,
@@ -58,6 +58,8 @@ class DownloadViewModel(
 
             _downloading.value =
                 (downloadDao.getDownloadsByStatus(TaskStatus.DOWNLOADING).map { it.toDownloadItemUi() } +
+                        downloadDao.getDownloadsByStatus(TaskStatus.PAUSED)
+                            .map { it.toDownloadItemUi() } +
                         downloadDao.getDownloadsByStatus(TaskStatus.FAILED)
                             .map { it.toDownloadItemUi() }).distinctBy { it.id }
             _completed.value = downloadDao.getDownloadsByStatus(TaskStatus.COMPLETED)
@@ -92,19 +94,54 @@ class DownloadViewModel(
 
             _downloading.update { it + newTasks }
 
-            val intent = Intent(context, DownloadService::class.java).apply {
-                putExtra("musicsJson", Gson().toJson(musics))
-                putExtra("rulesJson", Gson().toJson(rules))
-                putExtra("musicIdToDbIdMapJson", Gson().toJson(musicIdToDbIdMap))
-                putExtra("cookie", cookie)
-                putExtra("level", level)
-                putExtra("targetUri", targetDir.uri)
+            startDownloadService(context, musics, level, cookie, targetDir, rules, musicIdToDbIdMap)
+        }
+    }
+
+    /** 暂停下载 */
+    fun pauseDownload(context: Context, item: DownloadItemUi) {
+        viewModelScope.launch {
+            val paused = item.copy(status = TaskStatus.PAUSED, failureReason = null)
+            downloadDao.update(paused.toDownloadInfo())
+            _downloading.update { list ->
+                list.map { if (it.id == item.id) paused else it }
             }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
+
+            if (DownloadService.isRunning) {
+                val intent = Intent(context, DownloadService::class.java).apply {
+                    action = DownloadService.ACTION_PAUSE
+                    putExtra(DownloadService.EXTRA_DB_ID, item.id)
+                }
                 context.startService(intent)
             }
+        }
+    }
+
+    /** 恢复暂停任务 */
+    fun resumeDownload(
+        context: Context,
+        item: DownloadItemUi,
+        level: String,
+        cookie: String,
+        targetDir: DocumentFile,
+        rules: MusicDownloadRules
+    ) {
+        viewModelScope.launch {
+            val resumed = item.copy(status = TaskStatus.DOWNLOADING, failureReason = null)
+            downloadDao.update(resumed.toDownloadInfo())
+            _downloading.update { list ->
+                list.map { if (it.id == item.id) resumed else it }
+            }
+
+            startDownloadService(
+                context = context,
+                musics = listOf(item.music),
+                level = level,
+                cookie = cookie,
+                targetDir = targetDir,
+                rules = rules,
+                musicIdToDbIdMap = mapOf(item.music.id to item.id)
+            )
         }
     }
 
@@ -209,6 +246,22 @@ class DownloadViewModel(
         }
     }
 
+    /** 标记暂停 */
+    private fun markAsPaused(dbId: Long) {
+        viewModelScope.launch {
+            val task = _downloading.value.find { it.id == dbId }
+            if (task != null && task.status != TaskStatus.DOWNLOADING) {
+                val pausedTask = task.copy(status = TaskStatus.PAUSED, failureReason = null)
+                downloadDao.update(pausedTask.toDownloadInfo())
+                _downloading.update { list ->
+                    list.map {
+                        if (it.id == dbId) pausedTask else it
+                    }
+                }
+            }
+        }
+    }
+
     fun updateProgressById(intent: Intent?, onFinished: () -> Unit) {
         val dbId = intent?.getLongExtra("dbId", 0L) ?: 0L
         if (dbId == 0L) return
@@ -221,7 +274,11 @@ class DownloadViewModel(
                     list.map {
                         if (it.id == dbId) it.copy(
                             progress = progress,
-                            status = if (progress == 100) TaskStatus.COMPLETED else TaskStatus.DOWNLOADING
+                            status = when {
+                                it.status == TaskStatus.PAUSED -> TaskStatus.PAUSED
+                                progress == 100 -> TaskStatus.COMPLETED
+                                else -> TaskStatus.DOWNLOADING
+                            }
                         ) else it
                     }
                 }
@@ -238,6 +295,34 @@ class DownloadViewModel(
             "DOWNLOAD_FAILED" -> {
                 markAsFailed(dbId, failedReason)
             }
+
+            "DOWNLOAD_PAUSED" -> {
+                markAsPaused(dbId)
+            }
+        }
+    }
+
+    private fun startDownloadService(
+        context: Context,
+        musics: List<Music>,
+        level: String,
+        cookie: String,
+        targetDir: DocumentFile,
+        rules: MusicDownloadRules,
+        musicIdToDbIdMap: Map<Long, Long>
+    ) {
+        val intent = Intent(context, DownloadService::class.java).apply {
+            putExtra("musicsJson", Gson().toJson(musics))
+            putExtra("rulesJson", Gson().toJson(rules))
+            putExtra("musicIdToDbIdMapJson", Gson().toJson(musicIdToDbIdMap))
+            putExtra("cookie", cookie)
+            putExtra("level", level)
+            putExtra("targetUri", targetDir.uri)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
         }
     }
 

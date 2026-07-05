@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,6 +37,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.MusicDownloadRules
+import com.guang.cloudx.logic.service.DownloadService
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.ui.home.TooltipIconButton
@@ -78,6 +81,7 @@ fun DownloadManagerScreen(
             addAction("DOWNLOAD_COMPLETED")
             addAction("DOWNLOAD_FAILED")
             addAction("DOWNLOAD_FINISHED")
+            addAction(DownloadService.BROADCAST_PAUSED)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -313,6 +317,31 @@ fun DownloadingList(
                         )
                     }
                 },
+                onPause = {
+                    viewModel.pauseDownload(context, item)
+                },
+                onResumeDownload = {
+                    downloadDir?.let { dir ->
+                        viewModel.resumeDownload(
+                            context,
+                            item,
+                            prefs.getMusicLevel(),
+                            prefs.getCookie(),
+                            dir,
+                            MusicDownloadRules(
+                                isSaveLrc = prefs.getIsSaveLrc(),
+                                isSaveTlLrc = prefs.getIsSaveTlLrc(),
+                                isSaveRomaLrc = prefs.getIsSaveRomaLrc(),
+                                isSaveYrc = prefs.getIsSaveYrc(),
+                                fileName = prefs.getDownloadFileName()!!,
+                                delimiter = prefs.getArtistsDelimiter()!!,
+                                encoding = prefs.getLrcEncoding()!!,
+                                concurrentDownloads = prefs.getConcurrentDownloads(),
+                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
+                            )
+                        )
+                    }
+                },
                 onDelete = { viewModel.deleteFailed(item) },
                 onLongClick = {
                     if (item.status == TaskStatus.FAILED) {
@@ -330,6 +359,8 @@ fun DownloadingItem(
     item: DownloadItemUi,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit,
+    onPause: () -> Unit,
+    onResumeDownload: () -> Unit,
     onDelete: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -344,7 +375,14 @@ fun DownloadingItem(
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(16.dp))
             .combinedClickable(
-                onClick = { if (item.status == TaskStatus.FAILED) onRetry() },
+                onClick = {
+                    when (item.status) {
+                        TaskStatus.DOWNLOADING -> onPause()
+                        TaskStatus.PAUSED -> onResumeDownload()
+                        TaskStatus.FAILED -> onRetry()
+                        TaskStatus.COMPLETED -> Unit
+                    }
+                },
                 onLongClick = onLongClick
             ),
         shape = RoundedCornerShape(16.dp),
@@ -403,6 +441,14 @@ fun DownloadingItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                } else if (item.status == TaskStatus.PAUSED) {
+                    Text(
+                        text = "已暂停",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 } else {
                     LinearProgressIndicator(
                         progress = { animatedProgress },
@@ -414,8 +460,23 @@ fun DownloadingItem(
                 }
             }
 
-            // 右侧按钮 (仅失败时显示删除)
-            if (item.status == TaskStatus.FAILED) {
+            if (item.status == TaskStatus.DOWNLOADING || item.status == TaskStatus.PAUSED) {
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = if (item.status == TaskStatus.DOWNLOADING) onPause else onResumeDownload,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = if (item.status == TaskStatus.DOWNLOADING) {
+                            Icons.Default.Pause
+                        } else {
+                            Icons.Default.PlayArrow
+                        },
+                        contentDescription = if (item.status == TaskStatus.DOWNLOADING) "暂停" else "继续",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } else if (item.status == TaskStatus.FAILED) {
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onDelete,

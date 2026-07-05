@@ -40,11 +40,22 @@ class DownloadService : Service() {
     private val downloadQueue = LinkedList<DownloadTask>()
     private var isDownloading = false
     private var totalCompleted = 0
+    private var currentTask: DownloadTask? = null
+    private var activeDownloadJob: Job? = null
     private val progressMap = mutableMapOf<Long, Int>()
     private val progressUpdateAtMap = mutableMapOf<Long, Long>()
     private val stageMap = mutableMapOf<Long, DownloadStage>()
+    private val pauseRequestedIds = mutableSetOf<Long>()
 
     companion object {
+        const val ACTION_PAUSE = "com.guang.cloudx.action.PAUSE_DOWNLOAD"
+        const val EXTRA_DB_ID = "dbId"
+        const val BROADCAST_PROGRESS = "DOWNLOAD_PROGRESS"
+        const val BROADCAST_COMPLETED = "DOWNLOAD_COMPLETED"
+        const val BROADCAST_FAILED = "DOWNLOAD_FAILED"
+        const val BROADCAST_FINISHED = "DOWNLOAD_FINISHED"
+        const val BROADCAST_PAUSED = "DOWNLOAD_PAUSED"
+
         var isRunning = false
     }
 
@@ -57,6 +68,12 @@ class DownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_PAUSE) {
+            val dbId = intent.getLongExtra(EXTRA_DB_ID, 0L)
+            if (dbId != 0L) pauseDownload(dbId)
+            return START_STICKY
+        }
+
         val musicsJson = intent?.getStringExtra("musicsJson") ?: return START_NOT_STICKY
         val rulesJson = intent.getStringExtra("rulesJson") ?: return START_NOT_STICKY
         val musicIdToDbIdMapJson = intent.getStringExtra("musicIdToDbIdMapJson") ?: return START_NOT_STICKY
@@ -104,7 +121,7 @@ class DownloadService : Service() {
                     if (task == null) {
                         if (synchronized(queueLock) { downloadQueue.isEmpty() }) {
                             sendBroadcast(
-                                Intent("DOWNLOAD_FINISHED")
+                                Intent(BROADCAST_FINISHED)
                                     .setPackage(packageName)
                                     .putExtra("totalCompleted", totalCompleted)
                             )
@@ -118,45 +135,64 @@ class DownloadService : Service() {
                         }
                     }
 
+                    synchronized(queueLock) {
+                        currentTask = task
+                    }
+
+                    var downloadJob: Job? = null
                     try {
-                        repository.downloadMusic(
-                            this@DownloadService,
-                            task.rules,
-                            task.music,
-                            task.level,
-                            task.cookie,
-                            task.targetDir
-                        ) { _, progress, stage ->
-                            val previousProgress = progressMap[task.dbId] ?: -1
-                            val previousStage = stageMap[task.dbId]
-                            val now = SystemClock.elapsedRealtime()
-                            val lastUpdateAt = progressUpdateAtMap[task.dbId] ?: 0L
-                            val shouldPublishProgress = progress == 100 ||
-                                    progress != previousProgress && now - lastUpdateAt >= 400 ||
-                                    stage != previousStage
+                        supervisorScope {
+                            val job = async {
+                                repository.downloadMusic(
+                                    this@DownloadService,
+                                    task.rules,
+                                    task.music,
+                                    task.level,
+                                    task.cookie,
+                                    task.targetDir
+                                ) { _, progress, stage ->
+                                    val previousProgress = progressMap[task.dbId] ?: -1
+                                    val previousStage = stageMap[task.dbId]
+                                    val now = SystemClock.elapsedRealtime()
+                                    val lastUpdateAt = progressUpdateAtMap[task.dbId] ?: 0L
+                                    val shouldPublishProgress = progress == 100 ||
+                                            progress != previousProgress && now - lastUpdateAt >= 400 ||
+                                            stage != previousStage
 
-                            progressMap[task.dbId] = progress
-                            stageMap[task.dbId] = stage
+                                    progressMap[task.dbId] = progress
+                                    stageMap[task.dbId] = stage
 
-                            if (shouldPublishProgress) {
-                                progressUpdateAtMap[task.dbId] = now
-                                val avgProgress =
-                                    if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
-                                updateNotification(
-                                    "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
-                                    "${stage.toDisplayText()} ${task.music.name} ($progress%)",
-                                    avgProgress
-                                )
+                                    if (shouldPublishProgress) {
+                                        progressUpdateAtMap[task.dbId] = now
+                                        val avgProgress =
+                                            if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
+                                        updateNotification(
+                                            "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
+                                            "${stage.toDisplayText()} ${task.music.name} ($progress%)",
+                                            avgProgress
+                                        )
 
-                                sendBroadcast(
-                                    Intent("DOWNLOAD_PROGRESS")
-                                        .setPackage(packageName)
-                                        .apply {
-                                            putExtra("dbId", task.dbId)
-                                            putExtra("progress", progress)
-                                        }
-                                )
+                                        sendBroadcast(
+                                            Intent(BROADCAST_PROGRESS)
+                                                .setPackage(packageName)
+                                                .apply {
+                                                    putExtra(EXTRA_DB_ID, task.dbId)
+                                                    putExtra("progress", progress)
+                                                }
+                                        )
+                                    }
+                                }
                             }
+                            downloadJob = job
+                            var shouldCancelImmediately = false
+                            synchronized(queueLock) {
+                                activeDownloadJob = job
+                                shouldCancelImmediately = pauseRequestedIds.contains(task.dbId)
+                            }
+                            if (shouldCancelImmediately) {
+                                job.cancel(CancellationException("下载已暂停"))
+                            }
+                            job.await()
                         }
 
                         totalCompleted++
@@ -164,30 +200,86 @@ class DownloadService : Service() {
                         stageMap.remove(task.dbId)
 
                         sendBroadcast(
-                            Intent("DOWNLOAD_COMPLETED")
+                            Intent(BROADCAST_COMPLETED)
                                 .setPackage(packageName)
                                 .apply {
-                                    putExtra("dbId", task.dbId)
+                                    putExtra(EXTRA_DB_ID, task.dbId)
                                 }
                         )
 
+                    } catch (e: CancellationException) {
+                        val wasPaused = synchronized(queueLock) {
+                            pauseRequestedIds.remove(task.dbId)
+                        }
+                        if (wasPaused) {
+                            progressUpdateAtMap.remove(task.dbId)
+                            stageMap.remove(task.dbId)
+                            progressMap.remove(task.dbId)
+                            sendPausedBroadcast(task.dbId)
+                        } else {
+                            throw e
+                        }
                     } catch (e: Exception) {
                         progressUpdateAtMap.remove(task.dbId)
                         stageMap.remove(task.dbId)
                         sendBroadcast(
-                            Intent("DOWNLOAD_FAILED")
+                            Intent(BROADCAST_FAILED)
                                 .setPackage(packageName)
                                 .apply {
-                                    putExtra("dbId", task.dbId)
+                                    putExtra(EXTRA_DB_ID, task.dbId)
                                     putExtra("reason", e.localizedMessage)
                                 }
                         )
+                    } finally {
+                        synchronized(queueLock) {
+                            if (currentTask?.dbId == task.dbId) currentTask = null
+                            if (activeDownloadJob == downloadJob) activeDownloadJob = null
+                        }
                     }
                 }
             }
         }
 
         return START_STICKY
+    }
+
+    private fun pauseDownload(dbId: Long) {
+        var removedQueuedTask = false
+        var jobToCancel: Job? = null
+
+        synchronized(queueLock) {
+            val iterator = downloadQueue.iterator()
+            while (iterator.hasNext()) {
+                if (iterator.next().dbId == dbId) {
+                    iterator.remove()
+                    removedQueuedTask = true
+                    break
+                }
+            }
+
+            if (removedQueuedTask) {
+                progressMap.remove(dbId)
+                progressUpdateAtMap.remove(dbId)
+                stageMap.remove(dbId)
+            } else if (currentTask?.dbId == dbId) {
+                pauseRequestedIds.add(dbId)
+                jobToCancel = activeDownloadJob
+            }
+        }
+
+        if (removedQueuedTask) {
+            sendPausedBroadcast(dbId)
+        } else {
+            jobToCancel?.cancel(CancellationException("下载已暂停"))
+        }
+    }
+
+    private fun sendPausedBroadcast(dbId: Long) {
+        sendBroadcast(
+            Intent(BROADCAST_PAUSED)
+                .setPackage(packageName)
+                .putExtra(EXTRA_DB_ID, dbId)
+        )
     }
 
 

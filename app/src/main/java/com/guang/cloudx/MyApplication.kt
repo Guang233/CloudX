@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
+import com.guang.cloudx.logic.service.DownloadService
 import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.ui.downloadManager.DownloadViewModel
 
@@ -57,6 +58,7 @@ class MyApplication : Application() {
             addAction("DOWNLOAD_COMPLETED")
             addAction("DOWNLOAD_FAILED")
             addAction("DOWNLOAD_FINISHED")
+            addAction(DownloadService.BROADCAST_PAUSED)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
