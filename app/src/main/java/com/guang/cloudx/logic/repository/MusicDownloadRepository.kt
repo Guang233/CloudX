@@ -3,6 +3,7 @@ package com.guang.cloudx.logic.repository
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModelProvider
+import com.google.gson.Gson
 import com.guang.cloudx.logic.model.DownloadStage
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
@@ -25,18 +26,79 @@ import java.util.concurrent.atomic.AtomicLongArray
 
 class MusicDownloadRepository : ViewModelProvider.Factory {
     private class RangeNotSupportedException(message: String) : Exception(message)
-    private data class RemoteFileInfo(val contentLength: Long, val supportsRange: Boolean)
+    private data class RemoteFileInfo(
+        val contentLength: Long,
+        val supportsRange: Boolean,
+        val eTag: String? = null,
+        val lastModified: String? = null
+    )
+
+    private data class DownloadCheckpoint(
+        val version: Int = CHECKPOINT_VERSION,
+        val mode: String = "",
+        val identity: String = "",
+        val contentLength: Long = -1L,
+        val eTag: String? = null,
+        val lastModified: String? = null,
+        val ranges: MutableList<DownloadCheckpointRange>? = null
+    )
+
+    private data class DownloadCheckpointRange(
+        val start: Long = 0L,
+        val end: Long = -1L,
+        var downloaded: Long = 0L
+    )
+
+    private class CheckpointStore(
+        private val file: File,
+        val checkpoint: DownloadCheckpoint
+    ) {
+        private val gson = Gson()
+        private var lastSaveAt = 0L
+
+        @Synchronized
+        fun updateRange(index: Int, downloaded: Long, force: Boolean = false) {
+            val range = checkpoint.ranges!![index]
+            val rangeLength = range.end - range.start + 1
+            range.downloaded = downloaded.coerceIn(0L, rangeLength)
+            save(force)
+        }
+
+        @Synchronized
+        fun save(force: Boolean = false) {
+            val now = System.currentTimeMillis()
+            if (!force && now - lastSaveAt < CHECKPOINT_SAVE_INTERVAL_MS) return
+
+            file.parentFile?.mkdirs()
+            val json = gson.toJson(checkpoint)
+            val tempFile = File("${file.absolutePath}.tmp")
+            tempFile.writeText(json)
+            if (file.exists()) file.delete()
+            if (!tempFile.renameTo(file)) {
+                file.writeText(json)
+                tempFile.delete()
+            }
+            lastSaveAt = now
+        }
+
+    }
 
     private companion object {
         const val BUFFER_SIZE = 64 * 1024
         const val MAX_CONCURRENT_PARTS = 8
         const val MIN_PARALLEL_DOWNLOAD_BYTES = 4L * 1024 * 1024
         const val MIN_PART_SIZE_BYTES = 2L * 1024 * 1024
+        const val CHECKPOINT_VERSION = 1
+        const val CHECKPOINT_MODE_SINGLE = "single"
+        const val CHECKPOINT_MODE_MULTI = "multi"
+        const val CHECKPOINT_SAVE_INTERVAL_MS = 1_000L
 
         val downloadClient: OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
+
+        val checkpointGson = Gson()
     }
 
     suspend fun downloadMusic(
@@ -53,6 +115,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         var tmpWithExt: File? = null
         var outputAudioFile: File? = null
         var tmpCover: File? = null
+        var audioDownloaded = false
 
         try {
             // 1. 获取音乐 URL 和文件信息
@@ -96,16 +159,16 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     }
                 }
 
-                // 2. 执行分块下载
-                if (rules.concurrentDownloads > 1) {
-                    downloadConcurrently(musicUrl.url, tmpFile, rules.concurrentDownloads) { progress ->
-                        onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
-                    }
-                } else {
-                    downloadFile(url = musicUrl.url, file = tmpFile) { progress ->
-                        onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
-                    }
+                // 2. 执行可续传下载
+                downloadAudioFile(
+                    url = musicUrl.url,
+                    outputFile = tmpFile,
+                    checkpointIdentity = "${music.id}:${musicUrl.level}",
+                    parts = rules.concurrentDownloads
+                ) { progress ->
+                    onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
                 }
+                audioDownloaded = true
                 onProgress(music, 80, DownloadStage.PROCESSING)
 
                 // 3. 检测类型并重命名
@@ -165,21 +228,20 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             }
 
         } catch (e: Exception) {
-            tmpFile.delete()
+            if (audioDownloaded) {
+                resetDownloadState(tmpFile)
+            }
             tmpWithExt?.delete()
             outputAudioFile?.delete()
             tmpCover?.delete()
-            // 清理可能存在的分块临时文件
-            (0 until rules.concurrentDownloads).forEach {
-                File(cacheDir, "${music.id}.part$it").delete()
-            }
             throw e
         }
     }
 
-    private suspend fun downloadConcurrently(
+    private suspend fun downloadAudioFile(
         url: String,
         outputFile: File,
+        checkpointIdentity: String,
         parts: Int,
         onProgress: (Int) -> Unit
     ) = withContext(Dispatchers.IO) {
@@ -187,41 +249,152 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         val contentLength = remoteFileInfo.contentLength
         val partCount = choosePartCount(contentLength, parts)
 
-        if (!remoteFileInfo.supportsRange || contentLength <= 0 || partCount <= 1) {
+        try {
+            if (!remoteFileInfo.supportsRange || contentLength <= 0) {
+                resetDownloadState(outputFile)
+                downloadFile(url = url, file = outputFile, progressCallback = onProgress)
+                deleteCheckpoint(outputFile)
+                return@withContext
+            }
+
+            if (partCount > 1) {
+                downloadConcurrently(
+                    url = url,
+                    outputFile = outputFile,
+                    checkpointIdentity = checkpointIdentity,
+                    remoteFileInfo = remoteFileInfo,
+                    partCount = partCount,
+                    onProgress = onProgress
+                )
+            } else {
+                downloadWithResume(
+                    url = url,
+                    outputFile = outputFile,
+                    checkpointIdentity = checkpointIdentity,
+                    remoteFileInfo = remoteFileInfo,
+                    onProgress = onProgress
+                )
+            }
+
+            deleteCheckpoint(outputFile)
+            onProgress(100)
+        } catch (e: RangeNotSupportedException) {
+            resetDownloadState(outputFile)
             downloadFile(url = url, file = outputFile, progressCallback = onProgress)
+            deleteCheckpoint(outputFile)
+        } catch (e: Exception) {
+            throw e
+        }
+    }
+
+    private suspend fun downloadWithResume(
+        url: String,
+        outputFile: File,
+        checkpointIdentity: String,
+        remoteFileInfo: RemoteFileInfo,
+        onProgress: (Int) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        val contentLength = remoteFileInfo.contentLength
+        val checkpointRanges = buildRanges(contentLength, 1)
+        val checkpointStore = prepareCheckpoint(
+            outputFile = outputFile,
+            mode = CHECKPOINT_MODE_SINGLE,
+            identity = checkpointIdentity,
+            remoteFileInfo = remoteFileInfo,
+            expectedRanges = checkpointRanges
+        )
+        val range = checkpointStore.checkpoint.ranges!![0]
+
+        val downloadedFromFile = when {
+            !outputFile.exists() -> 0L
+            outputFile.length() > contentLength -> {
+                resetDownloadState(outputFile)
+                0L
+            }
+
+            else -> outputFile.length()
+        }
+        checkpointStore.updateRange(0, downloadedFromFile, force = true)
+
+        if (downloadedFromFile >= contentLength) {
+            onProgress(100)
             return@withContext
         }
 
+        if (downloadedFromFile > 0) {
+            onProgress(((downloadedFromFile * 100) / contentLength).toInt().coerceIn(0, 100))
+        }
+
+        RandomAccessFile(outputFile, "rw").use { it.setLength(downloadedFromFile) }
+        try {
+            downloadChunk(url, outputFile, range.start + downloadedFromFile, range.end) { downloaded ->
+                val totalDownloaded = downloadedFromFile + downloaded
+                checkpointStore.updateRange(0, totalDownloaded)
+                onProgress(((totalDownloaded * 100) / contentLength).toInt().coerceIn(0, 100))
+            }
+        } finally {
+            checkpointStore.save(force = true)
+        }
+        checkpointStore.updateRange(0, contentLength, force = true)
+    }
+
+    private suspend fun downloadConcurrently(
+        url: String,
+        outputFile: File,
+        checkpointIdentity: String,
+        remoteFileInfo: RemoteFileInfo,
+        partCount: Int,
+        onProgress: (Int) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        val contentLength = remoteFileInfo.contentLength
+        val checkpointRanges = buildRanges(contentLength, partCount)
+        val checkpointStore = prepareCheckpoint(
+            outputFile = outputFile,
+            mode = CHECKPOINT_MODE_MULTI,
+            identity = checkpointIdentity,
+            remoteFileInfo = remoteFileInfo,
+            expectedRanges = checkpointRanges
+        )
+        val ranges = checkpointStore.checkpoint.ranges!!
+
         outputFile.parentFile?.mkdirs()
-        if (outputFile.exists()) outputFile.delete()
-        RandomAccessFile(outputFile, "rw").use { it.setLength(contentLength) }
+        if (!outputFile.exists() || outputFile.length() != contentLength) {
+            RandomAccessFile(outputFile, "rw").use { it.setLength(contentLength) }
+        }
+
+        val progressArray = AtomicLongArray(partCount)
+        for (index in 0 until partCount) {
+            progressArray.set(index, ranges[index].downloaded)
+        }
+        onProgress(calculateProgress(progressArray, contentLength))
 
         try {
-            val partSize = contentLength / partCount
-            val progressArray = AtomicLongArray(partCount)
-
             coroutineScope {
                 (0 until partCount).map { partIndex ->
                     async {
-                        val start = partIndex * partSize
-                        val end = if (partIndex == partCount - 1) contentLength - 1 else start + partSize - 1
-                        downloadChunk(url, outputFile, start, end) { downloaded ->
-                            progressArray.set(partIndex, downloaded)
+                        val range = ranges[partIndex]
+                        val rangeLength = range.end - range.start + 1
+                        val alreadyDownloaded = range.downloaded.coerceIn(0L, rangeLength)
+                        if (alreadyDownloaded >= rangeLength) return@async
+
+                        val resumeStart = range.start + alreadyDownloaded
+                        downloadChunk(url, outputFile, resumeStart, range.end) { downloaded ->
+                            val totalForRange = alreadyDownloaded + downloaded
+                            progressArray.set(partIndex, totalForRange)
+                            checkpointStore.updateRange(partIndex, totalForRange)
                             onProgress(calculateProgress(progressArray, contentLength))
                         }
+                        progressArray.set(partIndex, rangeLength)
+                        checkpointStore.updateRange(partIndex, rangeLength, force = true)
                     }
                 }.awaitAll()
             }
-            if (outputFile.length() != contentLength) {
-                throw Exception("文件大小校验失败")
-            }
-            onProgress(100)
-        } catch (e: RangeNotSupportedException) {
-            outputFile.delete()
-            downloadFile(url = url, file = outputFile, progressCallback = onProgress)
-        } catch (e: Exception) {
-            outputFile.delete()
-            throw e
+        } finally {
+            checkpointStore.save(force = true)
+        }
+
+        if (outputFile.length() != contentLength) {
+            throw Exception("文件大小校验失败")
         }
     }
 
@@ -296,6 +469,109 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         return total?.toLongOrNull() ?: -1L
     }
 
+    private fun buildRanges(contentLength: Long, partCount: Int): MutableList<DownloadCheckpointRange> {
+        val partSize = contentLength / partCount
+        return (0 until partCount).map { partIndex ->
+            val start = partIndex * partSize
+            val end = if (partIndex == partCount - 1) contentLength - 1 else start + partSize - 1
+            DownloadCheckpointRange(start = start, end = end, downloaded = 0L)
+        }.toMutableList()
+    }
+
+    private fun prepareCheckpoint(
+        outputFile: File,
+        mode: String,
+        identity: String,
+        remoteFileInfo: RemoteFileInfo,
+        expectedRanges: MutableList<DownloadCheckpointRange>
+    ): CheckpointStore {
+        val checkpointFile = checkpointFile(outputFile)
+        val existingCheckpoint = readCheckpoint(checkpointFile)
+
+        if (
+            existingCheckpoint != null &&
+            isCheckpointCompatible(existingCheckpoint, mode, identity, remoteFileInfo, expectedRanges)
+        ) {
+            val multiCheckpointNeedsFile =
+                mode == CHECKPOINT_MODE_MULTI &&
+                        (!outputFile.exists() || outputFile.length() != remoteFileInfo.contentLength)
+            if (!multiCheckpointNeedsFile) {
+                val store = CheckpointStore(checkpointFile, existingCheckpoint)
+                store.save(force = true)
+                return store
+            }
+        }
+
+        resetDownloadState(outputFile)
+        val checkpoint = DownloadCheckpoint(
+            version = CHECKPOINT_VERSION,
+            mode = mode,
+            identity = identity,
+            contentLength = remoteFileInfo.contentLength,
+            eTag = remoteFileInfo.eTag,
+            lastModified = remoteFileInfo.lastModified,
+            ranges = expectedRanges
+        )
+        return CheckpointStore(checkpointFile, checkpoint).also { it.save(force = true) }
+    }
+
+    private fun isCheckpointCompatible(
+        checkpoint: DownloadCheckpoint,
+        mode: String,
+        identity: String,
+        remoteFileInfo: RemoteFileInfo,
+        expectedRanges: List<DownloadCheckpointRange>
+    ): Boolean {
+        val ranges = checkpoint.ranges ?: return false
+        if (checkpoint.version != CHECKPOINT_VERSION) return false
+        if (checkpoint.mode != mode) return false
+        if (checkpoint.identity != identity) return false
+        if (checkpoint.contentLength != remoteFileInfo.contentLength) return false
+        if (!validatorMatches(checkpoint.eTag, remoteFileInfo.eTag)) return false
+        if (!validatorMatches(checkpoint.lastModified, remoteFileInfo.lastModified)) return false
+        if (ranges.size != expectedRanges.size) return false
+
+        return ranges.indices.all { index ->
+            val saved = ranges[index]
+            val expected = expectedRanges[index]
+            val length = saved.end - saved.start + 1
+            saved.start == expected.start &&
+                    saved.end == expected.end &&
+                    length > 0 &&
+                    saved.downloaded in 0..length
+        }
+    }
+
+    private fun validatorMatches(saved: String?, current: String?): Boolean {
+        return saved.isNullOrBlank() || current.isNullOrBlank() || saved == current
+    }
+
+    private fun readCheckpoint(file: File): DownloadCheckpoint? {
+        return runCatching {
+            checkpointGson.fromJson(file.readText(), DownloadCheckpoint::class.java)
+        }.getOrNull()
+    }
+
+    private fun checkpointFile(outputFile: File): File {
+        val parent = outputFile.parentFile
+        return if (parent != null) {
+            File(parent, "${outputFile.name}.download.json")
+        } else {
+            File("${outputFile.name}.download.json")
+        }
+    }
+
+    private fun deleteCheckpoint(outputFile: File) {
+        val checkpointFile = checkpointFile(outputFile)
+        checkpointFile.delete()
+        File("${checkpointFile.absolutePath}.tmp").delete()
+    }
+
+    private fun resetDownloadState(outputFile: File) {
+        outputFile.delete()
+        deleteCheckpoint(outputFile)
+    }
+
     private suspend fun getRemoteFileInfo(url: String): RemoteFileInfo = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
@@ -308,11 +584,21 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 when (response.code) {
                     HttpURLConnection.HTTP_PARTIAL -> {
                         val totalLength = parseTotalLength(response.header("Content-Range"))
-                        RemoteFileInfo(totalLength, totalLength > 0)
+                        RemoteFileInfo(
+                            contentLength = totalLength,
+                            supportsRange = totalLength > 0,
+                            eTag = response.header("ETag"),
+                            lastModified = response.header("Last-Modified")
+                        )
                     }
 
                     HttpURLConnection.HTTP_OK -> {
-                        RemoteFileInfo(response.body.contentLength(), false)
+                        RemoteFileInfo(
+                            contentLength = response.body.contentLength(),
+                            supportsRange = false,
+                            eTag = response.header("ETag"),
+                            lastModified = response.header("Last-Modified")
+                        )
                     }
 
                     else -> RemoteFileInfo(-1L, false)
