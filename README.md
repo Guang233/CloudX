@@ -45,13 +45,9 @@ CloudX是一个轻量、精简的音乐下载器。
 - [x] 自动检测软件更新
 - [x] 多线程下载
 - [x] 自定义主题色
+- [x] 转换格式为`.mp3` 
 
 ## 🤔 常见问题
-**为什么下载的是`.m4a`而非`.mp3`，能不能支持下载`.mp3`文件？** [#26
-](https://github.com/Guang233/CloudX/issues/26) 
-
-wyy接口返回的是m4a格式，如果转成mp3将会损失部分音质。另外，现在绝大多数电子设备都是支持m4a格式的解码的，所以我认为没有必要且不建议转换，如有需要请利用其他工具批量转换。
-
 **使用网页端登录为什么登陆不上？** [#35
 ](https://github.com/Guang233/CloudX/issues/35)
 
@@ -70,13 +66,3 @@ CloudX采用 MIT 许可证，详情请见 [LICENSE](./LICENSE)。
 ## 🧑‍💻 社区反馈共建
 
 如有问题或建议，请在 Issues 区留言。
-
-## ⭐ Star History
-
-<a href="https://www.star-history.com/#Guang233/CloudX&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Guang233/CloudX&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Guang233/CloudX&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Guang233/CloudX&type=date&legend=top-left" />
- </picture>
-</a>
