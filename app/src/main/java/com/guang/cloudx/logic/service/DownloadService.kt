@@ -140,6 +140,7 @@ class DownloadService : Service() {
                     }
 
                     var downloadJob: Job? = null
+                    var completedFileName: String? = null
                     try {
                         supervisorScope {
                             val job = async {
@@ -192,7 +193,7 @@ class DownloadService : Service() {
                             if (shouldCancelImmediately) {
                                 job.cancel(CancellationException("下载已暂停"))
                             }
-                            job.await()
+                            completedFileName = job.await()
                         }
 
                         totalCompleted++
@@ -204,6 +205,7 @@ class DownloadService : Service() {
                                 .setPackage(packageName)
                                 .apply {
                                     putExtra(EXTRA_DB_ID, task.dbId)
+                                    putExtra("fileName", completedFileName)
                                 }
                         )
 
@@ -227,7 +229,7 @@ class DownloadService : Service() {
                                 .setPackage(packageName)
                                 .apply {
                                     putExtra(EXTRA_DB_ID, task.dbId)
-                                    putExtra("reason", e.localizedMessage)
+                                    putExtra("reason", classifyFailure(e))
                                 }
                         )
                     } finally {
@@ -280,6 +282,24 @@ class DownloadService : Service() {
                 .setPackage(packageName)
                 .putExtra(EXTRA_DB_ID, dbId)
         )
+    }
+
+    private fun classifyFailure(error: Throwable): String {
+        val message = error.localizedMessage?.takeIf { it.isNotBlank() } ?: "未知错误"
+        val text = message.lowercase()
+        return when {
+            error is SecurityException || text.contains("permission") || text.contains("权限") ->
+                "权限错误：$message"
+            text.contains("http error") || text.contains("timeout") || text.contains("网络") ->
+                "网络错误：$message"
+            text.contains("tag") || text.contains("frame") || text.contains("metadata") ->
+                "标签写入错误：$message"
+            text.contains("format") || text.contains("音频") || text.contains("文件大小") ->
+                "文件格式错误：$message"
+            text.contains("range") || text.contains("分块") || text.contains("续传") ->
+                "断点下载错误：$message"
+            else -> message
+        }
     }
 
 

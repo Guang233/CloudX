@@ -3,6 +3,7 @@ package com.guang.cloudx.ui.downloadManager
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,7 +12,9 @@ import com.guang.cloudx.logic.database.AppDatabase
 import com.guang.cloudx.logic.database.DownloadInfo
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
+import com.guang.cloudx.logic.repository.MusicDownloadRepository
 import com.guang.cloudx.logic.service.DownloadService
+import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -25,7 +28,11 @@ data class DownloadItemUi(
     val progress: Int,
     val status: TaskStatus,
     val timeStamp: Long = System.currentTimeMillis(),
-    val failureReason: String? = null
+    val failureReason: String? = null,
+    val downloadLevel: String = "standard",
+    val rulesJson: String = "",
+    val targetUri: String = "",
+    val savedFileName: String? = null
 )
 
 class DownloadViewModel(
@@ -33,6 +40,9 @@ class DownloadViewModel(
 ) : AndroidViewModel(application) {
 
     private val downloadDao = AppDatabase.getDatabase(application).downloadDao()
+    private val gson = Gson()
+    private val repository = MusicDownloadRepository()
+    private var recoveryStarted = false
 
     private val _downloading = MutableStateFlow<List<DownloadItemUi>>(emptyList())
     val downloading: StateFlow<List<DownloadItemUi>> = _downloading
@@ -46,14 +56,16 @@ class DownloadViewModel(
 
     private fun loadAllTasks() {
         viewModelScope.launch {
-            // 如果服务不在运行，才将正在下载的任务标记为失败
+            val allTasks = downloadDao.getAllDownloads()
             if (!DownloadService.isRunning) {
-                val downloadingTasks = downloadDao.getDownloadsByStatus(TaskStatus.DOWNLOADING)
-                downloadingTasks.forEach {
+                allTasks.filter { it.status == TaskStatus.DOWNLOADING }
+                    .filter { it.rulesJson.isBlank() || it.targetUri.isBlank() }
+                    .forEach {
                     it.status = TaskStatus.FAILED
-                    it.failureReason = "下载已中断"
+                    it.failureReason = "任务缺少恢复参数，请重新下载"
                     downloadDao.update(it)
                 }
+                recoverInterruptedDownloads(downloadDao.getDownloadsByStatus(TaskStatus.DOWNLOADING))
             }
 
             _downloading.value =
@@ -67,6 +79,63 @@ class DownloadViewModel(
         }
     }
 
+    private suspend fun recoverInterruptedDownloads(tasks: List<DownloadInfo>) {
+        if (recoveryStarted) return
+        recoveryStarted = true
+
+        val context = getApplication<Application>()
+        val prefs = SharedPreferencesUtils(context)
+        data class RecoveryTask(
+            val task: DownloadInfo,
+            val rules: MusicDownloadRules,
+            val targetDir: DocumentFile
+        )
+        data class RecoveryKey(val level: String, val rulesJson: String, val targetUri: String)
+
+        tasks.mapNotNull { task ->
+            val rules = runCatching {
+                gson.fromJson(task.rulesJson, MusicDownloadRules::class.java)
+            }.getOrNull()
+            if (rules == null) {
+                downloadDao.update(
+                    task.copy(
+                        status = TaskStatus.FAILED,
+                        failureReason = "任务下载参数无效，请重新下载"
+                    )
+                )
+                return@mapNotNull null
+            }
+
+            val targetDir = runCatching {
+                DocumentFile.fromTreeUri(context, Uri.parse(task.targetUri))
+            }.getOrNull()?.takeIf { it.isDirectory && it.canWrite() }
+            if (targetDir == null) {
+                downloadDao.update(
+                    task.copy(
+                        status = TaskStatus.FAILED,
+                        failureReason = "目标文件夹不可用，请重新选择"
+                    )
+                )
+                return@mapNotNull null
+            }
+
+            RecoveryTask(task, rules, targetDir)
+        }.groupBy { (task, _, _) ->
+            RecoveryKey(task.downloadLevel, task.rulesJson, task.targetUri)
+        }.values.forEach { group ->
+            val first = group.first()
+            startDownloadService(
+                context = context,
+                musics = group.map { it.task.music },
+                level = first.task.downloadLevel.ifBlank { "standard" },
+                cookie = prefs.getCookie(),
+                targetDir = first.targetDir,
+                rules = first.rules,
+                musicIdToDbIdMap = group.associate { it.task.music.id to it.task.id }
+            )
+        }
+    }
+
     /** 启动下载 */
     fun startDownloads(
         context: Context,
@@ -77,15 +146,25 @@ class DownloadViewModel(
         rules: MusicDownloadRules
     ) {
         viewModelScope.launch {
+            val existingIds = downloadDao.getAllDownloads()
+                .filter { it.status != TaskStatus.COMPLETED }
+                .mapTo(mutableSetOf()) { it.music.id }
+            val uniqueMusics = musics.distinctBy { it.id }
+                .filterNot { it.id in existingIds }
+            if (uniqueMusics.isEmpty()) return@launch
+
             val musicIdToDbIdMap = mutableMapOf<Long, Long>()
             val newTasks = mutableListOf<DownloadItemUi>()
 
-            musics.forEach { music ->
+            uniqueMusics.forEach { music ->
                 val newInfo = DownloadInfo(
                     music = music,
                     progress = 0,
                     status = TaskStatus.DOWNLOADING,
-                    timeStamp = System.currentTimeMillis()
+                    timeStamp = System.currentTimeMillis(),
+                    downloadLevel = level,
+                    rulesJson = gson.toJson(rules),
+                    targetUri = targetDir.uri.toString()
                 )
                 val id = downloadDao.insert(newInfo)
                 musicIdToDbIdMap[music.id] = id
@@ -94,7 +173,7 @@ class DownloadViewModel(
 
             _downloading.update { it + newTasks }
 
-            startDownloadService(context, musics, level, cookie, targetDir, rules, musicIdToDbIdMap)
+            startDownloadService(context, uniqueMusics, level, cookie, targetDir, rules, musicIdToDbIdMap)
         }
     }
 
@@ -127,6 +206,14 @@ class DownloadViewModel(
         rules: MusicDownloadRules
     ) {
         viewModelScope.launch {
+            val savedRules = item.rulesJson.takeIf { it.isNotBlank() }?.let {
+                runCatching { gson.fromJson(it, MusicDownloadRules::class.java) }.getOrNull()
+            } ?: rules
+            val savedTargetDir = item.targetUri.takeIf { it.isNotBlank() }
+                ?.let { DocumentFile.fromTreeUri(context, Uri.parse(it)) }
+                ?.takeIf { it.canWrite() }
+                ?: targetDir
+            val savedLevel = item.downloadLevel.ifBlank { level }
             val resumed = item.copy(status = TaskStatus.DOWNLOADING, failureReason = null)
             downloadDao.update(resumed.toDownloadInfo())
             _downloading.update { list ->
@@ -136,10 +223,10 @@ class DownloadViewModel(
             startDownloadService(
                 context = context,
                 musics = listOf(item.music),
-                level = level,
+                level = savedLevel,
                 cookie = cookie,
-                targetDir = targetDir,
-                rules = rules,
+                targetDir = savedTargetDir,
+                rules = savedRules,
                 musicIdToDbIdMap = mapOf(item.music.id to item.id)
             )
         }
@@ -186,6 +273,7 @@ class DownloadViewModel(
     fun deleteFailed(item: DownloadItemUi) {
         viewModelScope.launch {
             downloadDao.delete(item.toDownloadInfo())
+            repository.deleteDownloadArtifacts(getApplication(), item.music.id)
             _downloading.update { it.filterNot { t -> t.id == item.id } }
         }
     }
@@ -196,6 +284,7 @@ class DownloadViewModel(
             val deletableTasks =
                 _downloading.value.filter { it.status == TaskStatus.FAILED || it.status == TaskStatus.PAUSED }
             deletableTasks.forEach { downloadDao.delete(it.toDownloadInfo()) }
+            deletableTasks.forEach { repository.deleteDownloadArtifacts(getApplication(), it.music.id) }
             _downloading.update { list ->
                 list.filterNot { it.status == TaskStatus.FAILED || it.status == TaskStatus.PAUSED }
             }
@@ -214,18 +303,22 @@ class DownloadViewModel(
     /** 删除全部已完成 */
     fun deleteAllCompleted(deletedSavedData: () -> Unit) {
         viewModelScope.launch {
-            downloadDao.deleteAll()
+            downloadDao.deleteAllByStatus(TaskStatus.COMPLETED)
             _completed.value = emptyList()
             deletedSavedData()
         }
     }
 
     /** 下载完成 → 移动到 completed */
-    private fun moveToCompleted(dbId: Long) {
+    private fun moveToCompleted(dbId: Long, savedFileName: String?) {
         viewModelScope.launch {
             val task = _downloading.value.find { it.id == dbId }
             if (task != null) {
-                val finished = task.copy(status = TaskStatus.COMPLETED, progress = 100)
+                val finished = task.copy(
+                    status = TaskStatus.COMPLETED,
+                    progress = 100,
+                    savedFileName = savedFileName ?: task.savedFileName
+                )
                 downloadDao.update(finished.toDownloadInfo())
                 _downloading.update { it.filterNot { it.id == dbId } }
                 _completed.update { it + finished }
@@ -238,7 +331,7 @@ class DownloadViewModel(
         viewModelScope.launch {
             val task = _downloading.value.find { it.id == dbId }
             if (task != null) {
-                val failedTask = task.copy(status = TaskStatus.FAILED, progress = 0, failureReason = reason)
+                val failedTask = task.copy(status = TaskStatus.FAILED, failureReason = reason)
                 downloadDao.update(failedTask.toDownloadInfo())
                 _downloading.update { list ->
                     list.map {
@@ -271,8 +364,10 @@ class DownloadViewModel(
 
         val progress = intent?.getIntExtra("progress", 0) ?: 0
         val failedReason = intent?.getStringExtra("reason") ?: "未知原因"
+        val savedFileName = intent?.getStringExtra("fileName")
         when (intent?.action) {
             "DOWNLOAD_PROGRESS" -> {
+                var nextStatus: TaskStatus? = null
                 _downloading.update { list ->
                     list.map {
                         if (it.id == dbId) it.copy(
@@ -281,14 +376,19 @@ class DownloadViewModel(
                                 it.status == TaskStatus.PAUSED -> TaskStatus.PAUSED
                                 progress == 100 -> TaskStatus.COMPLETED
                                 else -> TaskStatus.DOWNLOADING
-                            }
+                            }.also { status -> nextStatus = status }
                         ) else it
+                    }
+                }
+                nextStatus?.let { status ->
+                    viewModelScope.launch {
+                        downloadDao.updateProgress(dbId, progress, status)
                     }
                 }
             }
 
             "DOWNLOAD_COMPLETED" -> {
-                moveToCompleted(dbId)
+                moveToCompleted(dbId, savedFileName)
             }
 
             "DOWNLOAD_FINISHED" -> {
@@ -336,7 +436,11 @@ class DownloadViewModel(
             progress = this.progress,
             status = this.status,
             timeStamp = this.timeStamp,
-            failureReason = this.failureReason
+            failureReason = this.failureReason,
+            downloadLevel = this.downloadLevel,
+            rulesJson = this.rulesJson,
+            targetUri = this.targetUri,
+            savedFileName = this.savedFileName
         )
     }
 
@@ -347,7 +451,11 @@ class DownloadViewModel(
             progress = this.progress,
             status = this.status,
             timeStamp = this.timeStamp,
-            failureReason = this.failureReason
+            failureReason = this.failureReason,
+            downloadLevel = this.downloadLevel,
+            rulesJson = this.rulesJson,
+            targetUri = this.targetUri,
+            savedFileName = this.savedFileName
         )
     }
 }

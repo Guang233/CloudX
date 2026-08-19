@@ -92,6 +92,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         const val CHECKPOINT_MODE_SINGLE = "single"
         const val CHECKPOINT_MODE_MULTI = "multi"
         const val CHECKPOINT_SAVE_INTERVAL_MS = 1_000L
+        const val DOWNLOAD_TEMP_DIR = "download_temp"
 
         val downloadClient: OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -99,6 +100,15 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             .build()
 
         val checkpointGson = Gson()
+    }
+
+    fun deleteDownloadArtifacts(context: Context, musicId: Long) {
+        val cacheDir = context.externalCacheDir ?: context.cacheDir
+        val downloadTempDir = File(cacheDir, DOWNLOAD_TEMP_DIR)
+        File(downloadTempDir, musicId.toString()).delete()
+        File(downloadTempDir, "${musicId}.download.json").delete()
+        File(downloadTempDir, "${musicId}.download.json.tmp").delete()
+        File(downloadTempDir, "${musicId}.jpg").delete()
     }
 
     suspend fun downloadMusic(
@@ -109,13 +119,16 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         cookie: String,
         targetDir: DocumentFile,
         onProgress: (Music, Int, DownloadStage) -> Unit
-    ) {
+    ): String? {
         val cacheDir = context.externalCacheDir ?: context.cacheDir
-        val tmpFile = File(cacheDir, music.id.toString())
+        val downloadTempDir = File(cacheDir, DOWNLOAD_TEMP_DIR).apply { mkdirs() }
+        migrateLegacyDownloadArtifacts(cacheDir, downloadTempDir, music.id)
+        val tmpFile = File(downloadTempDir, music.id.toString())
         var tmpWithExt: File? = null
         var outputAudioFile: File? = null
         var tmpCover: File? = null
         var audioDownloaded = false
+        var savedAudioFileName: String? = null
 
         try {
             // 1. 获取音乐 URL 和文件信息
@@ -135,7 +148,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 .replace("\${albumId}", music.album.id.toString())
                 .replace(Regex("[\\\\/:*?\"<>|]"), " ")
 
-            tmpCover = File(cacheDir, "${music.id}.jpg")
+            tmpCover = File(downloadTempDir, "${music.id}.jpg")
             val coverFile = tmpCover!!
 
             coroutineScope {
@@ -173,7 +186,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
 
                 // 3. 检测类型并重命名
                 val ext = detectFileTypeFromFile(tmpFile)
-                val downloadedAudioFile = File(cacheDir, "$baseFileName.$ext")
+                val downloadedAudioFile = File(downloadTempDir, "$baseFileName.$ext")
                 tmpWithExt = downloadedAudioFile
                 if (downloadedAudioFile.exists()) downloadedAudioFile.delete()
                 if (!tmpFile.renameTo(downloadedAudioFile)) {
@@ -184,7 +197,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 var finalAudioFile = downloadedAudioFile
 
                 if (rules.convertM4aToMp3 && ext == "m4a") {
-                    val tmpMp3 = File(cacheDir, "$baseFileName.mp3")
+                    val tmpMp3 = File(downloadTempDir, "$baseFileName.mp3")
                     Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
                         onProgress(music, scaleProgress(progress, 80, 95), DownloadStage.TRANSCODING)
                     }
@@ -215,11 +228,23 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 onProgress(music, 98, DownloadStage.SAVING)
 
                 // 6. 移动到最终位置
-                copyToSaf(context, finalAudioFile, targetDir, "$baseFileName.$finalExt")
+                savedAudioFileName = copyToSaf(
+                    context,
+                    finalAudioFile,
+                    targetDir,
+                    "$baseFileName.$finalExt",
+                    rules.fileConflictStrategy
+                )
 
                 // 7. 写入歌词文件
-                if (rules.isSaveLrc && lrcText != null) {
-                    writeLrcToSaf(context, lrcText, targetDir, "$baseFileName.lrc", rules.encoding)
+                if (savedAudioFileName != null && rules.isSaveLrc && lrcText != null) {
+                    writeLrcToSaf(
+                        context,
+                        lrcText,
+                        targetDir,
+                        "${savedAudioFileName!!.substringBeforeLast('.')}.lrc",
+                        rules.encoding
+                    )
                 }
 
                 // 8. 清理临时文件
@@ -236,6 +261,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             tmpCover?.delete()
             throw e
         }
+        return savedAudioFileName
     }
 
     private suspend fun downloadAudioFile(
@@ -561,6 +587,27 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
+    private fun migrateLegacyDownloadArtifacts(cacheDir: File, downloadTempDir: File, musicId: Long) {
+        val legacyFile = File(cacheDir, musicId.toString())
+        val legacyCheckpoint = File(cacheDir, "${musicId}.download.json")
+        val legacyCheckpointTemp = File(cacheDir, "${legacyCheckpoint.name}.tmp")
+        val hasLegacyArtifacts = legacyFile.exists() || legacyCheckpoint.exists() || legacyCheckpointTemp.exists()
+        if (!hasLegacyArtifacts) return
+
+        downloadTempDir.mkdirs()
+        val migratedFile = downloadTempDir.resolve(legacyFile.name)
+        val migratedCheckpoint = downloadTempDir.resolve(legacyCheckpoint.name)
+        val migratedCheckpointTemp = downloadTempDir.resolve(legacyCheckpointTemp.name)
+
+        if (legacyFile.exists() && !migratedFile.exists()) legacyFile.renameTo(migratedFile)
+        if (legacyCheckpoint.exists() && !migratedCheckpoint.exists()) {
+            legacyCheckpoint.renameTo(migratedCheckpoint)
+        }
+        if (legacyCheckpointTemp.exists() && !migratedCheckpointTemp.exists()) {
+            legacyCheckpointTemp.renameTo(migratedCheckpointTemp)
+        }
+    }
+
     private fun deleteCheckpoint(outputFile: File) {
         val checkpointFile = checkpointFile(outputFile)
         checkpointFile.delete()
@@ -664,9 +711,23 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
-    private suspend fun copyToSaf(context: Context, sourceFile: File, targetDir: DocumentFile, finalFileName: String) =
-        withContext(Dispatchers.IO) {
-            val existing = targetDir.findFile(finalFileName)
+    private suspend fun copyToSaf(
+        context: Context,
+        sourceFile: File,
+        targetDir: DocumentFile,
+        finalFileName: String,
+        conflictStrategy: String
+    ): String? = withContext(Dispatchers.IO) {
+            val targetFileName = when (conflictStrategy) {
+                "跳过" -> {
+                    if (targetDir.findFile(finalFileName) != null) return@withContext null
+                    finalFileName
+                }
+
+                "自动重命名" -> findAvailableFileName(targetDir, finalFileName)
+                else -> finalFileName
+            }
+            val existing = targetDir.findFile(targetFileName)
             if (existing != null) {
                 try {
                     context.contentResolver.openFileDescriptor(existing.uri, "w")?.use { pfd ->
@@ -676,18 +737,30 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     } ?: throw Exception("无法打开现有文件")
                 } catch (e: Exception) {
                     context.contentResolver.delete(existing.uri, null, null)
-                    val newDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
+                    val newDoc = targetDir.createFile("audio/*", targetFileName) ?: throw Exception("无法创建音乐文件")
                     context.contentResolver.openOutputStream(newDoc.uri)?.use { out ->
                         sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
                     } ?: throw Exception("无法打开新文件")
                 }
             } else {
-                val musicDoc = targetDir.createFile("audio/*", finalFileName) ?: throw Exception("无法创建音乐文件")
+                val musicDoc = targetDir.createFile("audio/*", targetFileName) ?: throw Exception("无法创建音乐文件")
                 context.contentResolver.openOutputStream(musicDoc.uri)?.use { out ->
                     sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
                 } ?: throw Exception("无法打开目标输出流")
             }
+            targetFileName
         }
+
+    private fun findAvailableFileName(targetDir: DocumentFile, originalName: String): String {
+        if (targetDir.findFile(originalName) == null) return originalName
+
+        val extensionIndex = originalName.lastIndexOf('.')
+        val baseName = if (extensionIndex > 0) originalName.substring(0, extensionIndex) else originalName
+        val extension = if (extensionIndex > 0) originalName.substring(extensionIndex) else ""
+        var index = 1
+        while (targetDir.findFile("$baseName ($index)$extension") != null) index++
+        return "$baseName ($index)$extension"
+    }
 
     private suspend fun writeLrcToSaf(
         context: Context,

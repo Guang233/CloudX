@@ -17,7 +17,8 @@ data class MusicUrl(val url: String, val level: String)
 data class MusicDownloadRules(
     val isSaveLrc: Boolean, val isSaveTlLrc: Boolean, val isSaveRomaLrc: Boolean, val isSaveYrc: Boolean,
     val fileName: String, val delimiter: String,
-    val encoding: String, val concurrentDownloads: Int = 1, val convertM4aToMp3: Boolean = false
+    val encoding: String, val concurrentDownloads: Int = 1, val convertM4aToMp3: Boolean = false,
+    val fileConflictStrategy: String = "覆盖"
 )
 
 enum class DownloadStage {

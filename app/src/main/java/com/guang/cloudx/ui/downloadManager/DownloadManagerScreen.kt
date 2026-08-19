@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -127,7 +128,8 @@ fun DownloadManagerScreen(
                                                 delimiter = prefs.getArtistsDelimiter()!!,
                                                 encoding = prefs.getLrcEncoding()!!,
                                                 concurrentDownloads = prefs.getConcurrentDownloads(),
-                                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
+                                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
+                                                fileConflictStrategy = prefs.getFileConflictStrategy()
                                             )
                                         )
                                     }
@@ -262,8 +264,22 @@ fun DownloadManagerScreen(
             title = { Text("详细信息") },
             text = { Text(message) },
             confirmButton = {
-                TextButton(onClick = { showDetailDialog = null }) {
-                    Text("关闭")
+                Row {
+                    TextButton(
+                        onClick = { openCompletedFile(context, item) },
+                        enabled = item.savedFileName != null
+                    ) {
+                        Text("打开")
+                    }
+                    TextButton(
+                        onClick = { shareCompletedFile(context, item) },
+                        enabled = item.savedFileName != null
+                    ) {
+                        Text("分享")
+                    }
+                    TextButton(onClick = { showDetailDialog = null }) {
+                        Text("关闭")
+                    }
                 }
             },
             dismissButton = {
@@ -275,6 +291,47 @@ fun DownloadManagerScreen(
                     Text("复制")
                 }
             }
+        )
+    }
+}
+
+private fun findCompletedDocument(context: Context, item: DownloadItemUi): DocumentFile? {
+    val fileName = item.savedFileName ?: return null
+    val targetUri = item.targetUri.takeIf { it.isNotBlank() } ?: return null
+    return DocumentFile.fromTreeUri(context, Uri.parse(targetUri))?.findFile(fileName)
+}
+
+private fun openCompletedFile(context: Context, item: DownloadItemUi) {
+    val document = findCompletedDocument(context, item) ?: return
+    val mimeType = when (document.name?.substringAfterLast('.', "")?.lowercase()) {
+        "mp3" -> "audio/mpeg"
+        "m4a", "aac" -> "audio/mp4"
+        "flac" -> "audio/flac"
+        "ogg" -> "audio/ogg"
+        else -> "audio/*"
+    }
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(document.uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }
+}
+
+private fun shareCompletedFile(context: Context, item: DownloadItemUi) {
+    val document = findCompletedDocument(context, item) ?: return
+    runCatching {
+        context.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "audio/*"
+                    putExtra(Intent.EXTRA_STREAM, document.uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
+                "分享音乐"
+            )
         )
     }
 }
@@ -314,7 +371,8 @@ fun DownloadingList(
                                 delimiter = prefs.getArtistsDelimiter()!!,
                                 encoding = prefs.getLrcEncoding()!!,
                                 concurrentDownloads = prefs.getConcurrentDownloads(),
-                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
+                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
+                                fileConflictStrategy = prefs.getFileConflictStrategy()
                             )
                         )
                     }
@@ -339,7 +397,8 @@ fun DownloadingList(
                                 delimiter = prefs.getArtistsDelimiter()!!,
                                 encoding = prefs.getLrcEncoding()!!,
                                 concurrentDownloads = prefs.getConcurrentDownloads(),
-                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3()
+                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
+                                fileConflictStrategy = prefs.getFileConflictStrategy()
                             )
                         )
                     }

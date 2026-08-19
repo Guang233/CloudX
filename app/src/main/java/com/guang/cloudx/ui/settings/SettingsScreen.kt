@@ -202,6 +202,16 @@ fun SettingsScreen(
             }
 
             item {
+                MenuListItem(
+                    icon = Icons.Outlined.FileCopy,
+                    title = "同名文件处理",
+                    options = listOf("覆盖", "自动重命名", "跳过"),
+                    selectedOption = prefs.getFileConflictStrategy(),
+                    onOptionSelected = { prefs.putFileConflictStrategy(it) }
+                )
+            }
+
+            item {
                 SwitchListItem(
                     icon = Icons.Outlined.AudioFile,
                     title = "M4A 转 MP3",
@@ -511,10 +521,9 @@ fun SettingsScreen(
                             SingletonImageLoader.get(context).diskCache?.clear()
                             SingletonImageLoader.get(context).memoryCache?.clear()
 
-                            val cacheDir = context.externalCacheDir!!
-                            if (cacheDir.exists() && cacheDir.isDirectory) {
-                                cacheDir.deleteRecursively()
-                            }
+                            context.externalCacheDir?.listFiles()
+                                ?.filterNot { it.name == "download_temp" }
+                                ?.forEach { it.deleteRecursively() }
 
                             withContext(Dispatchers.Main) {
                                 snackbarHostState.showSnackbar("已清理")
