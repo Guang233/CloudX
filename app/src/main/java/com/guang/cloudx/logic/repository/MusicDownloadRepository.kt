@@ -3,7 +3,6 @@ package com.guang.cloudx.logic.repository
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModelProvider
-import com.google.gson.Gson
 import com.guang.cloudx.logic.model.DownloadStage
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
@@ -14,6 +13,8 @@ import com.guang.cloudx.logic.utils.Mp3Transcoder
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -53,7 +54,6 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         private val file: File,
         val checkpoint: DownloadCheckpoint
     ) {
-        private val gson = Gson()
         private var lastSaveAt = 0L
 
         @Synchronized
@@ -70,7 +70,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             if (!force && now - lastSaveAt < CHECKPOINT_SAVE_INTERVAL_MS) return
 
             file.parentFile?.mkdirs()
-            val json = gson.toJson(checkpoint)
+            val json = checkpointToJson(checkpoint).toString()
             val tempFile = File("${file.absolutePath}.tmp")
             tempFile.writeText(json)
             if (file.exists()) file.delete()
@@ -99,7 +99,58 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             .readTimeout(20, TimeUnit.SECONDS)
             .build()
 
-        val checkpointGson = Gson()
+        fun checkpointToJson(checkpoint: DownloadCheckpoint): JSONObject {
+            return JSONObject().apply {
+                put("version", checkpoint.version)
+                put("mode", checkpoint.mode)
+                put("identity", checkpoint.identity)
+                put("contentLength", checkpoint.contentLength)
+                checkpoint.eTag?.let { put("eTag", it) }
+                checkpoint.lastModified?.let { put("lastModified", it) }
+                put(
+                    "ranges",
+                    JSONArray().apply {
+                        checkpoint.ranges.orEmpty().forEach { range ->
+                            put(
+                                JSONObject().apply {
+                                    put("start", range.start)
+                                    put("end", range.end)
+                                    put("downloaded", range.downloaded)
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+        }
+
+        fun checkpointFromJson(json: JSONObject): DownloadCheckpoint? {
+            val rangesJson = json.optJSONArray("ranges") ?: return null
+            val ranges = mutableListOf<DownloadCheckpointRange>()
+            for (index in 0 until rangesJson.length()) {
+                val range = rangesJson.optJSONObject(index) ?: return null
+                ranges += DownloadCheckpointRange(
+                    start = range.optLong("start", -1L),
+                    end = range.optLong("end", -1L),
+                    downloaded = range.optLong("downloaded", -1L)
+                )
+            }
+
+            return DownloadCheckpoint(
+                version = json.optInt("version", -1),
+                mode = json.optString("mode", ""),
+                identity = json.optString("identity", ""),
+                contentLength = json.optLong("contentLength", -1L),
+                eTag = json.optNullableString("eTag"),
+                lastModified = json.optNullableString("lastModified"),
+                ranges = ranges
+            )
+        }
+
+        private fun JSONObject.optNullableString(key: String): String? {
+            if (!has(key) || isNull(key)) return null
+            return optString(key).takeIf { it.isNotEmpty() }
+        }
     }
 
     fun deleteDownloadArtifacts(context: Context, musicId: Long) {
@@ -573,8 +624,9 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
     }
 
     private fun readCheckpoint(file: File): DownloadCheckpoint? {
+        if (!file.isFile) return null
         return runCatching {
-            checkpointGson.fromJson(file.readText(), DownloadCheckpoint::class.java)
+            checkpointFromJson(JSONObject(file.readText()))
         }.getOrNull()
     }
 

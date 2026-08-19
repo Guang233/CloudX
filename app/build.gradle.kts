@@ -10,7 +10,7 @@ plugins {
     id("kotlin-kapt")
 }
 
-val appVersion = "1.5.1-${getGitCommitHash()}"
+val appVersion = "1.5.2-${getGitCommitHash()}"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
 

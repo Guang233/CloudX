@@ -292,6 +292,8 @@ class DownloadService : Service() {
                 "权限错误：$message"
             text.contains("http error") || text.contains("timeout") || text.contains("网络") ->
                 "网络错误：$message"
+            text.contains("暂无可用下载地址") || text.contains("未返回下载信息") ->
+                "资源不可用：$message"
             text.contains("tag") || text.contains("frame") || text.contains("metadata") ->
                 "标签写入错误：$message"
             text.contains("format") || text.contains("音频") || text.contains("文件大小") ->

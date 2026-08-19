@@ -152,10 +152,16 @@ object Decrypt {
 
     fun decryptMusicUrl(encryptedBody: String): MusicUrl {
         val decryptedJson = AESECBHelper.decrypt(encryptedBody)
-        val data = JSONObject(decryptedJson).getJSONArray("data").get(0) as JSONObject
+        val data = JSONObject(decryptedJson)
+            .optJSONArray("data")
+            ?.optJSONObject(0)
+            ?: throw IllegalStateException("音乐接口未返回下载信息")
 
-        val url = data.getString("url")
-        val level = data.getString("level")
+        val url = data.optString("url", "")
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            throw IllegalStateException("歌曲暂无可用下载地址，可能受版权、会员或地区限制")
+        }
+        val level = data.optString("level", "standard").takeIf { it.isNotBlank() } ?: "standard"
 
         return MusicUrl(url, level)
     }
