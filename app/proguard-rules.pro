@@ -22,6 +22,10 @@
 
 -keep class org.jcodec.containers.** { *; }
 
+# jaudiotagger creates ID3 frame bodies with Class.forName("...FrameBody" + frameId).
+# Keep their original class names and constructors so release builds can write MP3 tags.
+-keep class org.jaudiotagger.tag.id3.framebody.FrameBody* { *; }
+
 -keep class com.google.gson.** { *; }
 -keepattributes Signature
 -keepattributes *Annotation*
