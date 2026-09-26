@@ -33,9 +33,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.downloadedMusicIds
+import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.ui.downloadManager.rememberLocalMusicViewModel
 import com.guang.cloudx.ui.home.DeselectDownloadedButton
-import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.ui.home.MusicBottomSheetContent
 import com.guang.cloudx.ui.home.MusicItem
 import com.guang.cloudx.ui.home.MusicPlayerViewModel
@@ -56,7 +56,7 @@ fun PlayListScreen(
     onMusicLongClick: (Music) -> Unit,
     onDownloadSelected: (List<Music>) -> Unit,
     onSaveLevel: (String) -> Unit,
-    playerViewModel: MusicPlayerViewModel
+    playerViewModel: MusicPlayerViewModel,
 ) {
     val viewModel: PlayListViewModel = viewModel()
     val state by viewModel.uiState.collectAsState()
@@ -89,8 +89,11 @@ fun PlayListScreen(
 
     val scrollOffset by remember {
         derivedStateOf {
-            if (firstVisibleItemIndex > 0) topBarHeightPx
-            else firstVisibleItemScrollOffset.toFloat().coerceAtMost(topBarHeightPx)
+            if (firstVisibleItemIndex > 0) {
+                topBarHeightPx
+            } else {
+                firstVisibleItemScrollOffset.toFloat().coerceAtMost(topBarHeightPx)
+            }
         }
     }
 
@@ -102,47 +105,43 @@ fun PlayListScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                PlayListTopBar(
-                    title = state.playList?.name ?: "歌单",
-                    isMultiSelectMode = state.isMultiSelectMode,
-                    selectedCount = state.selectedItems.size,
-                    alpha = alpha,
-                    onBackClick = {
-                        if (state.isMultiSelectMode) viewModel.exitMultiSelectMode()
-                        else onBackClick()
-                    },
-                    onSelectAll = { viewModel.selectAll() },
-                    onInvertSelection = { viewModel.invertSelection() },
-                    onDownloadSelected = {
-                        onDownloadSelected(state.selectedItems.toList())
+            PlayListTopBar(
+                title = state.playList?.name ?: "歌单",
+                isMultiSelectMode = state.isMultiSelectMode,
+                selectedCount = state.selectedItems.size,
+                hasDownloadedSelection = state.selectedItems.any { it.id in downloadedIds },
+                onDeselectDownloaded = { viewModel.deselectDownloaded(downloadedIds) },
+                alpha = alpha,
+                onBackClick = {
+                    if (state.isMultiSelectMode) {
                         viewModel.exitMultiSelectMode()
+                    } else {
+                        onBackClick()
                     }
-                )
-                if (state.isMultiSelectMode) {
-                    Surface {
-                        DeselectDownloadedButton(
-                            enabled = state.selectedItems.any { it.id in downloadedIds },
-                            onClick = { viewModel.deselectDownloaded(downloadedIds) }
-                        )
-                    }
-                }
-            }
-        }
+                },
+                onSelectAll = { viewModel.selectAll() },
+                onInvertSelection = { viewModel.invertSelection() },
+                onDownloadSelected = {
+                    onDownloadSelected(state.selectedItems.toList())
+                    viewModel.exitMultiSelectMode()
+                },
+            )
+        },
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
                 onRefresh = { viewModel.refresh() },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = paddingValues.calculateBottomPadding()) // Only apply bottom padding
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(bottom = paddingValues.calculateBottomPadding()), // Only apply bottom padding
             ) {
                 if (state.playList != null) {
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(bottom = 16.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     ) {
                         item {
                             PlayListHeader(state.playList!!)
@@ -172,7 +171,7 @@ fun PlayListScreen(
                                     } else {
                                         onMusicLongClick(music)
                                     }
-                                }
+                                },
                             )
                         }
                     }
@@ -190,7 +189,7 @@ fun PlayListScreen(
                         showBottomSheet = false
                         selectedMusic = null
                     },
-                    sheetState = sheetState
+                    sheetState = sheetState,
                 ) {
                     MusicBottomSheetContent(
                         music = selectedMusic!!,
@@ -212,7 +211,7 @@ fun PlayListScreen(
                         },
                         onLongClickText = { SystemUtils.copyToClipboard(context, "music", it) },
                         playerViewModel = playerViewModel,
-                        cookie = cookie
+                        cookie = cookie,
                     )
                 }
             }
@@ -223,53 +222,58 @@ fun PlayListScreen(
 @Composable
 fun PlayListHeader(playList: com.guang.cloudx.logic.model.PlayList) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(320.dp) // Increased height for better visual
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(320.dp), // Increased height for better visual
     ) {
         // Background Image with Blur/Dim
         AsyncImage(
             model = playList.coverImgUrl,
             contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize(),
-            contentScale = ContentScale.Crop
+            modifier =
+                Modifier
+                    .fillMaxSize(),
+            contentScale = ContentScale.Crop,
         )
 
         // Gradient Overlay
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                    MaterialTheme.colorScheme.surface,
+                                ),
+                        ),
+                    ),
         )
 
         // Content
         Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(24.dp)
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(24.dp),
         ) {
             Row(
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.Bottom,
             ) {
                 Card(
                     shape = MaterialTheme.shapes.medium,
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                    modifier = Modifier.size(120.dp)
+                    modifier = Modifier.size(120.dp),
                 ) {
                     AsyncImage(
                         model = playList.coverImgUrl,
                         contentDescription = "Cover",
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
                     )
                 }
 
@@ -281,13 +285,13 @@ fun PlayListHeader(playList: com.guang.cloudx.logic.model.PlayList) {
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "ID: ${playList.id}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -301,50 +305,57 @@ fun PlayListTopBar(
     title: String,
     isMultiSelectMode: Boolean,
     selectedCount: Int,
+    hasDownloadedSelection: Boolean,
+    onDeselectDownloaded: () -> Unit,
     alpha: Float,
     onBackClick: () -> Unit,
     onSelectAll: () -> Unit,
     onInvertSelection: () -> Unit,
-    onDownloadSelected: () -> Unit
+    onDownloadSelected: () -> Unit,
 ) {
     AnimatedContent(
         targetState = isMultiSelectMode,
         transitionSpec = {
             fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
         },
-        label = "TopBarState"
+        label = "TopBarState",
     ) { isMultiSelect ->
         if (isMultiSelect) {
             TopAppBar(
-                title = { Text("已选 $selectedCount 项") },
+                title = { Text("已选 $selectedCount 项", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     TooltipIconButton(
                         onClick = onBackClick,
                         imageVector = Icons.Default.Close,
-                        contentDescription = "关闭"
+                        contentDescription = "关闭",
                     )
                 },
                 actions = {
                     TooltipIconButton(
                         onClick = onSelectAll,
                         imageVector = Icons.Default.SelectAll,
-                        contentDescription = "全选"
+                        contentDescription = "全选",
                     )
                     TooltipIconButton(
                         onClick = onInvertSelection,
                         imageVector = Icons.Default.FlipToFront,
-                        contentDescription = "反选"
+                        contentDescription = "反选",
+                    )
+                    DeselectDownloadedButton(
+                        enabled = hasDownloadedSelection,
+                        onClick = onDeselectDownloaded,
                     )
                     TooltipIconButton(
                         onClick = onDownloadSelected,
                         imageVector = Icons.Default.Download,
                         contentDescription = "下载",
-                        enabled = selectedCount > 0
+                        enabled = selectedCount > 0,
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    ),
             )
         } else {
             val backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = alpha)
@@ -361,16 +372,17 @@ fun PlayListTopBar(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回",
-                            tint = contentColor
+                            tint = contentColor,
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = backgroundColor,
-                    titleContentColor = contentColor,
-                    navigationIconContentColor = contentColor,
-                    actionIconContentColor = contentColor
-                )
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = backgroundColor,
+                        titleContentColor = contentColor,
+                        navigationIconContentColor = contentColor,
+                        actionIconContentColor = contentColor,
+                    ),
             )
         }
     }

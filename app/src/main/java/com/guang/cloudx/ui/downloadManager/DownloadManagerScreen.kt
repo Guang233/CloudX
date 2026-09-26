@@ -31,21 +31,19 @@ import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import coil3.compose.AsyncImage
 import com.guang.cloudx.R
-import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.database.LocalMusicFile
+import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.ui.home.TooltipIconButton
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DownloadManagerScreen(
     onBackClick: () -> Unit,
-    downloadDir: DocumentFile?
+    downloadDir: DocumentFile?,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val viewModel = remember(application) { applicationViewModels<DownloadViewModel>(application).value }
@@ -79,7 +77,7 @@ fun DownloadManagerScreen(
                     TooltipIconButton(
                         onClick = onBackClick,
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回"
+                        contentDescription = "返回",
                     )
                 },
                 actions = {
@@ -107,20 +105,20 @@ fun DownloadManagerScreen(
                                                 encoding = prefs.getLrcEncoding()!!,
                                                 concurrentDownloads = prefs.getConcurrentDownloads(),
                                                 convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
-                                                fileConflictStrategy = prefs.getFileConflictStrategy()
-                                            )
+                                                fileConflictStrategy = prefs.getFileConflictStrategy(),
+                                            ),
                                         )
                                     }
                                 },
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "全部重试"
+                                contentDescription = "全部重试",
                             )
                         }
                         if (hasDeletableTasks) {
                             TooltipIconButton(
                                 onClick = { showDeleteAllFailedDialog = true },
                                 imageVector = Icons.Default.DeleteSweep,
-                                contentDescription = "删除所有失败或暂停任务"
+                                contentDescription = "删除所有失败或暂停任务",
                             )
                         }
                     }
@@ -129,7 +127,7 @@ fun DownloadManagerScreen(
                         TooltipIconButton(
                             onClick = { localMusic.refresh() },
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "刷新本地文件状态"
+                            contentDescription = "刷新本地文件状态",
                         )
                     }
                     // 批量清理仅移除记录，绝不顺带删除文件。
@@ -137,12 +135,12 @@ fun DownloadManagerScreen(
                         TooltipIconButton(
                             onClick = { showDeleteAllCompletedDialog = true },
                             imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "清空已完成记录"
+                            contentDescription = "清空已完成记录",
                         )
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
             PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
@@ -152,27 +150,30 @@ fun DownloadManagerScreen(
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage(index) }
                         },
-                        text = { Text(title) }
+                        text = { Text(title) },
                     )
                 }
             }
 
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             ) { page ->
                 if (page == 0) {
                     DownloadingList(
                         list = downloadingList,
                         viewModel = viewModel,
-                        downloadDir = downloadDir
+                        downloadDir = downloadDir,
                     )
                 } else {
                     CompletedList(
                         list = completedList,
                         filesByUri = filesByUri,
                         onDelete = { item -> showDeleteDialog = item },
-                        onClick = { item -> showDetailDialog = item }
+                        onClick = { item ->
+                            showDetailDialog = item
+                            localMusic.refresh()
+                        },
                     )
                 }
             }
@@ -190,7 +191,7 @@ fun DownloadManagerScreen(
                     onClick = {
                         viewModel.deleteAllCompleted {}
                         showDeleteAllCompletedDialog = false
-                    }
+                    },
                 ) {
                     Text("确定")
                 }
@@ -199,7 +200,7 @@ fun DownloadManagerScreen(
                 TextButton(onClick = { showDeleteAllCompletedDialog = false }) {
                     Text("取消")
                 }
-            }
+            },
         )
     }
 
@@ -214,7 +215,7 @@ fun DownloadManagerScreen(
                     onClick = {
                         viewModel.deleteAllFailed()
                         showDeleteAllFailedDialog = false
-                    }
+                    },
                 ) {
                     Text("确定")
                 }
@@ -223,7 +224,7 @@ fun DownloadManagerScreen(
                 TextButton(onClick = { showDeleteAllFailedDialog = false }) {
                     Text("取消")
                 }
-            }
+            },
         )
     }
 
@@ -232,8 +233,9 @@ fun DownloadManagerScreen(
         val file = filesByUri[item.savedFileUri]?.takeIf { it.musicId == item.music.id }
         var deleteSource by remember(item.id) { mutableStateOf(false) }
         var deleteLyrics by remember(item.id) { mutableStateOf(false) }
-        val canDeleteFile = file != null &&
-            (file.state != LocalMusicFile.MISSING || file.lyricUri != null)
+        val canDeleteFile =
+            file != null &&
+                (file.state != LocalMusicFile.MISSING || file.lyricUri != null)
         AlertDialog(
             onDismissRequest = { if (!deleting) showDeleteDialog = null },
             title = { Text("删除歌曲") },
@@ -244,7 +246,7 @@ fun DownloadManagerScreen(
                         Checkbox(
                             checked = deleteSource,
                             onCheckedChange = { deleteSource = it },
-                            enabled = canDeleteFile && !deleting
+                            enabled = canDeleteFile && !deleting,
                         )
                         Text("删除本地歌曲文件（不可恢复）")
                     }
@@ -253,13 +255,18 @@ fun DownloadManagerScreen(
                             Checkbox(
                                 checked = deleteLyrics,
                                 onCheckedChange = { deleteLyrics = it },
-                                enabled = !deleting
+                                enabled = !deleting,
                             )
                             Text("同时删除关联歌词")
                         }
                     }
-                    Text(if (deleteSource) "保留下载记录；其他副本不会删除。"
-                        else "仅移除这条记录，保留本地文件和已下载标记。")
+                    Text(
+                        if (deleteSource) {
+                            "保留下载记录；其他副本不会删除。"
+                        } else {
+                            "仅移除这条记录，保留本地文件和已下载标记。"
+                        },
+                    )
                     if (!canDeleteFile) Text("${completedFileStatus(item, filesByUri)}，只能移除记录。")
                 }
             },
@@ -282,73 +289,42 @@ fun DownloadManagerScreen(
                                 }
                             }
                         }
-                    }
-                ) { Text(if (deleting) "正在删除…" else if (deleteSource) "删除文件" else "移除记录") }
+                    },
+                ) {
+                    Text(
+                        if (deleting) {
+                            "正在删除…"
+                        } else if (deleteSource) {
+                            "删除文件"
+                        } else {
+                            "移除记录"
+                        },
+                    )
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }, enabled = !deleting) { Text("取消") }
-            }
+            },
         )
     }
 
     // 详情弹窗
     if (showDetailDialog != null) {
         val item = completedList.find { it.id == showDetailDialog!!.id } ?: showDetailDialog!!
-        val canOpen = filesByUri[item.savedFileUri]?.let {
-            it.musicId == item.music.id && it.state == LocalMusicFile.PRESENT
-        } == true
-        val message = remember(item) {
-            with(item) {
-                """
-                标题：${music.name}
-                音乐ID：${music.id}
-                艺术家：${music.artists.joinToString("、") { "${it.name}(${it.id})" }}
-                专辑：${music.album.name}
-                专辑ID：${music.album.id}
-                封面：${music.album.picUrl}
-                
-                保存时间：${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(timeStamp))}
-                """.trimIndent()
-            }
-        }
-
-        AlertDialog(
-            onDismissRequest = { showDetailDialog = null },
-            title = { Text("详细信息") },
-            text = { Text(message) },
-            confirmButton = {
-                Row {
-                    TextButton(
-                        onClick = { openCompletedFile(context, item) },
-                        enabled = canOpen
-                    ) {
-                        Text("打开")
-                    }
-                    TextButton(
-                        onClick = { shareCompletedFile(context, item) },
-                        enabled = canOpen
-                    ) {
-                        Text("分享")
-                    }
-                    TextButton(onClick = { showDetailDialog = null }) {
-                        Text("关闭")
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        SystemUtils.copyToClipboard(context, "MusicDetail", message)
-                    }
-                ) {
-                    Text("复制")
-                }
-            }
+        DownloadDetailsDialog(
+            item = item,
+            indexedFile = filesByUri[item.savedFileUri],
+            onDismiss = { showDetailDialog = null },
+            onOpen = { openCompletedFile(context, item) },
+            onShare = { shareCompletedFile(context, item) },
         )
     }
 }
 
-private fun completedFileStatus(item: DownloadItemUi, files: Map<String, LocalMusicFile>): String {
+private fun completedFileStatus(
+    item: DownloadItemUi,
+    files: Map<String, LocalMusicFile>,
+): String {
     val file = files[item.savedFileUri] ?: return "文件未确认"
     if (file.musicId != item.music.id) return "文件已被覆盖"
     return when (file.state) {
@@ -358,31 +334,41 @@ private fun completedFileStatus(item: DownloadItemUi, files: Map<String, LocalMu
     }
 }
 
-private fun findCompletedDocument(context: Context, item: DownloadItemUi): DocumentFile? {
+private fun findCompletedDocument(
+    context: Context,
+    item: DownloadItemUi,
+): DocumentFile? {
     val uri = item.savedFileUri ?: return null
     return DocumentFile.fromSingleUri(context, Uri.parse(uri))
 }
 
-private fun openCompletedFile(context: Context, item: DownloadItemUi) {
+private fun openCompletedFile(
+    context: Context,
+    item: DownloadItemUi,
+) {
     val document = findCompletedDocument(context, item) ?: return
-    val mimeType = when (document.name?.substringAfterLast('.', "")?.lowercase()) {
-        "mp3" -> "audio/mpeg"
-        "m4a", "aac" -> "audio/mp4"
-        "flac" -> "audio/flac"
-        "ogg" -> "audio/ogg"
-        else -> "audio/*"
-    }
+    val mimeType =
+        when (document.name?.substringAfterLast('.', "")?.lowercase()) {
+            "mp3" -> "audio/mpeg"
+            "m4a", "aac" -> "audio/mp4"
+            "flac" -> "audio/flac"
+            "ogg" -> "audio/ogg"
+            else -> "audio/*"
+        }
     runCatching {
         context.startActivity(
             Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(document.uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
+            },
         )
     }
 }
 
-private fun shareCompletedFile(context: Context, item: DownloadItemUi) {
+private fun shareCompletedFile(
+    context: Context,
+    item: DownloadItemUi,
+) {
     val document = findCompletedDocument(context, item) ?: return
     runCatching {
         context.startActivity(
@@ -392,8 +378,8 @@ private fun shareCompletedFile(context: Context, item: DownloadItemUi) {
                     putExtra(Intent.EXTRA_STREAM, document.uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 },
-                "分享音乐"
-            )
+                "分享音乐",
+            ),
         )
     }
 }
@@ -403,14 +389,14 @@ private fun shareCompletedFile(context: Context, item: DownloadItemUi) {
 fun DownloadingList(
     list: List<DownloadItemUi>,
     viewModel: DownloadViewModel,
-    downloadDir: DocumentFile?
+    downloadDir: DocumentFile?,
 ) {
     val context = LocalContext.current
     val prefs = remember { SharedPreferencesUtils(context) }
 
     LazyColumn(
         contentPadding = PaddingValues(vertical = 8.dp),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         items(list, key = { it.id }) { item ->
             DownloadingItem(
@@ -434,8 +420,8 @@ fun DownloadingList(
                                 encoding = prefs.getLrcEncoding()!!,
                                 concurrentDownloads = prefs.getConcurrentDownloads(),
                                 convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
-                                fileConflictStrategy = prefs.getFileConflictStrategy()
-                            )
+                                fileConflictStrategy = prefs.getFileConflictStrategy(),
+                            ),
                         )
                     }
                 },
@@ -460,8 +446,8 @@ fun DownloadingList(
                                 encoding = prefs.getLrcEncoding()!!,
                                 concurrentDownloads = prefs.getConcurrentDownloads(),
                                 convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
-                                fileConflictStrategy = prefs.getFileConflictStrategy()
-                            )
+                                fileConflictStrategy = prefs.getFileConflictStrategy(),
+                            ),
                         )
                     }
                 },
@@ -470,7 +456,7 @@ fun DownloadingList(
                     if (item.status == TaskStatus.FAILED) {
                         SystemUtils.copyToClipboard(context, "DownloadError", item.failureReason ?: "无错误信息")
                     }
-                }
+                },
             )
         }
     }
@@ -485,64 +471,69 @@ fun DownloadingItem(
     onPause: () -> Unit,
     onResumeDownload: () -> Unit,
     onDelete: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
 ) {
     val animatedProgress by animateFloatAsState(
         targetValue = item.progress / 100f,
-        label = "ProgressAnimation"
+        label = "ProgressAnimation",
     )
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(
-                onClick = {
-                    when (item.status) {
-                        TaskStatus.DOWNLOADING -> onPause()
-                        TaskStatus.PAUSED -> onResumeDownload()
-                        TaskStatus.FAILED -> onRetry()
-                        TaskStatus.COMPLETED -> Unit
-                    }
-                },
-                onLongClick = onLongClick
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .combinedClickable(
+                    onClick = {
+                        when (item.status) {
+                            TaskStatus.DOWNLOADING -> onPause()
+                            TaskStatus.PAUSED -> onResumeDownload()
+                            TaskStatus.FAILED -> onRetry()
+                            TaskStatus.COMPLETED -> Unit
+                        }
+                    },
+                    onLongClick = onLongClick,
+                ),
         shape = RoundedCornerShape(16.dp),
-        color = Color.Transparent
+        color = Color.Transparent,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // 封面
             AsyncImage(
                 model = item.music.album.picUrl,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(12.dp)), // ShapeAppearance.Material3.LargeComponent 约为 12-16dp
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                // ShapeAppearance.Material3.LargeComponent 约为 12-16dp
+                contentScale = ContentScale.Crop,
             )
 
             Spacer(modifier = Modifier.width(12.dp))
 
             // 中间内容
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(64.dp) // 匹配封面高度
-                    .padding(vertical = 2.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(64.dp) // 匹配封面高度
+                        .padding(vertical = 2.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 // 标题
                 Text(
                     text = item.music.name,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 // 艺术家
@@ -551,7 +542,7 @@ fun DownloadingItem(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -562,7 +553,7 @@ fun DownloadingItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 } else if (item.status == TaskStatus.PAUSED) {
                     Text(
@@ -570,15 +561,16 @@ fun DownloadingItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 } else {
                     LinearProgressIndicator(
                         progress = { animatedProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(4.dp)),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(4.dp)),
                     )
                 }
             }
@@ -587,12 +579,12 @@ fun DownloadingItem(
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.delete_24px),
                         contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -606,14 +598,14 @@ fun CompletedList(
     list: List<DownloadItemUi>,
     filesByUri: Map<String, LocalMusicFile>,
     onDelete: (DownloadItemUi) -> Unit,
-    onClick: (DownloadItemUi) -> Unit
+    onClick: (DownloadItemUi) -> Unit,
 ) {
     // 倒序显示，最新的在上面
     val reversedList = remember(list) { list.asReversed() }
 
     LazyColumn(
         contentPadding = PaddingValues(vertical = 8.dp),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         items(reversedList, key = { it.id }) { item ->
             CompletedItem(
@@ -621,7 +613,7 @@ fun CompletedList(
                 fileStatus = completedFileStatus(item, filesByUri),
                 modifier = Modifier.animateItem(),
                 onClick = { onClick(item) },
-                onDelete = { onDelete(item) }
+                onDelete = { onDelete(item) },
             )
         }
     }
@@ -633,52 +625,56 @@ fun CompletedItem(
     fileStatus: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {}
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {},
+                ),
         shape = RoundedCornerShape(16.dp),
-        color = Color.Transparent
+        color = Color.Transparent,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // 封面
             AsyncImage(
                 model = item.music.album.picUrl,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
             )
 
             Spacer(modifier = Modifier.width(12.dp))
 
             // 中间内容
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(64.dp)
-                    .padding(vertical = 2.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(64.dp)
+                        .padding(vertical = 2.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 // 标题
                 Text(
                     text = item.music.name,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 // 艺术家
@@ -687,7 +683,7 @@ fun CompletedItem(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -695,7 +691,7 @@ fun CompletedItem(
                 Text(
                     text = fileStatus,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
 
@@ -704,12 +700,12 @@ fun CompletedItem(
             // 删除按钮
             IconButton(
                 onClick = onDelete,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.delete_24px),
                     contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

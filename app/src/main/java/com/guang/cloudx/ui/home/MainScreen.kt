@@ -67,7 +67,7 @@ data class PlayerState(
     val currentPosition: Long = 0L,
     val totalDuration: Long = 0L,
     val isBuffering: Boolean = false,
-    val musicFile: File? = null
+    val musicFile: File? = null,
 )
 
 // 音乐播放器 ViewModel
@@ -77,7 +77,12 @@ class MusicPlayerViewModel : ViewModel() {
 
     private var audioPlayer: AudioPlayer? = null
 
-    fun cacheMusic(music: Music, parent: File, cookie: String, onError: (String) -> Unit = {}) {
+    fun cacheMusic(
+        music: Music,
+        parent: File,
+        cookie: String,
+        onError: (String) -> Unit = {},
+    ) {
         if (audioPlayer != null) {
             play()
             return
@@ -98,28 +103,31 @@ class MusicPlayerViewModel : ViewModel() {
 
     private fun playAudio(file: File) {
         audioPlayer?.release()
-        audioPlayer = AudioPlayer(file).apply {
-            prepare(
-                onPrepared = {
-                    _playerState.value = _playerState.value.copy(
-                        isPlaying = true,
-                        totalDuration = duration().toLong()
-                    )
-                },
-                onError = {
-                    _playerState.value = _playerState.value.copy(isPlaying = false)
-                }
-            )
-            setOnProgressUpdateListener { currentMs, totalMs ->
-                _playerState.value = _playerState.value.copy(
-                    currentPosition = currentMs.toLong(),
-                    totalDuration = totalMs.toLong()
+        audioPlayer =
+            AudioPlayer(file).apply {
+                prepare(
+                    onPrepared = {
+                        _playerState.value =
+                            _playerState.value.copy(
+                                isPlaying = true,
+                                totalDuration = duration().toLong(),
+                            )
+                    },
+                    onError = {
+                        _playerState.value = _playerState.value.copy(isPlaying = false)
+                    },
                 )
+                setOnProgressUpdateListener { currentMs, totalMs ->
+                    _playerState.value =
+                        _playerState.value.copy(
+                            currentPosition = currentMs.toLong(),
+                            totalDuration = totalMs.toLong(),
+                        )
+                }
+                setOnCompletionListener {
+                    _playerState.value = _playerState.value.copy(isPlaying = false, currentPosition = 0)
+                }
             }
-            setOnCompletionListener {
-                _playerState.value = _playerState.value.copy(isPlaying = false, currentPosition = 0)
-            }
-        }
     }
 
     fun play() {
@@ -163,7 +171,7 @@ data class MainScreenState(
     val userId: String = "",
     val cookie: String = "",
     val isLoggedIn: Boolean = false,
-    val downloadedIds: Set<Long> = emptySet()
+    val downloadedIds: Set<Long> = emptySet(),
 )
 
 @SuppressLint("ContextCastToActivity")
@@ -188,7 +196,7 @@ fun MainScreen(
     onToggleSelection: (Music) -> Unit,
     onNavItemClick: (NavItem) -> Unit,
     onHeadImageClick: () -> Unit,
-    onDeselectDownloaded: () -> Unit
+    onDeselectDownloaded: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -222,43 +230,41 @@ fun MainScreen(
                 userId = state.userId,
                 isLoggedIn = state.isLoggedIn,
                 onHeadImageClick = onHeadImageClick,
-                onNavItemClick = onNavItemClick
+                onNavItemClick = onNavItemClick,
             )
-        }
+        },
     ) {
         Scaffold(
             topBar = {
-                Column {
-                    MainTopBar(
-                        isSearchMode = state.isSearchMode,
-                        isMultiSelectMode = state.isMultiSelectMode,
-                        inputText = state.inputText,
-                        selectedCount = state.selectedItems.size,
-                        onMenuClick = { scope.launch { drawerState.open() } },
-                        onSearchClick = onEnterSearchMode,
-                        onSearchTextChange = onSearchTextChange,
-                        onSearch = onSearch,
-                        onBackClick = {
-                            if (state.isMultiSelectMode) onExitMultiSelectMode()
-                            else if (state.isSearchMode) onExitSearchMode()
-                        },
-                        onSelectAll = onSelectAll,
-                        onInvertSelection = onInvertSelection,
-                        onDownloadSelected = onDownloadSelected
-                    )
-                    if (state.isMultiSelectMode) {
-                        DeselectDownloadedButton(
-                            enabled = state.selectedItems.any { it.id in state.downloadedIds },
-                            onClick = onDeselectDownloaded
-                        )
-                    }
-                }
-            }
+                MainTopBar(
+                    isSearchMode = state.isSearchMode,
+                    isMultiSelectMode = state.isMultiSelectMode,
+                    inputText = state.inputText,
+                    selectedCount = state.selectedItems.size,
+                    hasDownloadedSelection = state.selectedItems.any { it.id in state.downloadedIds },
+                    onDeselectDownloaded = onDeselectDownloaded,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onSearchClick = onEnterSearchMode,
+                    onSearchTextChange = onSearchTextChange,
+                    onSearch = onSearch,
+                    onBackClick = {
+                        if (state.isMultiSelectMode) {
+                            onExitMultiSelectMode()
+                        } else if (state.isSearchMode) {
+                            onExitSearchMode()
+                        }
+                    },
+                    onSelectAll = onSelectAll,
+                    onInvertSelection = onInvertSelection,
+                    onDownloadSelected = onDownloadSelected,
+                )
+            },
         ) { paddingValues ->
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
             ) {
                 if (state.searchMusicList.isEmpty() && !state.isRefreshing) {
                     // 空状态提示
@@ -266,7 +272,7 @@ fun MainScreen(
                         text = "搜点什么吧 ο(=•ω＜=)ρ⌒☆",
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     MusicList(
@@ -286,7 +292,7 @@ fun MainScreen(
                                 onMusicClick(music)
                             }
                         },
-                        onMusicLongClick = onMusicLongClick
+                        onMusicLongClick = onMusicLongClick,
                     )
                 }
             }
@@ -301,6 +307,8 @@ fun MainTopBar(
     isMultiSelectMode: Boolean,
     inputText: String,
     selectedCount: Int,
+    hasDownloadedSelection: Boolean,
+    onDeselectDownloaded: () -> Unit,
     onMenuClick: () -> Unit,
     onSearchClick: () -> Unit,
     onSearchTextChange: (String) -> Unit,
@@ -308,7 +316,7 @@ fun MainTopBar(
     onBackClick: () -> Unit,
     onSelectAll: () -> Unit,
     onInvertSelection: () -> Unit,
-    onDownloadSelected: () -> Unit
+    onDownloadSelected: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -321,48 +329,53 @@ fun MainTopBar(
         }
     }
 
-    val topBarState = when {
-        isMultiSelectMode -> TopBarState.MultiSelect
-        isSearchMode -> TopBarState.Search
-        else -> TopBarState.Normal
-    }
+    val topBarState =
+        when {
+            isMultiSelectMode -> TopBarState.MultiSelect
+            isSearchMode -> TopBarState.Search
+            else -> TopBarState.Normal
+        }
 
     AnimatedContent(
         targetState = topBarState,
         transitionSpec = {
             fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
         },
-        label = "TopBarState"
+        label = "TopBarState",
     ) { targetState ->
         when (targetState) {
             TopBarState.MultiSelect -> {
                 TopAppBar(
-                    title = { Text("已选 $selectedCount 项") },
+                    title = { Text("已选 $selectedCount 项", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = {
                         TooltipIconButton(
                             onClick = onBackClick,
                             imageVector = Icons.Default.Close,
-                            contentDescription = "关闭"
+                            contentDescription = "关闭",
                         )
                     },
                     actions = {
                         TooltipIconButton(
                             onClick = onSelectAll,
                             imageVector = Icons.Default.SelectAll,
-                            contentDescription = "全选"
+                            contentDescription = "全选",
                         )
                         TooltipIconButton(
                             onClick = onInvertSelection,
                             imageVector = Icons.Default.FlipToFront,
-                            contentDescription = "反选"
+                            contentDescription = "反选",
+                        )
+                        DeselectDownloadedButton(
+                            enabled = hasDownloadedSelection,
+                            onClick = onDeselectDownloaded,
                         )
                         TooltipIconButton(
                             onClick = onDownloadSelected,
                             imageVector = Icons.Default.Download,
                             contentDescription = "下载",
-                            enabled = selectedCount > 0
+                            enabled = selectedCount > 0,
                         )
-                    }
+                    },
                 )
             }
 
@@ -382,11 +395,12 @@ fun MainTopBar(
                                 textFieldValue = it
                                 onSearchTextChange(it.text)
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(end = 8.dp)
-                                .padding(vertical = 4.dp)
-                                .focusRequester(focusRequester),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(end = 8.dp)
+                                    .padding(vertical = 4.dp)
+                                    .focusRequester(focusRequester),
                             placeholder = { Text("搜索音乐") },
                             textStyle = MaterialTheme.typography.bodyLarge,
                             singleLine = true,
@@ -398,33 +412,35 @@ fun MainTopBar(
                                     TooltipIconButton(
                                         onClick = { onSearchTextChange("") },
                                         imageVector = Icons.Default.Close,
-                                        contentDescription = "清除"
+                                        contentDescription = "清除",
                                     )
                                 }
                             },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(
-                                onSearch = {
-                                    onSearch(inputText)
-                                    keyboardController?.hide()
-                                    focusManager.clearFocus()
-                                }
-                            ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                            ),
-                            shape = RoundedCornerShape(12.dp)
+                            keyboardActions =
+                                KeyboardActions(
+                                    onSearch = {
+                                        onSearch(inputText)
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
+                                    },
+                                ),
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                ),
+                            shape = RoundedCornerShape(12.dp),
                         )
                     },
                     navigationIcon = {
                         TooltipIconButton(
                             onClick = onBackClick,
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = "返回",
                         )
                     },
-                    actions = {}
+                    actions = {},
                 )
             }
 
@@ -435,16 +451,16 @@ fun MainTopBar(
                         TooltipIconButton(
                             onClick = onMenuClick,
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "打开侧边栏"
+                            contentDescription = "打开侧边栏",
                         )
                     },
                     actions = {
                         TooltipIconButton(
                             onClick = onSearchClick,
                             imageVector = Icons.Default.Search,
-                            contentDescription = "搜索"
+                            contentDescription = "搜索",
                         )
-                    }
+                    },
                 )
             }
         }
@@ -452,16 +468,22 @@ fun MainTopBar(
 }
 
 @Composable
-fun DeselectDownloadedButton(enabled: Boolean, onClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = onClick, enabled = enabled) {
-            Text("取消选择已下载")
-        }
-    }
+fun DeselectDownloadedButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TooltipIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        imageVector = Icons.Default.RemoveDone,
+        contentDescription = "取消选择已下载",
+    )
 }
 
 private enum class TopBarState {
-    Normal, Search, MultiSelect
+    Normal,
+    Search,
+    MultiSelect,
 }
 
 // 导航项枚举
@@ -472,7 +494,7 @@ enum class NavItem {
     DOWNLOAD_MANAGER,
     SETTINGS,
     SUPPORT,
-    LOG_OUT
+    LOG_OUT,
 }
 
 @Composable
@@ -481,19 +503,21 @@ fun DrawerContent(
     userId: String,
     isLoggedIn: Boolean,
     onHeadImageClick: () -> Unit,
-    onNavItemClick: (NavItem) -> Unit
+    onNavItemClick: (NavItem) -> Unit,
 ) {
     ModalDrawerSheet(
-        modifier = Modifier
-            .widthIn(min = 280.dp, max = 300.dp)
-            .windowInsetsPadding(WindowInsets.statusBars)
+        modifier =
+            Modifier
+                .widthIn(min = 280.dp, max = 300.dp)
+                .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         // Header
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(16.dp),
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             AsyncImage(
@@ -502,30 +526,33 @@ fun DrawerContent(
                 placeholder = painterResource(R.drawable.person_48px),
                 error = painterResource(R.drawable.person_48px),
                 fallback = painterResource(R.drawable.person_48px),
-                modifier = Modifier
-                    .size(76.dp)
-                    .clip(CircleShape)
-                    .clickable { onHeadImageClick() },
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(76.dp)
+                        .clip(CircleShape)
+                        .clickable { onHeadImageClick() },
+                contentScale = ContentScale.Crop,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = when {
-                    userInfo != null -> userInfo.name
-                    isLoggedIn -> "已登录"
-                    else -> "未登录"
-                },
+                text =
+                    when {
+                        userInfo != null -> userInfo.name
+                        isLoggedIn -> "已登录"
+                        else -> "未登录"
+                    },
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = when {
-                    userId.isNotEmpty() -> userId
-                    isLoggedIn -> "输入用户ID以获取头像昵称"
-                    else -> "点按头像以登录"
-                },
+                text =
+                    when {
+                        userId.isNotEmpty() -> userId
+                        isLoggedIn -> "输入用户ID以获取头像昵称"
+                        else -> "点按头像以登录"
+                    },
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.secondary,
             )
         }
 
@@ -536,36 +563,40 @@ fun DrawerContent(
             label = { Text("解析歌单", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.ADD_PLAYLIST) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.Album, contentDescription = null) },
             label = { Text("解析专辑", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.ADD_ALBUM) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.AutoMirrored.Outlined.QueueMusic, contentDescription = null) },
             label = { Text("我的歌单", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.MY_PLAYLISTS) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.Download, contentDescription = null) },
             label = { Text("下载管理", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.DOWNLOAD_MANAGER) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp))
@@ -575,27 +606,30 @@ fun DrawerContent(
             label = { Text("设置", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.SETTINGS) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.VolunteerActivism, contentDescription = null) },
             label = { Text("赞助作者", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.SUPPORT) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
         NavigationDrawerItem(
             icon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },
             label = { Text("退出登录", style = MaterialTheme.typography.labelLarge) },
             selected = false,
             onClick = { onNavItemClick(NavItem.LOG_OUT) },
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .height(48.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
         )
     }
 }
@@ -613,7 +647,7 @@ fun MusicList(
     onLoadMore: () -> Unit,
     onDownloadClick: (Music) -> Unit,
     onMusicClick: (Music) -> Unit,
-    onMusicLongClick: (Music) -> Unit
+    onMusicLongClick: (Music) -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -640,12 +674,12 @@ fun MusicList(
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(vertical = 8.dp),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             items(musicList, key = { it.id }) { music ->
                 MusicItem(
@@ -656,7 +690,7 @@ fun MusicList(
                     isSelected = selectedItems.contains(music),
                     onDownloadClick = { onDownloadClick(music) },
                     onClick = { onMusicClick(music) },
-                    onLongClick = { onMusicLongClick(music) }
+                    onLongClick = { onMusicLongClick(music) },
                 )
             }
         }
@@ -674,46 +708,51 @@ fun MusicItem(
     isSelected: Boolean,
     onDownloadClick: () -> Unit,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(12.dp)
 
     ElevatedCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .animateContentSize()
-            .clip(shape)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .animateContentSize()
+                .clip(shape)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                ),
         shape = shape,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        )
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (displayIndex != null) {
                 Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = displayIndex.toString(),
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             } else {
@@ -721,10 +760,11 @@ fun MusicItem(
                 AsyncImage(
                     model = music.album.picUrl,
                     contentDescription = "专辑封面",
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
                 )
             }
 
@@ -732,14 +772,14 @@ fun MusicItem(
 
             // 歌曲信息
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text(
                     text = music.name,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 val authors = music.artists.joinToString("/") { it.name }
                 val albumName = music.album.name
@@ -748,13 +788,13 @@ fun MusicItem(
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (isDownloaded) {
                     Text(
                         text = "已下载",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -763,13 +803,13 @@ fun MusicItem(
             AnimatedVisibility(
                 visible = !isMultiSelectMode,
                 enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally()
+                exit = fadeOut() + shrinkHorizontally(),
             ) {
                 IconButton(onClick = onDownloadClick) {
                     Icon(
                         Icons.Default.Download,
                         contentDescription = "下载",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -779,8 +819,9 @@ fun MusicItem(
 
 // 底部弹窗内容 - 用于选择音质并下载
 @OptIn(
-    ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
 )
 @Composable
 fun MusicBottomSheetContent(
@@ -791,7 +832,7 @@ fun MusicBottomSheetContent(
     onDownload: (Music, String) -> Unit,
     onLongClickText: (String) -> Unit,
     playerViewModel: MusicPlayerViewModel,
-    cookie: String
+    cookie: String,
 ) {
     val context = LocalContext.current
     val playerState by playerViewModel.playerState.collectAsState()
@@ -809,10 +850,11 @@ fun MusicBottomSheetContent(
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -820,16 +862,16 @@ fun MusicBottomSheetContent(
             AsyncImage(
                 model = music.album.picUrl,
                 contentDescription = "专辑封面",
-                modifier = Modifier
-                    .size(120.dp)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = RoundedCornerShape(16.dp),
-                        clip = true
-                    )
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { showCoverDialog = true },
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(120.dp)
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = RoundedCornerShape(16.dp),
+                            clip = true,
+                        ).background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { showCoverDialog = true },
+                contentScale = ContentScale.Crop,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -839,15 +881,16 @@ fun MusicBottomSheetContent(
                 text = music.name,
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .basicMarquee()
-                    .combinedClickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                        onLongClick = { onLongClickText(music.name) }
-                    ),
+                modifier =
+                    Modifier
+                        .padding(horizontal = 24.dp)
+                        .basicMarquee()
+                        .combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                            onLongClick = { onLongClickText(music.name) },
+                        ),
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -858,15 +901,16 @@ fun MusicBottomSheetContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .basicMarquee()
-                    .combinedClickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                        onLongClick = { onLongClickText(music.artists.joinToString("/") { it.name }) }
-                    )
+                modifier =
+                    Modifier
+                        .padding(horizontal = 24.dp)
+                        .basicMarquee()
+                        .combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                            onLongClick = { onLongClickText(music.artists.joinToString("/") { it.name }) },
+                        ),
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -876,15 +920,16 @@ fun MusicBottomSheetContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .basicMarquee()
-                    .combinedClickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                        onLongClick = { onLongClickText(music.album.name) }
-                    )
+                modifier =
+                    Modifier
+                        .padding(horizontal = 24.dp)
+                        .basicMarquee()
+                        .combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                            onLongClick = { onLongClickText(music.album.name) },
+                        ),
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -892,13 +937,14 @@ fun MusicBottomSheetContent(
             if (isPreviewEnabled) {
                 // 播放控制区域
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // 播放按钮
                         FilledIconButton(
@@ -909,7 +955,7 @@ fun MusicBottomSheetContent(
                                     playerViewModel.cacheMusic(
                                         music = music,
                                         parent = context.externalCacheDir!!,
-                                        cookie = cookie
+                                        cookie = cookie,
                                     ) { errorMessage ->
                                         scope.launch {
                                             snackbarHostState.showSnackbar(errorMessage)
@@ -917,19 +963,19 @@ fun MusicBottomSheetContent(
                                     }
                                 }
                             },
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(48.dp),
                         ) {
                             if (playerState.isBuffering) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
                                     color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.dp
+                                    strokeWidth = 2.dp,
                                 )
                             } else {
                                 Icon(
                                     imageVector = if (playerState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                     contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
                         }
@@ -945,44 +991,47 @@ fun MusicBottomSheetContent(
                             thumb = {
                                 SliderDefaults.Thumb(
                                     interactionSource = remember { MutableInteractionSource() },
-                                    thumbSize = DpSize(16.dp, 16.dp)
+                                    thumbSize = DpSize(16.dp, 16.dp),
                                 )
                             },
                             track = {
                                 SliderDefaults.Track(
                                     sliderState = it,
-                                    modifier = Modifier
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(3.dp)),
-                                    colors = SliderDefaults.colors(
-                                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
+                                    modifier =
+                                        Modifier
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
+                                    colors =
+                                        SliderDefaults.colors(
+                                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        ),
                                 )
-                            }
+                            },
                         )
                     }
 
                     Row(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         // 48.dp (按钮) + 12.dp (间距) = 60.dp，确保时间文本与 Slider 对齐
                         Spacer(modifier = Modifier.width(60.dp))
                         Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
                                 text = formatDuration(playerState.currentPosition),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = formatDuration(playerState.totalDuration),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -997,9 +1046,10 @@ fun MusicBottomSheetContent(
 
             // 音质选择
             FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             ) {
                 val levels = listOf("standard" to "标准", "exhigh" to "极高", "lossless" to "无损", "hires" to "Hi-Res")
@@ -1008,15 +1058,18 @@ fun MusicBottomSheetContent(
                         selected = selectedLevel == level,
                         onClick = { selectedLevel = level },
                         label = { Text(label) },
-                        leadingIcon = if (selectedLevel == level) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Filled.Done,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                )
-                            }
-                        } else null
+                        leadingIcon =
+                            if (selectedLevel == level) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Filled.Done,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                     )
                 }
             }
@@ -1025,10 +1078,11 @@ fun MusicBottomSheetContent(
 
             // 按钮行
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.End
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.End,
             ) {
                 OutlinedButton(onClick = onDismiss) {
                     Text("取消")
@@ -1047,22 +1101,24 @@ fun MusicBottomSheetContent(
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column {
                             AsyncImage(
                                 model = music.album.picUrl,
                                 contentDescription = "Cover",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f),
-                                contentScale = ContentScale.Crop
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f),
+                                contentScale = ContentScale.Crop,
                             )
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                horizontalArrangement = Arrangement.End
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                horizontalArrangement = Arrangement.End,
                             ) {
                                 TextButton(onClick = { showCoverDialog = false }) {
                                     Text("取消")
@@ -1086,7 +1142,7 @@ fun MusicBottomSheetContent(
 
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
@@ -1102,7 +1158,7 @@ private suspend fun saveCoverToDir(
     context: android.content.Context,
     url: String,
     fileName: String,
-    onShowSnackbar: (String) -> Unit
+    onShowSnackbar: (String) -> Unit,
 ) {
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
@@ -1134,13 +1190,12 @@ private suspend fun saveCoverToDir(
     }
 }
 
-private tailrec fun android.content.Context.findBaseActivity(): BaseActivity? {
-    return when (this) {
+private tailrec fun android.content.Context.findBaseActivity(): BaseActivity? =
+    when (this) {
         is BaseActivity -> this
         is android.content.ContextWrapper -> baseContext.findBaseActivity()
         else -> null
     }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1149,12 +1204,12 @@ fun TooltipIconButton(
     imageVector: ImageVector,
     contentDescription: String,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ) {
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text(contentDescription) } },
-        state = rememberTooltipState()
+        state = rememberTooltipState(),
     ) {
         IconButton(onClick = onClick, modifier = modifier, enabled = enabled) {
             Icon(imageVector, contentDescription = contentDescription)
