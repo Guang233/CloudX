@@ -18,7 +18,7 @@ val releaseVersion =
         ?.let { Regex("^[vV]?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)$").matchEntire(it) }
         ?.groupValues
         ?.get(1)
-val appVersion = releaseVersion ?: "1.5.2-${getGitCommitHash()}"
+val appVersion = releaseVersion ?: "1.6.0-${getGitCommitHash()}"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
 
