@@ -35,13 +35,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.SingletonImageLoader
 import com.guang.cloudx.BuildConfig
-import com.guang.cloudx.logic.repository.UpdateResult
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
-import com.guang.cloudx.logic.utils.toast
 import com.guang.cloudx.ui.ui.theme.SeedColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,6 +50,7 @@ import java.io.File
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
+    onCheckUpdate: () -> Unit,
     onThemeChanged: (String, String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
@@ -464,15 +462,12 @@ fun SettingsScreen(
             }
 
             item {
-                var isChecked by remember { mutableStateOf(false) }
                 val v = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
                 ActionListItem(
                     icon = Icons.Outlined.Apps,
                     title = "应用版本",
-                    description = v,
-                    onClick = {
-                        isChecked = true
-                    },
+                    description = "$v · 点击检查 GitHub 更新",
+                    onClick = onCheckUpdate,
                     onLongClick = {
                         scope.launch {
                             SystemUtils.copyToClipboard(context, "version", v)
@@ -480,15 +475,6 @@ fun SettingsScreen(
                     }
                 )
 
-                if (isChecked) {
-                    UpdateScreen(
-                        onEnd = { isChecked = false },
-                        showSnackbar = {
-                            scope.launch {
-                                snackbarHostState.showSnackbar(it)
-                            }
-                        })
-                }
             }
 
             item {
@@ -671,42 +657,4 @@ private fun tryResolveAbsolutePathFromTreeUri(treeUri: Uri): String? {
 
     // 其他情况无法解析
     return null
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun UpdateScreen(
-    viewModel: SettingsViewModel = viewModel(),
-    onEnd: () -> Unit,
-    showSnackbar: (String) -> Unit
-) {
-    val state by viewModel.updateState.collectAsState()
-
-    LaunchedEffect(Unit) {
-        viewModel.checkUpdate()
-    }
-
-    when (state) {
-        is UpdateResult.Loading -> {
-            showSnackbar("正在检测更新...")
-        }
-
-        is UpdateResult.Success -> {
-            val info = (state as UpdateResult.Success).data
-            if (BuildConfig.VERSION_CODE < info.build) {
-                val builder = CustomTabsIntent.Builder()
-                val customTabsIntent = builder.build()
-                "检测到新版本".toast(LocalContext.current)
-                customTabsIntent.launchUrl(LocalContext.current, info.download_url.toUri())
-            } else {
-                showSnackbar("已是最新版本")
-            }
-            onEnd.invoke()
-        }
-
-        is UpdateResult.Error -> {
-            showSnackbar((state as UpdateResult.Error).message)
-            onEnd.invoke()
-        }
-    }
 }

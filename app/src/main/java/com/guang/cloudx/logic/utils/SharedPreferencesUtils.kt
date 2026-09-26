@@ -53,6 +53,14 @@ class SharedPreferencesUtils(context: Context) {
     fun getThemeColor() = sharedPreferences.getString("theme_color", "跟随系统").toString()
     fun getDarkMode() = sharedPreferences.getString("dark_mode", "跟随系统").toString()
     fun getIsFirstLaunch() = sharedPreferences.getBoolean("is_first_launch", true)
+    fun getIgnoredUpdateTags(): Set<String> =
+        sharedPreferences.getStringSet("ignored_github_release_tags", emptySet()).orEmpty().toSet()
+
+    fun ignoreUpdateTag(tag: String) {
+        sharedPreferences.edit {
+            putStringSet("ignored_github_release_tags", getIgnoredUpdateTags() + tag)
+        }
+    }
 
     fun putMusicLevel(musicLevel: String) = sharedPreferences.edit { putString("music_level", musicLevel) }
     fun putIsAutoLevel(value: Boolean) = sharedPreferences.edit { putBoolean("auto_level", value) }

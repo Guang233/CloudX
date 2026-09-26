@@ -10,7 +10,12 @@ plugins {
     id("kotlin-kapt")
 }
 
-val appVersion = "1.5.2-${getGitCommitHash()}"
+// A tagged GitHub release must advertise the same version in its APK as in releases/latest.
+val releaseVersion = System.getenv("GITHUB_REF_NAME")
+    ?.takeIf { System.getenv("GITHUB_REF_TYPE") == "tag" }
+    ?.let { Regex("^[vV]?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)$").matchEntire(it) }
+    ?.groupValues?.get(1)
+val appVersion = releaseVersion ?: "1.5.2-${getGitCommitHash()}"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
 

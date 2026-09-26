@@ -42,15 +42,17 @@ import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.downloadedMusicIds
 import com.guang.cloudx.logic.model.withoutDownloaded
-import com.guang.cloudx.ui.downloadManager.rememberLocalMusicViewModel
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.toast
 import com.guang.cloudx.ui.Screen
 import com.guang.cloudx.ui.downloadManager.DownloadManagerScreen
+import com.guang.cloudx.ui.downloadManager.rememberLocalMusicViewModel
 import com.guang.cloudx.ui.login.LoginScreen
 import com.guang.cloudx.ui.myPlayLists.MyPlayListsScreen
 import com.guang.cloudx.ui.playList.PlayListScreen
 import com.guang.cloudx.ui.settings.SettingsScreen
+import com.guang.cloudx.ui.update.UpdateDialogHost
+import com.guang.cloudx.ui.update.UpdateViewModel
 import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import com.guang.cloudx.util.ext.e
 import kotlinx.coroutines.channels.Channel
@@ -62,19 +64,21 @@ import java.io.File
 class MainActivity : BaseActivity() {
     private val viewModel: MainViewModel by viewModels()
     private val playerViewModel: MusicPlayerViewModel by viewModels()
+    private val updateViewModel: UpdateViewModel by viewModels()
     private lateinit var userId: String
 
-    private val safLauncher = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            contentResolver.takePersistableUriPermission(uri, takeFlags)
+    private val safLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) {
+                val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                contentResolver.takePersistableUriPermission(uri, takeFlags)
 
-            prefs.putSafUri(uri.toString())
-            dir = DocumentFile.fromTreeUri(this, uri)
+                prefs.putSafUri(uri.toString())
+                dir = DocumentFile.fromTreeUri(this, uri)
 
-            prefs.putIsFirstLaunch(false)
+                prefs.putIsFirstLaunch(false)
+            }
         }
-    }
 
     // Compose 状态
     private val searchMusicList = mutableStateListOf<Music>()
@@ -91,18 +95,19 @@ class MainActivity : BaseActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
-                    Manifest.permission.POST_NOTIFICATIONS
+                    Manifest.permission.POST_NOTIFICATIONS,
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    1001
+                    1001,
                 )
             }
         }
 
         userId = prefs.getUserId()
+        updateViewModel.checkOnLaunch()
 
         // 首次打开应用且未设置下载目录时，自动启动SAF文件选择器
         if (prefs.getIsFirstLaunch() && prefs.getSafUri().isNullOrEmpty()) {
@@ -115,41 +120,43 @@ class MainActivity : BaseActivity() {
             var currentThemeColor by remember { mutableStateOf(prefs.getThemeColor()) }
             var currentDarkMode by remember { mutableStateOf(prefs.getDarkMode()) }
 
-            val isDark = when (currentDarkMode) {
-                "启用" -> true
-                "关闭" -> false
-                else -> isSystemInDarkTheme()
-            }
+            val isDark =
+                when (currentDarkMode) {
+                    "启用" -> true
+                    "关闭" -> false
+                    else -> isSystemInDarkTheme()
+                }
 
             CloudXTheme(
                 darkTheme = isDark,
-                themeColor = currentThemeColor
+                themeColor = currentThemeColor,
             ) {
                 val navController = rememberNavController()
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
                 ) {
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Home.route,
                         enterTransition = {
                             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
-                                    fadeIn(tween(300))
+                                fadeIn(tween(300))
                         },
                         exitTransition = {
                             slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(300)) +
-                                    fadeOut(tween(300))
+                                fadeOut(tween(300))
                         },
                         popEnterTransition = {
                             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
-                                    fadeIn(tween(300))
+                                fadeIn(tween(300))
                         },
                         popExitTransition = {
                             slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300)) +
-                                    fadeOut(tween(300))
-                        }
+                                fadeOut(tween(300))
+                        },
                     ) {
                         composable(Screen.Home.route) {
                             MainActivityContent(
@@ -159,7 +166,7 @@ class MainActivity : BaseActivity() {
                                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                                 onNavigateToPlaylist = { type, id ->
                                     navController.navigate(Screen.Playlist.createRoute(type, id))
-                                }
+                                },
                             )
                         }
                         composable(Screen.Login.route) {
@@ -169,25 +176,26 @@ class MainActivity : BaseActivity() {
                                     navController.popBackStack()
                                     userId = prefs.getUserId()
                                     initNavHeader()
-                                }
+                                },
                             )
                         }
                         composable(
                             route = Screen.DownloadManager.route,
-                            deepLinks = listOf(navDeepLink { uriPattern = "app://cloudx/download_manager" })
+                            deepLinks = listOf(navDeepLink { uriPattern = "app://cloudx/download_manager" }),
                         ) {
                             DownloadManagerScreen(
                                 onBackClick = { navController.popBackStack() },
-                                downloadDir = dir
+                                downloadDir = dir,
                             )
                         }
                         composable(Screen.Settings.route) {
                             SettingsScreen(
                                 onBackClick = { navController.popBackStack() },
+                                onCheckUpdate = updateViewModel::checkManually,
                                 onThemeChanged = { color, mode ->
                                     currentThemeColor = color
                                     currentDarkMode = mode
-                                }
+                                },
                             )
                         }
                         composable(Screen.MyPlayLists.route) {
@@ -195,15 +203,16 @@ class MainActivity : BaseActivity() {
                                 onBackClick = { navController.popBackStack() },
                                 onPlayListClick = { playList ->
                                     navController.navigate(Screen.Playlist.createRoute("playlist", playList.id.toString()))
-                                }
+                                },
                             )
                         }
                         composable(
                             route = Screen.Playlist.route,
-                            arguments = listOf(
-                                navArgument("type") { type = NavType.StringType },
-                                navArgument("id") { type = NavType.StringType }
-                            )
+                            arguments =
+                                listOf(
+                                    navArgument("type") { type = NavType.StringType },
+                                    navArgument("id") { type = NavType.StringType },
+                                ),
                         ) { backStackEntry ->
                             val type = backStackEntry.arguments?.getString("type") ?: ""
                             val id = backStackEntry.arguments?.getString("id") ?: ""
@@ -225,10 +234,11 @@ class MainActivity : BaseActivity() {
                                 onSaveLevel = { level ->
                                     prefs.putMusicLevel(level)
                                 },
-                                playerViewModel = playerViewModel
+                                playerViewModel = playerViewModel,
                             )
                         }
                     }
+                    UpdateDialogHost(updateViewModel)
                 }
             }
         }
@@ -282,7 +292,7 @@ class MainActivity : BaseActivity() {
         onNavigateToMyPlayLists: () -> Unit,
         onNavigateToDownloadManager: () -> Unit,
         onNavigateToSettings: () -> Unit,
-        onNavigateToPlaylist: (String, String) -> Unit
+        onNavigateToPlaylist: (String, String) -> Unit,
     ) {
         val scope = rememberCoroutineScope()
         val snackbarHostState = remember { SnackbarHostState() }
@@ -292,7 +302,7 @@ class MainActivity : BaseActivity() {
             snackbarChannel.receiveAsFlow().collect { message ->
                 snackbarHostState.showSnackbar(
                     message = message,
-                    duration = SnackbarDuration.Short
+                    duration = SnackbarDuration.Short,
                 )
             }
         }
@@ -324,25 +334,27 @@ class MainActivity : BaseActivity() {
         // 底部弹窗状态
         var showBottomSheet by remember { mutableStateOf(false) }
         var selectedMusic by remember { mutableStateOf<Music?>(null) }
-        val sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true
-        )
+        val sheetState =
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+            )
 
-        val state = MainScreenState(
-            searchMusicList = searchMusicList.toList(),
-            isSearchMode = isSearchMode,
-            isMultiSelectMode = isMultiSelectMode,
-            selectedItems = selectedItems,
-            inputText = inputText,
-            searchText = viewModel.searchText,
-            isRefreshing = isRefreshing,
-            isLastPage = isLastPage,
-            userInfo = userDetail?.getOrNull(),
-            userId = prefs.getUserId(),
-            cookie = prefs.getCookie(),
-            isLoggedIn = prefs.getCookie().isNotEmpty(),
-            downloadedIds = downloadedIds
-        )
+        val state =
+            MainScreenState(
+                searchMusicList = searchMusicList.toList(),
+                isSearchMode = isSearchMode,
+                isMultiSelectMode = isMultiSelectMode,
+                selectedItems = selectedItems,
+                inputText = inputText,
+                searchText = viewModel.searchText,
+                isRefreshing = isRefreshing,
+                isLastPage = isLastPage,
+                userInfo = userDetail?.getOrNull(),
+                userId = prefs.getUserId(),
+                cookie = prefs.getCookie(),
+                isLoggedIn = prefs.getCookie().isNotEmpty(),
+                downloadedIds = downloadedIds,
+            )
 
         Box(modifier = Modifier.fillMaxSize()) {
             MainScreen(
@@ -392,7 +404,7 @@ class MainActivity : BaseActivity() {
                             viewModel.searchText,
                             searchMusicList.size,
                             20,
-                            prefs.getCookie()
+                            prefs.getCookie(),
                         )
                     }
                 },
@@ -447,11 +459,12 @@ class MainActivity : BaseActivity() {
                     }
                 },
                 onToggleSelection = { music ->
-                    selectedItems = if (selectedItems.contains(music)) {
-                        selectedItems - music
-                    } else {
-                        selectedItems + music
-                    }
+                    selectedItems =
+                        if (selectedItems.contains(music)) {
+                            selectedItems - music
+                        } else {
+                            selectedItems + music
+                        }
                 },
                 onNavItemClick = { navItem ->
                     when (navItem) {
@@ -486,7 +499,7 @@ class MainActivity : BaseActivity() {
                 },
                 onHeadImageClick = {
                     onNavigateToLogin()
-                }
+                },
             )
 
             // 底部弹窗
@@ -496,7 +509,7 @@ class MainActivity : BaseActivity() {
                         showBottomSheet = false
                         selectedMusic = null
                     },
-                    sheetState = sheetState
+                    sheetState = sheetState,
                 ) {
                     MusicBottomSheetContent(
                         music = selectedMusic!!,
@@ -518,7 +531,7 @@ class MainActivity : BaseActivity() {
                         },
                         onLongClickText = { SystemUtils.copyToClipboard(context, "music", it) },
                         playerViewModel = playerViewModel,
-                        cookie = prefs.getCookie()
+                        cookie = prefs.getCookie(),
                     )
                 }
             }
@@ -528,17 +541,23 @@ class MainActivity : BaseActivity() {
                 PlaylistDialog(
                     onDismiss = { showPlaylistDialog = false },
                     onConfirm = { text ->
-                        val id = with(text) {
-                            if (this.matches(Regex("[0-9]+"))) this
-                            else """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(
-                                1
-                            )
-                                ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                        }
-                        if (id != null)
+                        val id =
+                            with(text) {
+                                if (this.matches(Regex("[0-9]+"))) {
+                                    this
+                                } else {
+                                    """music\.163\.com.*?playlist.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(
+                                        1,
+                                    )
+                                        ?: """music\.163\.com.*?playlist/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                }
+                            }
+                        if (id != null) {
                             onNavigateToPlaylist("playlist", id)
-                        else showSnackbar("请输入正确的歌单ID或链接")
-                    }
+                        } else {
+                            showSnackbar("请输入正确的歌单ID或链接")
+                        }
+                    },
                 )
             }
 
@@ -546,21 +565,27 @@ class MainActivity : BaseActivity() {
                 AlbumDialog(
                     onDismiss = { showAlbumDialog = false },
                     onConfirm = { text ->
-                        val id = with(text) {
-                            if (this.matches(Regex("[0-9]+"))) this
-                            else """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                                ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
-                        }
-                        if (id != null)
+                        val id =
+                            with(text) {
+                                if (this.matches(Regex("[0-9]+"))) {
+                                    this
+                                } else {
+                                    """music\.163\.com.*?album.*?[?&]id=(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                        ?: """music\.163\.com.*?album/(\d+)""".toRegex().find(this)?.groupValues?.get(1)
+                                }
+                            }
+                        if (id != null) {
                             onNavigateToPlaylist("album", id)
-                        else showSnackbar("请输入正确的专辑ID或链接")
-                    }
+                        } else {
+                            showSnackbar("请输入正确的专辑ID或链接")
+                        }
+                    },
                 )
             }
 
             if (showSupportDialog) {
                 SupportDialog(
-                    onDismiss = { showSupportDialog = false }
+                    onDismiss = { showSupportDialog = false },
                 )
             }
 
@@ -584,15 +609,16 @@ class MainActivity : BaseActivity() {
                         showSnackbar("已退出登录")
                         userId = ""
                         initNavHeader()
-                    }
+                    },
                 )
             }
 
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .imePadding()
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .imePadding(),
             )
         }
     }
@@ -633,9 +659,8 @@ class MainActivity : BaseActivity() {
     private fun startDownloadMusicWrapper(
         music: Music? = null,
         musics: List<Music> = emptyList(),
-        level: String = prefs.getMusicLevel()
+        level: String = prefs.getMusicLevel(),
     ) {
         startDownloadMusic(level, musics, music) { showSnackbar(it) }
     }
-
 }
