@@ -57,7 +57,7 @@ data class MusicDownloadRules(
     val fileName: String,
     val delimiter: String,
     val encoding: String,
-    val concurrentDownloads: Int = 1,
+    val concurrentDownloads: Int = DownloadConcurrency.DEFAULT_PARTS,
     val convertM4aToMp3: Boolean = false,
     val fileConflictStrategy: String = "覆盖",
 )
@@ -66,6 +66,7 @@ enum class DownloadStage {
     PREPARING,
     DOWNLOADING,
     PROCESSING,
+    WAITING_TRANSCODE,
     TRANSCODING,
     WRITING_TAGS,
     SAVING,

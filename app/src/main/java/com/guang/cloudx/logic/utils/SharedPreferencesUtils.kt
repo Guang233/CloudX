@@ -7,6 +7,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.core.content.edit
+import com.guang.cloudx.logic.model.DownloadConcurrency
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -18,6 +19,7 @@ class SharedPreferencesUtils(
     context: Context,
 ) {
     companion object {
+        const val SIMULTANEOUS_SONGS_KEY = "simultaneous_songs"
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
         private const val COOKIE_KEY_ALIAS = "CloudX.Cookie"
         private const val COOKIE_KEY = "cookie"
@@ -63,7 +65,13 @@ class SharedPreferencesUtils(
 
     fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
 
-    fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", 4).coerceIn(1, 8)
+    fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", DownloadConcurrency.DEFAULT_PARTS).coerceIn(1, DownloadConcurrency.MAX_PARTS)
+
+    fun getSimultaneousSongs() = sharedPreferences.getInt(SIMULTANEOUS_SONGS_KEY, DownloadConcurrency.DEFAULT_SONGS).coerceIn(1, DownloadConcurrency.MAX_SONGS)
+
+    fun putSimultaneousSongs(value: Int) = sharedPreferences.edit {
+        putInt(SIMULTANEOUS_SONGS_KEY, value.coerceIn(1, DownloadConcurrency.MAX_SONGS))
+    }
 
     fun getIsConvertM4aToMp3() = sharedPreferences.getBoolean("is_convert_m4a_to_mp3", false)
 
@@ -119,7 +127,7 @@ class SharedPreferencesUtils(
 
     fun putIsPreviewMusic(value: Boolean) = sharedPreferences.edit { putBoolean("is_preview_music", value) }
 
-    fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value.coerceIn(1, 8)) }
+    fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value.coerceIn(1, DownloadConcurrency.MAX_PARTS)) }
 
     fun putIsConvertM4aToMp3(value: Boolean) = sharedPreferences.edit { putBoolean("is_convert_m4a_to_mp3", value) }
 

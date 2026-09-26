@@ -15,6 +15,7 @@ import com.guang.cloudx.logic.utils.Mp3Transcoder
 import com.guang.cloudx.logic.utils.clearDownloadArtifacts
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -98,6 +99,8 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
     }
 
     private companion object {
+        // Bound native encoder memory and avoid sharing encoder state between simultaneous songs.
+        val transcodeMutex = Mutex()
         const val BUFFER_SIZE = 64 * 1024
         const val MAX_CONCURRENT_PARTS = 8
         const val MIN_PARALLEL_DOWNLOAD_BYTES = 4L * 1024 * 1024
@@ -273,9 +276,13 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 if (rules.convertM4aToMp3 && ext == "m4a") {
                     val tmpMp3 = File(processingDir, "transcoded.mp3")
                     outputAudioFile = tmpMp3
-                    onProgress(music, 0, DownloadStage.TRANSCODING)
-                    Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
-                        onProgress(music, progress, DownloadStage.TRANSCODING)
+                    onProgress(music, 0, DownloadStage.WAITING_TRANSCODE)
+                    transcodeMutex.withLock {
+                        currentCoroutineContext().ensureActive()
+                        onProgress(music, 0, DownloadStage.TRANSCODING)
+                        Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
+                            onProgress(music, progress, DownloadStage.TRANSCODING)
+                        }
                     }
                     downloadedAudioFile.delete()
                     finalAudioFile = tmpMp3

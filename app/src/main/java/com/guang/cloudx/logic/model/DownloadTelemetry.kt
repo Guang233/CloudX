@@ -90,6 +90,7 @@ fun DownloadStage.displayName(): String =
         DownloadStage.PREPARING -> "正在获取下载信息"
         DownloadStage.DOWNLOADING -> "正在下载"
         DownloadStage.PROCESSING -> "正在检查音频"
+        DownloadStage.WAITING_TRANSCODE -> "等待转码"
         DownloadStage.TRANSCODING -> "正在转码"
         DownloadStage.WRITING_TAGS -> "正在写入标签"
         DownloadStage.SAVING -> "正在保存文件"

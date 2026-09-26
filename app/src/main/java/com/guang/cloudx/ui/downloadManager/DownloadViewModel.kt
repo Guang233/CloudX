@@ -102,7 +102,7 @@ class DownloadViewModel(
                             ),
                         )
                     }
-                if (ids.isNotEmpty()) sendCommand(context, DownloadService.ACTION_RESUME, ids)
+                if (ids.isNotEmpty()) sendCommand(context, DownloadService.ACTION_ENQUEUE, ids)
             }
         }
     }

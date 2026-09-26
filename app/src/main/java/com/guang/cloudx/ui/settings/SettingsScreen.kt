@@ -192,12 +192,24 @@ fun SettingsScreen(
             item {
                 MenuListItem(
                     icon = Icons.Outlined.Sync,
-                    title = "并发下载数",
+                    title = "单曲分块并发数",
+                    description = "一首歌同时使用的下载连接数；仅支持分块的资源生效，未设置时默认 2。",
                     options = listOf("1", "2", "3", "4", "6", "8"),
                     selectedOption = prefs.getConcurrentDownloads().toString(),
                     onOptionSelected = {
                         prefs.putConcurrentDownloads(it.toInt())
                     },
+                )
+            }
+
+            item {
+                MenuListItem(
+                    icon = Icons.Outlined.QueueMusic,
+                    title = "同时下载歌曲数",
+                    description = "同时执行的歌曲任务数，默认 2；调低不会中断正在执行的任务。",
+                    options = listOf("1", "2", "3", "4"),
+                    selectedOption = prefs.getSimultaneousSongs().toString(),
+                    onOptionSelected = { prefs.putSimultaneousSongs(it.toInt()) },
                 )
             }
 
@@ -590,6 +602,7 @@ fun MenuListItem(
     title: String,
     options: List<String>,
     selectedOption: String,
+    description: String? = null,
     onOptionSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -608,7 +621,12 @@ fun MenuListItem(
             )
         },
         headlineContent = { Text(title) },
-        supportingContent = { Text(currentOption) },
+        supportingContent = {
+            Column {
+                Text(currentOption)
+                description?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+        },
         trailingContent = {
             Box {
                 DropdownMenu(
