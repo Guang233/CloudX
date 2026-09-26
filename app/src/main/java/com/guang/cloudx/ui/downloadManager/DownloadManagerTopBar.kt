@@ -13,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextOverflow
 import com.guang.cloudx.ui.home.TooltipIconButton
 
-/** Uses the same selection header transition, close affordance and colours as the song list. */
+/** Switch selection controls without changing the download screen's original bar colours. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadManagerTopBar(
@@ -38,10 +38,7 @@ fun DownloadManagerTopBar(
                 )
             },
             actions = { actions(selecting) },
-            colors =
-                TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (selecting) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surface,
-                ),
+            colors = TopAppBarDefaults.topAppBarColors(),
         )
     }
 }

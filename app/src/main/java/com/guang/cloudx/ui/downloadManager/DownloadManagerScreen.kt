@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -27,8 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
@@ -89,7 +88,10 @@ fun DownloadManagerScreen(
                 selectionMode = selectionMode,
                 selectedCount = selectedIds.size,
                 onBack = onBackClick,
-                onCloseSelection = { selectionMode = false; selectedIds = emptySet() },
+                onCloseSelection = {
+                    selectionMode = false
+                    selectedIds = emptySet()
+                },
                 actions = { selecting ->
                     if (pagerState.currentPage == 0) {
                         DownloadTaskActions(
@@ -451,13 +453,12 @@ fun DownloadingItem(
         label = "ProgressAnimation",
     )
 
-    ElevatedCard(
+    Surface(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp)
-                .animateContentSize()
-                .clip(RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .clip(RoundedCornerShape(16.dp))
                 .semantics { if (selectionMode) selected = isSelected }
                 .combinedClickable(
                     onClick = {
@@ -474,10 +475,8 @@ fun DownloadingItem(
                     },
                     onLongClick = onLongClick,
                 ),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = if (selectionMode && isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        ),
+        shape = RoundedCornerShape(16.dp),
+        color = if (selectionMode && isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
     ) {
         Row(
             modifier =
@@ -492,8 +491,8 @@ fun DownloadingItem(
                 contentDescription = null,
                 modifier =
                     Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp)),
                 contentScale = ContentScale.Crop,
             )
 
@@ -564,11 +563,8 @@ fun DownloadingItem(
                 }
             }
 
-            AnimatedVisibility(
-                visible = !selectionMode && item.status.canCancel(),
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally(),
-            ) {
+            if (!selectionMode && item.status.canCancel()) {
+                Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier.size(40.dp),
