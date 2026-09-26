@@ -193,7 +193,7 @@ fun SettingsScreen(
                 MenuListItem(
                     icon = Icons.Outlined.Sync,
                     title = "单曲分块并发数",
-                    description = "一首歌同时使用的下载连接数；仅支持分块的资源生效，未设置时默认 2。",
+                    description = "一首歌同时使用的下载连接数",
                     options = listOf("1", "2", "3", "4", "6", "8"),
                     selectedOption = prefs.getConcurrentDownloads().toString(),
                     onOptionSelected = {
@@ -206,7 +206,7 @@ fun SettingsScreen(
                 MenuListItem(
                     icon = Icons.Outlined.QueueMusic,
                     title = "同时下载歌曲数",
-                    description = "同时执行的歌曲任务数，默认 2；调低不会中断正在执行的任务。",
+                    description = "同时执行的歌曲任务数",
                     options = listOf("1", "2", "3", "4"),
                     selectedOption = prefs.getSimultaneousSongs().toString(),
                     onOptionSelected = { prefs.putSimultaneousSongs(it.toInt()) },

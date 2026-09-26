@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -15,7 +16,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
@@ -83,33 +85,20 @@ fun DownloadManagerScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = { Text(if (selectionMode) "已选 ${selectedIds.size} 项" else "下载管理") },
-                navigationIcon = {
-                    TooltipIconButton(
-                        onClick = {
-                            if (selectionMode) {
-                                selectionMode = false
-                                selectedIds = emptySet()
-                            } else {
-                                onBackClick()
-                            }
-                        },
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回",
-                    )
-                },
-                actions = {
+            DownloadManagerTopBar(
+                selectionMode = selectionMode,
+                selectedCount = selectedIds.size,
+                onBack = onBackClick,
+                onCloseSelection = { selectionMode = false; selectedIds = emptySet() },
+                actions = { selecting ->
                     if (pagerState.currentPage == 0) {
                         DownloadTaskActions(
                             tasks = downloadingList,
-                            selectionMode = selectionMode,
+                            selectionMode = selecting,
                             selectedIds = selectedIds,
                             onSelect = { selectionMode = true },
-                            onSelectAll = {
-                                selectedIds =
-                                    if (selectedIds.size == downloadingList.size) emptySet() else downloadingList.map { it.id }.toSet()
-                            },
+                            onSelectAll = { selectedIds = downloadingList.map { it.id }.toSet() },
+                            onInvertSelection = { selectedIds = downloadingList.map { it.id }.toSet() - selectedIds },
                             onPause = { viewModel.pauseTasks(context, it) },
                             onContinue = { viewModel.resumeTasks(context, it) },
                             onCancel = { cancelIds = it },
@@ -435,7 +424,7 @@ fun DownloadingList(
                     onPause = { viewModel.pauseDownload(context, item) },
                     onResumeDownload = { viewModel.resumeDownload(context, item) },
                     onDelete = { onCancel(item.id) },
-                    onLongClick = { onToggleSelection(item.id) },
+                    onLongClick = { if (!selectionMode) onToggleSelection(item.id) },
                 )
             }
         }
@@ -462,12 +451,14 @@ fun DownloadingItem(
         label = "ProgressAnimation",
     )
 
-    Surface(
+    ElevatedCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .animateContentSize()
+                .clip(RoundedCornerShape(12.dp))
+                .semantics { if (selectionMode) selected = isSelected }
                 .combinedClickable(
                     onClick = {
                         if (selectionMode) {
@@ -483,8 +474,10 @@ fun DownloadingItem(
                     },
                     onLongClick = onLongClick,
                 ),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.Transparent,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (selectionMode && isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        ),
     ) {
         Row(
             modifier =
@@ -499,13 +492,10 @@ fun DownloadingItem(
                 contentDescription = null,
                 modifier =
                     Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(12.dp)),
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop,
             )
-            if (selectionMode) {
-                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
-            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -574,8 +564,11 @@ fun DownloadingItem(
                 }
             }
 
-            if (!selectionMode && item.status.canCancel()) {
-                Spacer(modifier = Modifier.width(8.dp))
+            AnimatedVisibility(
+                visible = !selectionMode && item.status.canCancel(),
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally(),
+            ) {
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier.size(40.dp),
