@@ -33,7 +33,9 @@ object DownloadedFileMetadataReader {
                     context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                         if (cursor.extras.getBoolean(DocumentsContract.EXTRA_LOADING, false) ||
                             !cursor.extras.getString(DocumentsContract.EXTRA_ERROR).isNullOrBlank()
-                        ) return@withContext DownloadedFileMetadata(FileAccess.UNAVAILABLE)
+                        ) {
+                            return@withContext DownloadedFileMetadata(FileAccess.UNAVAILABLE)
+                        }
                         if (!cursor.moveToFirst()) return@withContext DownloadedFileMetadata(FileAccess.MISSING)
                         DownloadedFileMetadata(
                             access = FileAccess.AVAILABLE,
@@ -49,11 +51,12 @@ object DownloadedFileMetadataReader {
                     return@withContext DownloadedFileMetadata(FileAccess.UNAVAILABLE)
                 }
             ensureActive()
-            val retriever = try {
-                MediaMetadataRetriever()
-            } catch (_: Exception) {
-                return@withContext file
-            }
+            val retriever =
+                try {
+                    MediaMetadataRetriever()
+                } catch (_: Exception) {
+                    return@withContext file
+                }
             try {
                 retriever.setDataSource(context, uri)
                 ensureActive()

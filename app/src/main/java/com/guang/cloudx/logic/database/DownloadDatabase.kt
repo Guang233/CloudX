@@ -71,7 +71,11 @@ interface DownloadDao {
     suspend fun findById(id: Long): DownloadInfo?
 
     @Query("UPDATE DownloadInfo SET status = :status, failureReason = :reason WHERE id = :id AND status != 'COMPLETED'")
-    suspend fun setUnfinishedStatus(id: Long, status: TaskStatus, reason: String? = null)
+    suspend fun setUnfinishedStatus(
+        id: Long,
+        status: TaskStatus,
+        reason: String? = null,
+    )
 
     @Query("UPDATE DownloadInfo SET status = 'PAUSING', failureReason = NULL WHERE id IN (:ids) AND status IN ('DOWNLOADING', 'QUEUED')")
     suspend fun markPausingChunk(ids: List<Long>)

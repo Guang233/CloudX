@@ -11,14 +11,16 @@ plugins {
 }
 
 // A tagged GitHub release must advertise the same version in its APK as in releases/latest.
-val releaseVersion = System.getenv("GITHUB_REF_NAME")
-    ?.takeIf { System.getenv("GITHUB_REF_TYPE") == "tag" }
-    ?.let { Regex("^[vV]?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)$").matchEntire(it) }
-    ?.groupValues?.get(1)
+val releaseVersion =
+    System
+        .getenv("GITHUB_REF_NAME")
+        ?.takeIf { System.getenv("GITHUB_REF_TYPE") == "tag" }
+        ?.let { Regex("^[vV]?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)$").matchEntire(it) }
+        ?.groupValues
+        ?.get(1)
 val appVersion = releaseVersion ?: "1.5.2-${getGitCommitHash()}"
 val currentBuildUuid = UUID.randomUUID().toString()
 val currentBuildTimestamp = System.currentTimeMillis()
-
 
 android {
     namespace = "com.guang.cloudx"
@@ -127,11 +129,11 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
-
-fun getGitCommitCount(): Int {
-    return try {
+fun getGitCommitCount(): Int =
+    try {
         val stdout = ByteArrayOutputStream()
-        @Suppress("DEPRECATION") exec {
+        @Suppress("DEPRECATION")
+        exec {
             commandLine("git", "rev-list", "--count", "HEAD")
             standardOutput = stdout
         }
@@ -139,10 +141,9 @@ fun getGitCommitCount(): Int {
     } catch (e: Exception) {
         8
     }
-}
 
-fun getGitCommitHash(): String {
-    return try {
+fun getGitCommitHash(): String =
+    try {
         val stdout = ByteArrayOutputStream()
         exec {
             commandLine("git", "rev-parse", "--short", "HEAD")
@@ -152,6 +153,8 @@ fun getGitCommitHash(): String {
     } catch (e: Exception) {
         "unknown"
     }
-}
 
-val adb: String = androidComponents.sdkComponents.adb.get().asFile.absolutePath
+val adb: String =
+    androidComponents.sdkComponents.adb
+        .get()
+        .asFile.absolutePath

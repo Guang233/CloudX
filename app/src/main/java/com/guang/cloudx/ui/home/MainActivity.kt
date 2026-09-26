@@ -51,9 +51,9 @@ import com.guang.cloudx.ui.login.LoginScreen
 import com.guang.cloudx.ui.myPlayLists.MyPlayListsScreen
 import com.guang.cloudx.ui.playList.PlayListScreen
 import com.guang.cloudx.ui.settings.SettingsScreen
+import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import com.guang.cloudx.ui.update.UpdateDialogHost
 import com.guang.cloudx.ui.update.UpdateViewModel
-import com.guang.cloudx.ui.ui.theme.CloudXTheme
 import com.guang.cloudx.util.ext.e
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest

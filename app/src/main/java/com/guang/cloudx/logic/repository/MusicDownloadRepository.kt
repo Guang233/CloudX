@@ -551,21 +551,30 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
     }
 
     /** Cancel the underlying socket as well as the coroutine, including blocking stream reads. */
-    private suspend fun <T> withDownloadResponse(request: Request, block: (okhttp3.Response) -> T): T = coroutineScope {
-        ensureActive()
-        val call = downloadClient.newCall(request)
-        val cancellation = launch(start = CoroutineStart.UNDISPATCHED) {
-            try { awaitCancellation() } finally { call.cancel() }
+    private suspend fun <T> withDownloadResponse(
+        request: Request,
+        block: (okhttp3.Response) -> T,
+    ): T =
+        coroutineScope {
+            ensureActive()
+            val call = downloadClient.newCall(request)
+            val cancellation =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        call.cancel()
+                    }
+                }
+            try {
+                call.execute().use(block)
+            } catch (e: Exception) {
+                ensureActive() // Socket closure caused by cancellation is not a download failure.
+                throw e
+            } finally {
+                cancellation.cancel()
+            }
         }
-        try {
-            call.execute().use(block)
-        } catch (e: Exception) {
-            ensureActive() // Socket closure caused by cancellation is not a download failure.
-            throw e
-        } finally {
-            cancellation.cancel()
-        }
-    }
 
     private suspend fun downloadChunk(
         url: String,

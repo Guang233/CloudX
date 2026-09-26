@@ -143,11 +143,13 @@ class DownloadService : Service() {
                         val rules =
                             Gson().fromJson(info.rulesJson, MusicDownloadRules::class.java)
                                 ?: error("任务缺少下载参数，请重新下载")
-                        val target = targets.getOrPut(info.targetUri) {
-                            DocumentFile.fromTreeUri(this@DownloadService, info.targetUri.toUri())
-                                ?.takeIf { it.isDirectory && it.canWrite() }
-                                ?: error("目标文件夹不可用，请重新授权后继续")
-                        }
+                        val target =
+                            targets.getOrPut(info.targetUri) {
+                                DocumentFile
+                                    .fromTreeUri(this@DownloadService, info.targetUri.toUri())
+                                    ?.takeIf { it.isDirectory && it.canWrite() }
+                                    ?: error("目标文件夹不可用，请重新授权后继续")
+                            }
                         Task(info, rules, target)
                     }
                 dao.setUnfinishedStatus(id, TaskStatus.QUEUED)
@@ -220,7 +222,11 @@ class DownloadService : Service() {
                                     dao.updateProgress(id, value.stageProgress ?: 0, TaskStatus.DOWNLOADING)
                                     notifications.notify(
                                         1,
-                                        notification(task.info.music.name, value.stage.displayName() + "\n" + transferSummary(value, true), value.stageProgress),
+                                        notification(
+                                            task.info.music.name,
+                                            value.stage.displayName() + "\n" + transferSummary(value, true),
+                                            value.stageProgress,
+                                        ),
                                     )
                                     delay(500)
                                 }

@@ -63,7 +63,7 @@ fun transferSummary(
                     it >= 60 -> "${it / 60}分${it % 60}秒"
                     else -> "${it}秒"
                 }
-            "网络下载预计剩余 $duration"
+            "剩余 $duration"
         } ?: "剩余时间未知"
     return "$size\n$speed · $eta"
 }

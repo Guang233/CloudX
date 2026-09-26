@@ -19,7 +19,7 @@ data class PlayListUiState(
     val isMultiSelectMode: Boolean = false,
     val selectedItems: Set<Music> = emptySet(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )
 
 class PlayListViewModel : ViewModel() {
@@ -30,7 +30,11 @@ class PlayListViewModel : ViewModel() {
     private var currentCookie: String = ""
     private var currentType: String = ""
 
-    fun getPlayList(id: String, cookie: String, type: String) {
+    fun getPlayList(
+        id: String,
+        cookie: String,
+        type: String,
+    ) {
         currentId = id
         currentCookie = cookie
         currentType = type
@@ -38,11 +42,12 @@ class PlayListViewModel : ViewModel() {
         _uiState.update { it.copy(isLoading = true, isRefreshing = true) }
 
         viewModelScope.launch {
-            val liveData = if (type == "playlist") {
-                Repository.getPlayList(id, cookie)
-            } else {
-                Repository.getAlbum(id, cookie)
-            }
+            val liveData =
+                if (type == "playlist") {
+                    Repository.getPlayList(id, cookie)
+                } else {
+                    Repository.getAlbum(id, cookie)
+                }
 
             // Convert LiveData to Flow or collect it
             liveData.asFlow().collect { result ->
@@ -54,7 +59,7 @@ class PlayListViewModel : ViewModel() {
                             musicList = playList.musics,
                             isLoading = false,
                             isRefreshing = false,
-                            error = null
+                            error = null,
                         )
                     }
                 } else {
@@ -62,7 +67,7 @@ class PlayListViewModel : ViewModel() {
                         it.copy(
                             isLoading = false,
                             isRefreshing = false,
-                            error = "获取失败"
+                            error = "获取失败",
                         )
                     }
                 }
@@ -86,11 +91,12 @@ class PlayListViewModel : ViewModel() {
 
     fun toggleSelection(music: Music) {
         _uiState.update { state ->
-            val newSelection = if (state.selectedItems.contains(music)) {
-                state.selectedItems - music
-            } else {
-                state.selectedItems + music
-            }
+            val newSelection =
+                if (state.selectedItems.contains(music)) {
+                    state.selectedItems - music
+                } else {
+                    state.selectedItems + music
+                }
             state.copy(selectedItems = newSelection)
         }
     }

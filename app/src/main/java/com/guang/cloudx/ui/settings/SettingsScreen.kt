@@ -51,7 +51,7 @@ import java.io.File
 fun SettingsScreen(
     onBackClick: () -> Unit,
     onCheckUpdate: () -> Unit,
-    onThemeChanged: (String, String) -> Unit = { _, _ -> }
+    onThemeChanged: (String, String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val prefs = remember { SharedPreferencesUtils(context) }
@@ -75,24 +75,25 @@ fun SettingsScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null
+                            contentDescription = null,
                         )
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
+            modifier =
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
         ) {
             item {
                 Text(
                     "应用",
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -106,7 +107,7 @@ fun SettingsScreen(
                     onOptionSelected = {
                         prefs.putThemeColor(it)
                         onThemeChanged(it, prefs.getDarkMode())
-                    }
+                    },
                 )
             }
 
@@ -119,7 +120,7 @@ fun SettingsScreen(
                     onOptionSelected = {
                         prefs.putDarkMode(it)
                         onThemeChanged(prefs.getThemeColor(), it)
-                    }
+                    },
                 )
             }
 
@@ -132,7 +133,7 @@ fun SettingsScreen(
                     onCheckedChange = {
                         previewMusicEnabled = it
                         prefs.putIsPreviewMusic(previewMusicEnabled)
-                    }
+                    },
                 )
             }
 
@@ -141,7 +142,7 @@ fun SettingsScreen(
                     "下载",
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -154,18 +155,19 @@ fun SettingsScreen(
                     }
                 }
 
-                val launcher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocumentTree()
-                ) { uri ->
-                    if (uri != null) {
-                        val takeFlags =
-                            (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                        context.contentResolver.takePersistableUriPermission(uri, takeFlags)
+                val launcher =
+                    rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocumentTree(),
+                    ) { uri ->
+                        if (uri != null) {
+                            val takeFlags =
+                                (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                            context.contentResolver.takePersistableUriPermission(uri, takeFlags)
 
-                        prefs.putSafUri(uri.toString())
-                        pickedUri = uri
+                            prefs.putSafUri(uri.toString())
+                            pickedUri = uri
+                        }
                     }
-                }
 
                 val path = pickedUri?.let { tryResolveAbsolutePathFromTreeUri(it) } ?: "未选择"
                 ActionListItem(
@@ -180,10 +182,10 @@ fun SettingsScreen(
                             SystemUtils.copyToClipboard(
                                 context,
                                 "downloadPath",
-                                path
+                                path,
                             )
                         }
-                    }
+                    },
                 )
             }
 
@@ -195,7 +197,7 @@ fun SettingsScreen(
                     selectedOption = prefs.getConcurrentDownloads().toString(),
                     onOptionSelected = {
                         prefs.putConcurrentDownloads(it.toInt())
-                    }
+                    },
                 )
             }
 
@@ -205,7 +207,7 @@ fun SettingsScreen(
                     title = "同名文件处理",
                     options = listOf("覆盖", "自动重命名", "跳过"),
                     selectedOption = prefs.getFileConflictStrategy(),
-                    onOptionSelected = { prefs.putFileConflictStrategy(it) }
+                    onOptionSelected = { prefs.putFileConflictStrategy(it) },
                 )
             }
 
@@ -218,7 +220,7 @@ fun SettingsScreen(
                     onCheckedChange = { checked ->
                         convertM4aToMp3Enabled = checked
                         prefs.putIsConvertM4aToMp3(checked)
-                    }
+                    },
                 )
             }
 
@@ -231,7 +233,7 @@ fun SettingsScreen(
                     onCheckedChange = { checked ->
                         lrcEnabled = checked
                         prefs.putIsSaveLrc(checked)
-                    }
+                    },
                 )
             }
 
@@ -252,7 +254,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.TextFields,
                     description = "同上，日语歌词将保存罗马音",
                     title = "保存歌词罗马音",
-                    checked = romaLrcEnabled
+                    checked = romaLrcEnabled,
                 ) {
                     romaLrcEnabled = it
                     prefs.putIsSaveRomaLrc(it)
@@ -264,7 +266,7 @@ fun SettingsScreen(
                     Icons.Outlined.Subtitles,
                     title = "保存逐字歌词",
                     description = "尝试保存并转换为lrc格式(如果有)",
-                    checked = yrcEnabled
+                    checked = yrcEnabled,
                 ) {
                     yrcEnabled = it
                     prefs.putIsSaveYrc(it)
@@ -276,29 +278,34 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Equalizer,
                     title = "默认下载音质",
                     options = listOf("标准", "极高", "无损", "Hi-Res", "上次选择"),
-                    selectedOption = if (prefs.getIsAutoLevel())
-                        "上次选择"
-                    else when (prefs.getMusicLevel()) {
-                        "standard" -> "标准"
-                        "exhigh" -> "极高"
-                        "lossless" -> "无损"
-                        "hires" -> "Hi-Res"
-                        else -> "标准"
-                    },
+                    selectedOption =
+                        if (prefs.getIsAutoLevel()) {
+                            "上次选择"
+                        } else {
+                            when (prefs.getMusicLevel()) {
+                                "standard" -> "标准"
+                                "exhigh" -> "极高"
+                                "lossless" -> "无损"
+                                "hires" -> "Hi-Res"
+                                else -> "标准"
+                            }
+                        },
                     onOptionSelected = { selectedOption ->
                         if (selectedOption != "上次选择") {
-                            val level = when (selectedOption) {
-                                "标准" -> "standard"
-                                "极高" -> "exhigh"
-                                "无损" -> "lossless"
-                                "Hi-Res" -> "hires"
-                                else -> "exhigh"
-                            }
+                            val level =
+                                when (selectedOption) {
+                                    "标准" -> "standard"
+                                    "极高" -> "exhigh"
+                                    "无损" -> "lossless"
+                                    "Hi-Res" -> "hires"
+                                    else -> "exhigh"
+                                }
                             prefs.putIsAutoLevel(false)
                             prefs.putMusicLevel(level)
-                        } else
+                        } else {
                             prefs.putIsAutoLevel(true)
-                    }
+                        }
+                    },
                 )
             }
 
@@ -306,44 +313,47 @@ fun SettingsScreen(
                 var openFileNameDialog by remember { mutableStateOf(false) }
 
                 var isFileNameFocused by remember { mutableStateOf(false) }
-                val variableList = listOf(
-                    "\${name}" to "歌曲名称",
-                    "\${id}" to "歌曲id",
-                    "\${album}" to "专辑名称",
-                    "\${albumId}" to "专辑id",
-                    "\${artists}" to "艺术家",
-                    "\${level}" to "实际下载音质 (格式为 [音质] ，若为标准音质则为空)"
-                )
+                val variableList =
+                    listOf(
+                        "\${name}" to "歌曲名称",
+                        "\${id}" to "歌曲id",
+                        "\${album}" to "专辑名称",
+                        "\${albumId}" to "专辑id",
+                        "\${artists}" to "艺术家",
+                        "\${level}" to "实际下载音质 (格式为 [音质] ，若为标准音质则为空)",
+                    )
 
                 // 用 AnnotatedString 构建带点击区域的 Text
-                val annotatedText = buildAnnotatedString {
-                    append("命名规则可用变量：\n")
+                val annotatedText =
+                    buildAnnotatedString {
+                        append("命名规则可用变量：\n")
 
-                    variableList.forEachIndexed { index, (code, desc) ->
-                        val start = length
-                        append(code)
-                        val end = length
-                        addStyle(
-                            style = SpanStyle(
-                                color = MaterialTheme.colorScheme.primary,
-                                textDecoration = TextDecoration.Underline,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            start = start,
-                            end = end
-                        )
-                        addStringAnnotation(
-                            tag = "VAR",
-                            annotation = code,
-                            start = start,
-                            end = end
-                        )
-                        append(" $desc")
-                        if (index != variableList.lastIndex) append("\n")
+                        variableList.forEachIndexed { index, (code, desc) ->
+                            val start = length
+                            append(code)
+                            val end = length
+                            addStyle(
+                                style =
+                                    SpanStyle(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textDecoration = TextDecoration.Underline,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                start = start,
+                                end = end,
+                            )
+                            addStringAnnotation(
+                                tag = "VAR",
+                                annotation = code,
+                                start = start,
+                                end = end,
+                            )
+                            append(" $desc")
+                            if (index != variableList.lastIndex) append("\n")
+                        }
+
+                        append("\n\n艺术家分隔符：\n若有多个艺术家则在多个艺术家间添加分隔符 (同时在写入的 ID3 标签中生效)")
                     }
-
-                    append("\n\n艺术家分隔符：\n若有多个艺术家则在多个艺术家间添加分隔符 (同时在写入的 ID3 标签中生效)")
-                }
 
                 ActionListItem(
                     icon = Icons.Outlined.Edit,
@@ -351,7 +361,7 @@ fun SettingsScreen(
                     description = "修改下载的歌曲文件名命名规则",
                     onClick = {
                         openFileNameDialog = true
-                    }
+                    },
                 )
 
                 if (openFileNameDialog) {
@@ -366,48 +376,56 @@ fun SettingsScreen(
                                     label = { Text("文件命名规则") },
                                     value = fileName,
                                     onValueChange = { fileName = it },
-                                    keyboardOptions = KeyboardOptions(
-                                        imeAction = ImeAction.Next
-                                    ),
-                                    modifier = Modifier
-                                        .onFocusChanged { focusState ->
-                                            isFileNameFocused = focusState.isFocused
-                                        }
+                                    keyboardOptions =
+                                        KeyboardOptions(
+                                            imeAction = ImeAction.Next,
+                                        ),
+                                    modifier =
+                                        Modifier
+                                            .onFocusChanged { focusState ->
+                                                isFileNameFocused = focusState.isFocused
+                                            },
                                 )
                                 OutlinedTextField(
                                     label = { Text("艺术家分隔符") },
                                     value = delimiter,
                                     onValueChange = { delimiter = it },
-                                    keyboardOptions = KeyboardOptions(
-                                        imeAction = ImeAction.Done
-                                    )
+                                    keyboardOptions =
+                                        KeyboardOptions(
+                                            imeAction = ImeAction.Done,
+                                        ),
                                 )
                                 Spacer(Modifier.height(12.dp))
 
                                 ClickableText(
                                     text = annotatedText,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    ),
+                                    style =
+                                        MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        ),
                                     onClick = { offset ->
-                                        annotatedText.getStringAnnotations(
-                                            tag = "VAR",
-                                            start = offset,
-                                            end = offset
-                                        ).firstOrNull()?.let { annotation ->
-                                            if (isFileNameFocused) {
-                                                val code = annotation.item
-                                                val cursor = fileName.selection.start
-                                                val newText = fileName.text.substring(0, cursor) +
-                                                        code +
-                                                        fileName.text.substring(cursor)
-                                                fileName = fileName.copy(
-                                                    text = newText,
-                                                    selection = TextRange(cursor + code.length)
-                                                )
+                                        annotatedText
+                                            .getStringAnnotations(
+                                                tag = "VAR",
+                                                start = offset,
+                                                end = offset,
+                                            ).firstOrNull()
+                                            ?.let { annotation ->
+                                                if (isFileNameFocused) {
+                                                    val code = annotation.item
+                                                    val cursor = fileName.selection.start
+                                                    val newText =
+                                                        fileName.text.substring(0, cursor) +
+                                                            code +
+                                                            fileName.text.substring(cursor)
+                                                    fileName =
+                                                        fileName.copy(
+                                                            text = newText,
+                                                            selection = TextRange(cursor + code.length),
+                                                        )
+                                                }
                                             }
-                                        }
-                                    }
+                                    },
                                 )
                             }
                         },
@@ -420,18 +438,18 @@ fun SettingsScreen(
                                     scope.launch {
                                         snackbarHostState.showSnackbar("已保存")
                                     }
-                                }
+                                },
                             ) {
                                 Text("保存")
                             }
                         },
                         dismissButton = {
                             TextButton(
-                                onClick = { openFileNameDialog = false }
+                                onClick = { openFileNameDialog = false },
                             ) {
                                 Text("取消")
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -440,15 +458,24 @@ fun SettingsScreen(
                 MenuListItem(
                     icon = Icons.Outlined.Code,
                     title = "保存歌词文件编码",
-                    options = listOf(
-                        "UTF-8", "UTF-8-BOM", "UTF-16", "UTF-16LE", "UTF-16BE",
-                        "GB2312", "GBK", "GB18030",
-                        "Big5", "Big5-HKSCS",
-                        "ISO-8859-1", "Windows-1252",
-                        "ASCII"
-                    ),
+                    options =
+                        listOf(
+                            "UTF-8",
+                            "UTF-8-BOM",
+                            "UTF-16",
+                            "UTF-16LE",
+                            "UTF-16BE",
+                            "GB2312",
+                            "GBK",
+                            "GB18030",
+                            "Big5",
+                            "Big5-HKSCS",
+                            "ISO-8859-1",
+                            "Windows-1252",
+                            "ASCII",
+                        ),
                     selectedOption = prefs.getLrcEncoding()!!,
-                    onOptionSelected = { prefs.putLrcEncoding(it) }
+                    onOptionSelected = { prefs.putLrcEncoding(it) },
                 )
             }
 
@@ -457,7 +484,7 @@ fun SettingsScreen(
                     "关于",
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(16.dp, 6.dp, 16.dp, 6.dp),
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -466,15 +493,14 @@ fun SettingsScreen(
                 ActionListItem(
                     icon = Icons.Outlined.Apps,
                     title = "应用版本",
-                    description = "$v · 点击检查 GitHub 更新",
+                    description = "$v | 点击检查更新",
                     onClick = onCheckUpdate,
                     onLongClick = {
                         scope.launch {
                             SystemUtils.copyToClipboard(context, "version", v)
                         }
-                    }
+                    },
                 )
-
             }
 
             item {
@@ -492,7 +518,7 @@ fun SettingsScreen(
                         scope.launch {
                             SystemUtils.copyToClipboard(context, "github", url)
                         }
-                    }
+                    },
                 )
             }
 
@@ -507,7 +533,8 @@ fun SettingsScreen(
                             SingletonImageLoader.get(context).diskCache?.clear()
                             SingletonImageLoader.get(context).memoryCache?.clear()
 
-                            context.externalCacheDir?.listFiles()
+                            context.externalCacheDir
+                                ?.listFiles()
                                 ?.filterNot { it.name == "download_temp" }
                                 ?.forEach { it.deleteRecursively() }
 
@@ -515,7 +542,7 @@ fun SettingsScreen(
                                 snackbarHostState.showSnackbar("已清理")
                             }
                         }
-                    }
+                    },
                 )
             }
         }
@@ -528,17 +555,17 @@ fun SwitchListItem(
     title: String,
     description: String? = null,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
 ) {
-
     ListItem(
         leadingContent = {
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(28.dp)
-                    .wrapContentSize(align = Alignment.Center)
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .wrapContentSize(align = Alignment.Center),
             )
         },
         headlineContent = { Text(title) },
@@ -546,13 +573,14 @@ fun SwitchListItem(
         trailingContent = {
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
             )
         },
-        modifier = Modifier
-            .clickable {
-                onCheckedChange(!checked)
-            }
+        modifier =
+            Modifier
+                .clickable {
+                    onCheckedChange(!checked)
+                },
     )
 }
 
@@ -562,7 +590,7 @@ fun MenuListItem(
     title: String,
     options: List<String>,
     selectedOption: String,
-    onOptionSelected: (String) -> Unit
+    onOptionSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var currentOption by remember { mutableStateOf(selectedOption) }
@@ -573,9 +601,10 @@ fun MenuListItem(
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(28.dp)
-                    .wrapContentSize(align = Alignment.Center)
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .wrapContentSize(align = Alignment.Center),
             )
         },
         headlineContent = { Text(title) },
@@ -584,7 +613,7 @@ fun MenuListItem(
             Box {
                 DropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
                 ) {
                     options.forEach { option ->
                         DropdownMenuItem(
@@ -594,17 +623,19 @@ fun MenuListItem(
                                 currentOption = option
                                 expanded = false
                             },
-                            modifier = Modifier.background(
-                                if (option == currentOption)
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                else
-                                    Color.Transparent
-                            )
+                            modifier =
+                                Modifier.background(
+                                    if (option == currentOption) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                ),
                         )
                     }
                 }
             }
-        }
+        },
     )
 }
 
@@ -615,22 +646,24 @@ fun ActionListItem(
     title: String,
     description: String? = null,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
 ) {
     ListItem(
         leadingContent = {
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(28.dp)
-                    .wrapContentSize(align = Alignment.Center)
+                modifier =
+                    Modifier
+                        .size(28.dp)
+                        .wrapContentSize(align = Alignment.Center),
             )
         },
         headlineContent = { Text(title) },
         supportingContent = description?.let { { Text(it) } },
-        modifier = Modifier
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        modifier =
+            Modifier
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     )
 }
 

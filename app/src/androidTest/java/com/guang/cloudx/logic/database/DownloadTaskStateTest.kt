@@ -52,16 +52,18 @@ class DownloadTaskStateTest {
             assertEquals("content://test/saved", completed.savedFileUri)
         }
 
-    @Test fun largeBatchesStayWithinSqliteVariableLimits() = runBlocking {
-        val dao = db.downloadDao()
-        val ids = (1..1005).map {
-            dao.insert(DownloadInfo(music = music, progress = 0, status = TaskStatus.QUEUED, timeStamp = 0))
+    @Test fun largeBatchesStayWithinSqliteVariableLimits() =
+        runBlocking {
+            val dao = db.downloadDao()
+            val ids =
+                (1..1005).map {
+                    dao.insert(DownloadInfo(music = music, progress = 0, status = TaskStatus.QUEUED, timeStamp = 0))
+                }
+            dao.markPausing(ids)
+            assertEquals(1005, dao.getDownloadsByStatus(TaskStatus.PAUSING).size)
+            dao.markCancelling(ids)
+            assertEquals(1005, dao.getDownloadsByStatus(TaskStatus.CANCELLING).size)
         }
-        dao.markPausing(ids)
-        assertEquals(1005, dao.getDownloadsByStatus(TaskStatus.PAUSING).size)
-        dao.markCancelling(ids)
-        assertEquals(1005, dao.getDownloadsByStatus(TaskStatus.CANCELLING).size)
-    }
 
     @Test fun cancelDeletesOnlyUnfinishedRecordsAndKeepsLocalIndex() =
         runBlocking {
