@@ -22,6 +22,7 @@ data class MusicDownloadRules(
 )
 
 enum class DownloadStage {
+    PREPARING,
     DOWNLOADING,
     PROCESSING,
     TRANSCODING,

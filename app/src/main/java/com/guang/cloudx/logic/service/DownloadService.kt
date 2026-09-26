@@ -2,355 +2,292 @@ package com.guang.cloudx.logic.service
 
 import android.app.*
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.IBinder
-import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.database.AppDatabase
-import com.guang.cloudx.logic.model.DownloadStage
-import com.guang.cloudx.logic.model.Music
-import com.guang.cloudx.logic.model.MusicDownloadRules
+import com.guang.cloudx.logic.database.DownloadInfo
+import com.guang.cloudx.logic.model.*
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
+import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.ui.downloadManager.TaskStatus
+import com.guang.cloudx.ui.downloadManager.transferSummary
 import kotlinx.coroutines.*
-import java.util.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
+/** Commands and scheduling have one owner. A stopped worker is joined before its files are removed. */
 class DownloadService : Service() {
-    private data class DownloadTask(
-        val music: Music,
-        val dbId: Long,
-        val rules: MusicDownloadRules,
-        val level: String,
-        val cookie: String,
-        val targetDir: DocumentFile
+    private data class Command(
+        val action: String,
+        val ids: List<Long>,
+        val generation: Long = 0,
     )
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private data class Task(
+        val info: DownloadInfo,
+        val rules: MusicDownloadRules,
+        val target: DocumentFile,
+    )
+
+    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private val commands = Channel<Command>(Channel.UNLIMITED)
+    private val queue = DownloadQueueState<Task>()
+    private var worker: Job? = null
+    private var lastStartId = 0
     private val repository = MusicDownloadRepository()
-    private lateinit var notificationManager: NotificationManager
-    private val downloadDao by lazy { AppDatabase.getDatabase(this).downloadDao() }
-
-
-    private val queueLock = Any()
-    private val downloadQueue = LinkedList<DownloadTask>()
-    private var isDownloading = false
-    private var totalCompleted = 0
-    private var currentTask: DownloadTask? = null
-    private var activeDownloadJob: Job? = null
-    private val progressMap = mutableMapOf<Long, Int>()
-    private val progressUpdateAtMap = mutableMapOf<Long, Long>()
-    private val stageMap = mutableMapOf<Long, DownloadStage>()
-    private val pauseRequestedIds = mutableSetOf<Long>()
+    private val dao by lazy { AppDatabase.getDatabase(this).downloadDao() }
+    private lateinit var notifications: NotificationManager
 
     companion object {
         const val ACTION_PAUSE = "com.guang.cloudx.action.PAUSE_DOWNLOAD"
+        const val ACTION_RESUME = "com.guang.cloudx.action.RESUME_DOWNLOAD"
+        const val ACTION_CANCEL = "com.guang.cloudx.action.CANCEL_DOWNLOAD"
+        const val ACTION_RECOVER = "com.guang.cloudx.action.RECOVER_DOWNLOAD"
+        private const val ACTION_FINISHED = "worker_finished"
         const val EXTRA_DB_ID = "dbId"
+        const val EXTRA_DB_IDS = "dbIds"
         const val BROADCAST_PROGRESS = "DOWNLOAD_PROGRESS"
         const val BROADCAST_COMPLETED = "DOWNLOAD_COMPLETED"
         const val BROADCAST_FAILED = "DOWNLOAD_FAILED"
         const val BROADCAST_FINISHED = "DOWNLOAD_FINISHED"
         const val BROADCAST_PAUSED = "DOWNLOAD_PAUSED"
 
-        var isRunning = false
+        @Volatile var isRunning = false
+            private set
+        private val measurements = MutableStateFlow<Map<Long, DownloadTelemetry>>(emptyMap())
+        val telemetry = measurements.asStateFlow()
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun onCreate() {
         super.onCreate()
         isRunning = true
-        createNotificationChannel()
-        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        startForeground(1, buildNotification("正在准备下载…", "", 0))
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_PAUSE) {
-            val dbId = intent.getLongExtra(EXTRA_DB_ID, 0L)
-            if (dbId != 0L) pauseDownload(dbId)
-            return START_STICKY
-        }
-
-        val musicsJson = intent?.getStringExtra("musicsJson") ?: return START_NOT_STICKY
-        val rulesJson = intent.getStringExtra("rulesJson") ?: return START_NOT_STICKY
-        val musicIdToDbIdMapJson = intent.getStringExtra("musicIdToDbIdMapJson") ?: return START_NOT_STICKY
-
-        val musics = Gson().fromJson<List<Music>>(musicsJson, object : TypeToken<List<Music>>() {}.type)
-        val rules = Gson().fromJson(rulesJson, MusicDownloadRules::class.java)
-        val musicIdToDbIdMap =
-            Gson().fromJson<Map<Long, Long>>(musicIdToDbIdMapJson, object : TypeToken<Map<Long, Long>>() {}.type)
-        val cookie = intent.getStringExtra("cookie") ?: ""
-        val level = intent.getStringExtra("level") ?: "standard"
-        val uri = intent.getParcelableExtra<Uri>("targetUri") ?: return START_NOT_STICKY
-        val targetDir = DocumentFile.fromTreeUri(this, uri) ?: return START_NOT_STICKY
-
-        updateNotification("正在准备下载…", "", 0)
-
-        synchronized(queueLock) {
-            musics.forEach { music ->
-                val dbId = musicIdToDbIdMap[music.id]
-                if (dbId != null) {
-                    if (downloadQueue.none { it.dbId == dbId }) {
-                        val task = DownloadTask(
-                            music = music,
-                            dbId = dbId,
-                            rules = rules,
-                            level = level,
-                            cookie = cookie,
-                            targetDir = targetDir
-                        )
-                        downloadQueue.add(task)
-                        progressMap.putIfAbsent(dbId, 0)
-                    }
-                }
-            }
-        }
-
-
-        if (!isDownloading) {
-            isDownloading = true
-            scope.launch {
-
-                while (isActive) {
-                    val task = synchronized(queueLock) { downloadQueue.poll() }
-
-                    // 如果队列为空则检查是否应退出
-                    if (task == null) {
-                        if (synchronized(queueLock) { downloadQueue.isEmpty() }) {
-                            sendBroadcast(
-                                Intent(BROADCAST_FINISHED)
-                                    .setPackage(packageName)
-                                    .putExtra("totalCompleted", totalCompleted)
-                            )
-                            stopForeground(STOP_FOREGROUND_REMOVE)
-                            stopSelf()
-                            isDownloading = false
-                            break
-                        } else {
-                            delay(200)
-                            continue
-                        }
-                    }
-
-                    synchronized(queueLock) {
-                        currentTask = task
-                    }
-
-                    var downloadJob: Job? = null
-                    var completedFile: MusicDownloadRepository.SavedAudio? = null
-                    try {
-                        supervisorScope {
-                            val job = async {
-                                repository.downloadMusic(
-                                    this@DownloadService,
-                                    task.rules,
-                                    task.music,
-                                    task.level,
-                                    task.cookie,
-                                    task.targetDir
-                                ) { _, progress, stage ->
-                                    val previousProgress = progressMap[task.dbId] ?: -1
-                                    val previousStage = stageMap[task.dbId]
-                                    val now = SystemClock.elapsedRealtime()
-                                    val lastUpdateAt = progressUpdateAtMap[task.dbId] ?: 0L
-                                    val shouldPublishProgress = progress == 100 ||
-                                            progress != previousProgress && now - lastUpdateAt >= 400 ||
-                                            stage != previousStage
-
-                                    progressMap[task.dbId] = progress
-                                    stageMap[task.dbId] = stage
-
-                                    if (shouldPublishProgress) {
-                                        scope.launch {
-                                            downloadDao.updateProgress(task.dbId, progress, TaskStatus.DOWNLOADING)
-                                        }
-                                        progressUpdateAtMap[task.dbId] = now
-                                        val avgProgress =
-                                            if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
-                                        updateNotification(
-                                            "音乐下载中... ($totalCompleted/${totalCompleted + downloadQueue.size + 1})",
-                                            "${stage.toDisplayText()} ${task.music.name} ($progress%)",
-                                            avgProgress
-                                        )
-
-                                        sendBroadcast(
-                                            Intent(BROADCAST_PROGRESS)
-                                                .setPackage(packageName)
-                                                .apply {
-                                                    putExtra(EXTRA_DB_ID, task.dbId)
-                                                    putExtra("progress", progress)
-                                                }
-                                        )
-                                    }
-                                }
-                            }
-                            downloadJob = job
-                            var shouldCancelImmediately = false
-                            synchronized(queueLock) {
-                                activeDownloadJob = job
-                                shouldCancelImmediately = pauseRequestedIds.contains(task.dbId)
-                            }
-                            if (shouldCancelImmediately) {
-                                job.cancel(CancellationException("下载已暂停"))
-                            }
-                            completedFile = job.await()
-                        }
-
-                        downloadDao.complete(task.dbId, completedFile?.fileName, completedFile?.uri)
-                        totalCompleted++
-                        progressUpdateAtMap.remove(task.dbId)
-                        stageMap.remove(task.dbId)
-
-                        sendBroadcast(
-                            Intent(BROADCAST_COMPLETED)
-                                .setPackage(packageName)
-                                .apply {
-                                    putExtra(EXTRA_DB_ID, task.dbId)
-                                    putExtra("fileName", completedFile?.fileName)
-                                    putExtra("fileUri", completedFile?.uri)
-                                }
-                        )
-
-                    } catch (e: CancellationException) {
-                        val wasPaused = synchronized(queueLock) {
-                            pauseRequestedIds.remove(task.dbId)
-                        }
-                        if (wasPaused) {
-                            progressUpdateAtMap.remove(task.dbId)
-                            stageMap.remove(task.dbId)
-                            progressMap.remove(task.dbId)
-                            sendPausedBroadcast(task.dbId)
-                        } else {
-                            throw e
-                        }
-                    } catch (e: Exception) {
-                        downloadDao.setStatus(task.dbId, TaskStatus.FAILED, classifyFailure(e))
-                        progressUpdateAtMap.remove(task.dbId)
-                        stageMap.remove(task.dbId)
-                        sendBroadcast(
-                            Intent(BROADCAST_FAILED)
-                                .setPackage(packageName)
-                                .apply {
-                                    putExtra(EXTRA_DB_ID, task.dbId)
-                                    putExtra("reason", classifyFailure(e))
-                                }
-                        )
-                    } finally {
-                        synchronized(queueLock) {
-                            if (currentTask?.dbId == task.dbId) currentTask = null
-                            if (activeDownloadJob == downloadJob) activeDownloadJob = null
-                        }
-                    }
-                }
-            }
-        }
-
-        return START_STICKY
-    }
-
-    private fun pauseDownload(dbId: Long) {
-        var removedQueuedTask = false
-        var jobToCancel: Job? = null
-
-        synchronized(queueLock) {
-            val iterator = downloadQueue.iterator()
-            while (iterator.hasNext()) {
-                if (iterator.next().dbId == dbId) {
-                    iterator.remove()
-                    removedQueuedTask = true
-                    break
-                }
-            }
-
-            if (removedQueuedTask) {
-                progressMap.remove(dbId)
-                progressUpdateAtMap.remove(dbId)
-                stageMap.remove(dbId)
-            } else if (currentTask?.dbId == dbId) {
-                pauseRequestedIds.add(dbId)
-                jobToCancel = activeDownloadJob
-            }
-        }
-
-        if (removedQueuedTask) {
-            sendPausedBroadcast(dbId)
-        } else {
-            jobToCancel?.cancel(CancellationException("下载已暂停"))
-        }
-    }
-
-    private fun sendPausedBroadcast(dbId: Long) {
-        // The pause command is persisted before dispatch; a late write here could undo a resume.
-        sendBroadcast(
-            Intent(BROADCAST_PAUSED)
-                .setPackage(packageName)
-                .putExtra(EXTRA_DB_ID, dbId)
-        )
-    }
-
-    private fun classifyFailure(error: Throwable): String {
-        val message = error.localizedMessage?.takeIf { it.isNotBlank() } ?: "未知错误"
-        val text = message.lowercase()
-        return when {
-            error is SecurityException || text.contains("permission") || text.contains("权限") ->
-                "权限错误：$message"
-            text.contains("http error") || text.contains("timeout") || text.contains("网络") ->
-                "网络错误：$message"
-            text.contains("暂无可用下载地址") || text.contains("未返回下载信息") ->
-                "资源不可用：$message"
-            text.contains("tag") || text.contains("frame") || text.contains("metadata") ->
-                "标签写入错误：$message"
-            text.contains("format") || text.contains("音频") || text.contains("文件大小") ->
-                "文件格式错误：$message"
-            text.contains("range") || text.contains("分块") || text.contains("续传") ->
-                "断点下载错误：$message"
-            else -> message
-        }
-    }
-
-
-    private fun createNotificationChannel() {
-        val channelId = "download_channel"
+        notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            val channel = NotificationChannel(channelId, "音乐下载", NotificationManager.IMPORTANCE_LOW)
-            manager.createNotificationChannel(channel)
+            notifications.createNotificationChannel(NotificationChannel("download_channel", "音乐下载", NotificationManager.IMPORTANCE_LOW))
+        }
+        startForeground(1, notification("正在准备下载…", "", null))
+        scope.launch {
+            for (command in commands) {
+                when (command.action) {
+                    ACTION_FINISHED -> {
+                        if (queue.finish(command.generation)) worker = null
+                    }
+
+                    ACTION_PAUSE, ACTION_CANCEL -> {
+                        stopTasks(command.ids, command.action == ACTION_CANCEL)
+                    }
+
+                    ACTION_RECOVER -> {
+                        recover()
+                    }
+
+                    ACTION_RESUME -> {
+                        enqueue(command.ids)
+                    }
+                }
+                if (commands.isEmpty) startNext()
+                // A start received while a DAO call suspends is already in the channel.
+                if (queue.isIdle && commands.isEmpty) {
+                    sendBroadcast(Intent(BROADCAST_FINISHED).setPackage(packageName))
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelfResult(lastStartId)
+                }
+            }
         }
     }
 
-    private fun buildNotification(title: String, content: String, progress: Int): Notification {
-        val intent = Intent(Intent.ACTION_VIEW, "app://cloudx/download_manager".toUri()).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
+        lastStartId = startId
+        startForeground(1, notification("正在管理下载任务…", "", null))
+        val ids =
+            intent?.getLongArrayExtra(EXTRA_DB_IDS)?.toList()
+                ?: listOfNotNull(intent?.getLongExtra(EXTRA_DB_ID, 0)?.takeIf { it > 0 })
+        commands.trySend(Command(intent?.action ?: ACTION_RECOVER, ids.distinct()))
+        return START_NOT_STICKY
+    }
+
+    private suspend fun recover() {
+        val resumable = mutableListOf<Long>()
+        for (task in dao.getAllDownloads()) {
+            when (task.status) {
+                TaskStatus.CANCELLING -> stopTasks(listOf(task.id), true)
+                TaskStatus.PAUSING -> stopTasks(listOf(task.id), false)
+                TaskStatus.QUEUED, TaskStatus.DOWNLOADING -> resumable += task.id
+                else -> Unit // A manually paused task must never auto-resume.
+            }
         }
-        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
-        return NotificationCompat.Builder(this, "download_channel")
+        enqueue(resumable)
+    }
+
+    private suspend fun enqueue(ids: List<Long>) {
+        val targets = mutableMapOf<String, DocumentFile>()
+        for (id in ids) {
+            if (queue.contains(id)) continue
+            val info = dao.findById(id) ?: continue
+            if (info.status == TaskStatus.COMPLETED || info.status == TaskStatus.CANCELLING) continue
+            try {
+                val task =
+                    withContext(Dispatchers.IO) {
+                        val rules =
+                            Gson().fromJson(info.rulesJson, MusicDownloadRules::class.java)
+                                ?: error("任务缺少下载参数，请重新下载")
+                        val target = targets.getOrPut(info.targetUri) {
+                            DocumentFile.fromTreeUri(this@DownloadService, info.targetUri.toUri())
+                                ?.takeIf { it.isDirectory && it.canWrite() }
+                                ?: error("目标文件夹不可用，请重新授权后继续")
+                        }
+                        Task(info, rules, target)
+                    }
+                dao.setUnfinishedStatus(id, TaskStatus.QUEUED)
+                measurements.update { it - id }
+                queue.enqueue(id, task)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                dao.setUnfinishedStatus(id, TaskStatus.FAILED, e.localizedMessage ?: "无法恢复下载")
+            }
+        }
+    }
+
+    private suspend fun stopTasks(
+        ids: List<Long>,
+        cancel: Boolean,
+    ) {
+        // Remove the entire batch before the next task is allowed to start.
+        queue.removeQueued(ids)
+        // Persist the whole batch before waiting for I/O, so process death cannot restart paused tasks.
+        if (cancel) dao.markCancelling(ids) else dao.markPausing(ids)
+        for (id in ids) {
+            val info = dao.findById(id) ?: continue
+            if (info.status == TaskStatus.COMPLETED) continue
+            if (!cancel && info.status !in setOf(TaskStatus.QUEUED, TaskStatus.DOWNLOADING, TaskStatus.PAUSING)) continue
+            dao.setUnfinishedStatus(id, if (cancel) TaskStatus.CANCELLING else TaskStatus.PAUSING)
+            queue.active?.takeIf { it.id == id }?.let { active ->
+                worker?.cancelAndJoin()
+                queue.finish(active.generation)
+                worker = null
+            }
+            // A short, non-cancellable SAF commit may have finished while cancellation was requested.
+            if (dao.findById(id)?.status == TaskStatus.COMPLETED) continue
+            if (cancel) {
+                try {
+                    withContext(Dispatchers.IO) { repository.deleteDownloadArtifacts(this@DownloadService, info.music.id) }
+                    dao.deleteUnfinished(id)
+                    measurements.update { it - id }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    dao.setUnfinishedStatus(id, TaskStatus.FAILED, "临时文件清理失败：${e.localizedMessage}")
+                }
+            } else {
+                dao.setUnfinishedStatus(id, TaskStatus.PAUSED)
+                measurements.update { map -> map[id]?.let { map + (id to it.copy(bytesPerSecond = null, etaSeconds = null)) } ?: map }
+                sendBroadcast(Intent(BROADCAST_PAUSED).setPackage(packageName).putExtra(EXTRA_DB_ID, id))
+            }
+        }
+    }
+
+    private suspend fun startNext() {
+        val attempt = queue.startNext() ?: return
+        val task = attempt.task
+        val id = attempt.id
+        dao.setUnfinishedStatus(id, TaskStatus.DOWNLOADING)
+        measurements.update { it + (id to DownloadTelemetry()) }
+        worker =
+            scope.launch(Dispatchers.IO) {
+                val meter = DownloadTransferMeter()
+                var committed = false
+                var saved: MusicDownloadRepository.SavedAudio? = null
+                try {
+                    coroutineScope {
+                        val reporter =
+                            launch {
+                                while (isActive) {
+                                    val value = meter.sample()
+                                    measurements.update { it + (id to value) }
+                                    dao.updateProgress(id, value.stageProgress ?: 0, TaskStatus.DOWNLOADING)
+                                    notifications.notify(
+                                        1,
+                                        notification(task.info.music.name, value.stage.displayName() + "\n" + transferSummary(value, true), value.stageProgress),
+                                    )
+                                    delay(500)
+                                }
+                            }
+                        try {
+                            repository.downloadMusic(
+                                this@DownloadService,
+                                task.rules,
+                                task.info.music,
+                                task.info.downloadLevel,
+                                SharedPreferencesUtils(this@DownloadService).getCookie(),
+                                task.target,
+                                onBytes = meter::bytes,
+                                onSaved = { result ->
+                                    saved = result
+                                    committed = true
+                                },
+                                onProgress = { _, progress, stage ->
+                                    meter.stage(stage, progress)
+                                    if (stage != DownloadStage.DOWNLOADING) measurements.update { it + (id to meter.sample()) }
+                                },
+                            )
+                        } finally {
+                            reporter.cancelAndJoin()
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (!committed) {
+                        dao.setUnfinishedStatus(id, TaskStatus.FAILED, e.localizedMessage ?: "下载失败")
+                        sendBroadcast(Intent(BROADCAST_FAILED).setPackage(packageName).putExtra(EXTRA_DB_ID, id))
+                    }
+                } finally {
+                    withContext(NonCancellable) {
+                        if (committed) {
+                            dao.complete(id, saved?.fileName, saved?.uri)
+                            measurements.update { it - id }
+                            sendBroadcast(Intent(BROADCAST_COMPLETED).setPackage(packageName).putExtra(EXTRA_DB_ID, id))
+                        }
+                    }
+                    commands.trySend(Command(ACTION_FINISHED, listOf(id), attempt.generation))
+                }
+            }
+    }
+
+    private fun notification(
+        title: String,
+        content: String,
+        progress: Int?,
+    ): Notification {
+        val intent =
+            Intent(Intent.ACTION_VIEW, "app://cloudx/download_manager".toUri()).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+        val pending = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        return NotificationCompat
+            .Builder(this, "download_channel")
             .setContentTitle(title)
             .setContentText(content)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(pending)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setSmallIcon(R.drawable.download_24px)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setProgress(100, progress, false)
+            .setProgress(100, progress ?: 0, progress == null)
             .build()
-    }
-
-
-    private fun updateNotification(title: String, content: String, progress: Int) {
-        notificationManager.notify(1, buildNotification(title, content, progress))
-    }
-
-    private fun DownloadStage.toDisplayText(): String = when (this) {
-        DownloadStage.DOWNLOADING -> "正在下载"
-        DownloadStage.PROCESSING -> "正在处理"
-        DownloadStage.TRANSCODING -> "正在转码"
-        DownloadStage.WRITING_TAGS -> "正在写入信息"
-        DownloadStage.SAVING -> "正在保存"
-        DownloadStage.COMPLETED -> "下载完成"
     }
 
     override fun onDestroy() {

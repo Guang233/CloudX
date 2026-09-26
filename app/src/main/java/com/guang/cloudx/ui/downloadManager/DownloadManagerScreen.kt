@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -32,8 +33,6 @@ import androidx.documentfile.provider.DocumentFile
 import coil3.compose.AsyncImage
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.database.LocalMusicFile
-import com.guang.cloudx.logic.model.MusicDownloadRules
-import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.ui.home.TooltipIconButton
@@ -56,7 +55,21 @@ fun DownloadManagerScreen(
 
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
-    val titles = listOf("正在下载", "已完成")
+    val titles = listOf("下载任务", "已完成")
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var cancelIds by remember { mutableStateOf<List<Long>>(emptyList()) }
+    LaunchedEffect(downloadingList.map { it.id }, pagerState.currentPage) {
+        selectedIds = selectedIds.intersect(downloadingList.map { it.id }.toSet())
+        if (pagerState.currentPage != 0) {
+            selectionMode = false
+            selectedIds = emptySet()
+        }
+    }
+    BackHandler(selectionMode) {
+        selectionMode = false
+        selectedIds = emptySet()
+    }
 
     // 弹窗状态
     var showDeleteAllCompletedDialog by remember { mutableStateOf(false) }
@@ -66,61 +79,43 @@ fun DownloadManagerScreen(
     var deleting by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val prefs = remember { SharedPreferencesUtils(context) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("下载管理") },
+                title = { Text(if (selectionMode) "已选 ${selectedIds.size} 项" else "下载管理") },
                 navigationIcon = {
                     TooltipIconButton(
-                        onClick = onBackClick,
+                        onClick = {
+                            if (selectionMode) {
+                                selectionMode = false
+                                selectedIds = emptySet()
+                            } else {
+                                onBackClick()
+                            }
+                        },
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
                     )
                 },
                 actions = {
-                    // 正在下载页：失败任务可重试，失败或暂停任务可批量删除
                     if (pagerState.currentPage == 0) {
-                        val hasFailedTasks = downloadingList.any { it.status == TaskStatus.FAILED }
-                        val hasDeletableTasks =
-                            downloadingList.any { it.status == TaskStatus.FAILED || it.status == TaskStatus.PAUSED }
-                        if (hasFailedTasks) {
-                            TooltipIconButton(
-                                onClick = {
-                                    downloadDir?.let { dir ->
-                                        viewModel.retryAllFailed(
-                                            context,
-                                            prefs.getMusicLevel(),
-                                            prefs.getCookie(),
-                                            dir,
-                                            MusicDownloadRules(
-                                                isSaveLrc = prefs.getIsSaveLrc(),
-                                                isSaveTlLrc = prefs.getIsSaveTlLrc(),
-                                                isSaveRomaLrc = prefs.getIsSaveRomaLrc(),
-                                                isSaveYrc = prefs.getIsSaveYrc(),
-                                                fileName = prefs.getDownloadFileName()!!,
-                                                delimiter = prefs.getArtistsDelimiter()!!,
-                                                encoding = prefs.getLrcEncoding()!!,
-                                                concurrentDownloads = prefs.getConcurrentDownloads(),
-                                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
-                                                fileConflictStrategy = prefs.getFileConflictStrategy(),
-                                            ),
-                                        )
-                                    }
-                                },
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "全部重试",
-                            )
-                        }
-                        if (hasDeletableTasks) {
-                            TooltipIconButton(
-                                onClick = { showDeleteAllFailedDialog = true },
-                                imageVector = Icons.Default.DeleteSweep,
-                                contentDescription = "删除所有失败或暂停任务",
-                            )
-                        }
+                        DownloadTaskActions(
+                            tasks = downloadingList,
+                            selectionMode = selectionMode,
+                            selectedIds = selectedIds,
+                            onSelect = { selectionMode = true },
+                            onSelectAll = {
+                                selectedIds =
+                                    if (selectedIds.size == downloadingList.size) emptySet() else downloadingList.map { it.id }.toSet()
+                            },
+                            onPause = { viewModel.pauseTasks(context, it) },
+                            onContinue = { viewModel.resumeTasks(context, it) },
+                            onCancel = { cancelIds = it },
+                            onRetryFailed = { viewModel.retryAllFailed(context) },
+                            onClearFailed = { showDeleteAllFailedDialog = true },
+                        )
                     }
 
                     if (pagerState.currentPage == 1) {
@@ -163,7 +158,13 @@ fun DownloadManagerScreen(
                     DownloadingList(
                         list = downloadingList,
                         viewModel = viewModel,
-                        downloadDir = downloadDir,
+                        selectionMode = selectionMode,
+                        selectedIds = selectedIds,
+                        onToggleSelection = { id ->
+                            selectionMode = true
+                            selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+                        },
+                        onCancel = { cancelIds = listOf(it) },
                     )
                 } else {
                     CompletedList(
@@ -178,6 +179,22 @@ fun DownloadManagerScreen(
                 }
             }
         }
+    }
+
+    if (cancelIds.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { cancelIds = emptyList() },
+            title = { Text("取消 ${cancelIds.size} 个任务？") },
+            text = { Text("将停止所选任务并清理对应临时文件，之后需要重新下载。已保存的歌曲和歌词不会删除；保存已完成的任务会保留在已完成列表。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.cancelTasks(context, cancelIds)
+                    selectedIds = selectedIds - cancelIds.toSet()
+                    cancelIds = emptyList()
+                }) { Text("取消任务") }
+            },
+            dismissButton = { TextButton(onClick = { cancelIds = emptyList() }) { Text("返回") } },
+        )
     }
 
     // 删除所有已完成任务确认弹窗
@@ -209,7 +226,7 @@ fun DownloadManagerScreen(
         AlertDialog(
             onDismissRequest = { showDeleteAllFailedDialog = false },
             title = { Text("提示") },
-            text = { Text("真的要删除全部失败或暂停记录吗？") },
+            text = { Text("删除全部失败或暂停任务，并清理对应临时文件？已保存的歌曲和歌词不会删除。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -389,75 +406,38 @@ private fun shareCompletedFile(
 fun DownloadingList(
     list: List<DownloadItemUi>,
     viewModel: DownloadViewModel,
-    downloadDir: DocumentFile?,
+    selectionMode: Boolean,
+    selectedIds: Set<Long>,
+    onToggleSelection: (Long) -> Unit,
+    onCancel: (Long) -> Unit,
 ) {
     val context = LocalContext.current
-    val prefs = remember { SharedPreferencesUtils(context) }
-
-    LazyColumn(
-        contentPadding = PaddingValues(vertical = 8.dp),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        items(list, key = { it.id }) { item ->
-            DownloadingItem(
-                item = item,
-                modifier = Modifier.animateItem(),
-                onRetry = {
-                    downloadDir?.let { dir ->
-                        viewModel.retryDownload(
-                            context,
-                            item,
-                            prefs.getMusicLevel(),
-                            prefs.getCookie(),
-                            dir,
-                            MusicDownloadRules(
-                                isSaveLrc = prefs.getIsSaveLrc(),
-                                isSaveTlLrc = prefs.getIsSaveTlLrc(),
-                                isSaveRomaLrc = prefs.getIsSaveRomaLrc(),
-                                isSaveYrc = prefs.getIsSaveYrc(),
-                                fileName = prefs.getDownloadFileName()!!,
-                                delimiter = prefs.getArtistsDelimiter()!!,
-                                encoding = prefs.getLrcEncoding()!!,
-                                concurrentDownloads = prefs.getConcurrentDownloads(),
-                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
-                                fileConflictStrategy = prefs.getFileConflictStrategy(),
-                            ),
-                        )
-                    }
-                },
-                onPause = {
-                    viewModel.pauseDownload(context, item)
-                },
-                onResumeDownload = {
-                    downloadDir?.let { dir ->
-                        viewModel.resumeDownload(
-                            context,
-                            item,
-                            prefs.getMusicLevel(),
-                            prefs.getCookie(),
-                            dir,
-                            MusicDownloadRules(
-                                isSaveLrc = prefs.getIsSaveLrc(),
-                                isSaveTlLrc = prefs.getIsSaveTlLrc(),
-                                isSaveRomaLrc = prefs.getIsSaveRomaLrc(),
-                                isSaveYrc = prefs.getIsSaveYrc(),
-                                fileName = prefs.getDownloadFileName()!!,
-                                delimiter = prefs.getArtistsDelimiter()!!,
-                                encoding = prefs.getLrcEncoding()!!,
-                                concurrentDownloads = prefs.getConcurrentDownloads(),
-                                convertM4aToMp3 = prefs.getIsConvertM4aToMp3(),
-                                fileConflictStrategy = prefs.getFileConflictStrategy(),
-                            ),
-                        )
-                    }
-                },
-                onDelete = { viewModel.deleteFailed(item) },
-                onLongClick = {
-                    if (item.status == TaskStatus.FAILED) {
-                        SystemUtils.copyToClipboard(context, "DownloadError", item.failureReason ?: "无错误信息")
-                    }
-                },
-            )
+    Column {
+        Text(
+            "下载中 ${list.count {
+                it.status == TaskStatus.DOWNLOADING
+            }} · 排队 ${list.count { it.status == TaskStatus.QUEUED }} · 已暂停 ${list.count { it.status == TaskStatus.PAUSED }}",
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (list.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("暂无下载任务") }
+        }
+        LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), modifier = Modifier.fillMaxSize()) {
+            items(list, key = { it.id }) { item ->
+                DownloadingItem(
+                    item = item,
+                    modifier = Modifier.animateItem(),
+                    selectionMode = selectionMode,
+                    isSelected = item.id in selectedIds,
+                    onToggleSelection = { onToggleSelection(item.id) },
+                    onRetry = { viewModel.retryDownload(context, item) },
+                    onPause = { viewModel.pauseDownload(context, item) },
+                    onResumeDownload = { viewModel.resumeDownload(context, item) },
+                    onDelete = { onCancel(item.id) },
+                    onLongClick = { onToggleSelection(item.id) },
+                )
+            }
         }
     }
 }
@@ -472,9 +452,13 @@ fun DownloadingItem(
     onResumeDownload: () -> Unit,
     onDelete: () -> Unit,
     onLongClick: () -> Unit,
+    selectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelection: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val animatedProgress by animateFloatAsState(
-        targetValue = item.progress / 100f,
+        targetValue = (item.telemetry?.stageProgress ?: item.progress).coerceIn(0, 100) / 100f,
         label = "ProgressAnimation",
     )
 
@@ -486,11 +470,15 @@ fun DownloadingItem(
                 .clip(RoundedCornerShape(16.dp))
                 .combinedClickable(
                     onClick = {
-                        when (item.status) {
-                            TaskStatus.DOWNLOADING -> onPause()
-                            TaskStatus.PAUSED -> onResumeDownload()
-                            TaskStatus.FAILED -> onRetry()
-                            TaskStatus.COMPLETED -> Unit
+                        if (selectionMode) {
+                            onToggleSelection()
+                        } else {
+                            when (item.status) {
+                                TaskStatus.QUEUED, TaskStatus.DOWNLOADING -> onPause()
+                                TaskStatus.PAUSED -> onResumeDownload()
+                                TaskStatus.FAILED -> onRetry()
+                                TaskStatus.PAUSING, TaskStatus.CANCELLING, TaskStatus.COMPLETED -> Unit
+                            }
                         }
                     },
                     onLongClick = onLongClick,
@@ -513,9 +501,11 @@ fun DownloadingItem(
                     Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(12.dp)),
-                // ShapeAppearance.Material3.LargeComponent 约为 12-16dp
                 contentScale = ContentScale.Crop,
             )
+            if (selectionMode) {
+                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -524,7 +514,7 @@ fun DownloadingItem(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(64.dp) // 匹配封面高度
+                        .heightIn(min = 80.dp)
                         .padding(vertical = 2.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -545,37 +535,46 @@ fun DownloadingItem(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 if (item.status == TaskStatus.FAILED) {
                     Text(
-                        text = "下载失败: ${item.failureReason ?: "未知错误"}",
+                        text = "下载失败: ${item.failureReason ?: "未知错误"}（点此复制）",
+                        modifier =
+                            Modifier.combinedClickable(
+                                onClick = {
+                                    if (selectionMode) {
+                                        onToggleSelection()
+                                    } else {
+                                        SystemUtils.copyToClipboard(
+                                            context,
+                                            "DownloadError",
+                                            item.failureReason ?: "未知错误",
+                                        )
+                                    }
+                                },
+                                onLongClick = onLongClick,
+                            ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                } else if (item.status == TaskStatus.PAUSED) {
-                    Text(
-                        text = "已暂停",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 } else {
-                    LinearProgressIndicator(
-                        progress = { animatedProgress },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(4.dp)),
-                    )
+                    Text(downloadTaskStatusText(item), style = MaterialTheme.typography.bodySmall)
+                    downloadTransferText(item)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    if (item.status == TaskStatus.DOWNLOADING) {
+                        Spacer(Modifier.height(6.dp))
+                        if (item.telemetry?.stageProgress != null) {
+                            LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                    }
                 }
             }
 
-            if (item.status == TaskStatus.PAUSED || item.status == TaskStatus.FAILED) {
+            if (!selectionMode && item.status.canCancel()) {
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onDelete,
@@ -583,7 +582,7 @@ fun DownloadingItem(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.delete_24px),
-                        contentDescription = "删除",
+                        contentDescription = "取消任务",
                         tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }

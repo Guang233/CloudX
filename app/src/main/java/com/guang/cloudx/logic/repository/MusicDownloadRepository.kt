@@ -12,6 +12,7 @@ import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.network.MusicNetwork
 import com.guang.cloudx.logic.utils.AudioTagWriter
 import com.guang.cloudx.logic.utils.Mp3Transcoder
+import com.guang.cloudx.logic.utils.clearDownloadArtifacts
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
@@ -28,14 +29,20 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLongArray
 
 class MusicDownloadRepository : ViewModelProvider.Factory {
-    data class SavedAudio(val fileName: String, val uri: String)
+    data class SavedAudio(
+        val fileName: String,
+        val uri: String,
+    )
 
-    private class RangeNotSupportedException(message: String) : Exception(message)
+    private class RangeNotSupportedException(
+        message: String,
+    ) : Exception(message)
+
     private data class RemoteFileInfo(
         val contentLength: Long,
         val supportsRange: Boolean,
         val eTag: String? = null,
-        val lastModified: String? = null
+        val lastModified: String? = null,
     )
 
     private data class DownloadCheckpoint(
@@ -45,23 +52,27 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         val contentLength: Long = -1L,
         val eTag: String? = null,
         val lastModified: String? = null,
-        val ranges: MutableList<DownloadCheckpointRange>? = null
+        val ranges: MutableList<DownloadCheckpointRange>? = null,
     )
 
     private data class DownloadCheckpointRange(
         val start: Long = 0L,
         val end: Long = -1L,
-        var downloaded: Long = 0L
+        var downloaded: Long = 0L,
     )
 
     private class CheckpointStore(
         private val file: File,
-        val checkpoint: DownloadCheckpoint
+        val checkpoint: DownloadCheckpoint,
     ) {
         private var lastSaveAt = 0L
 
         @Synchronized
-        fun updateRange(index: Int, downloaded: Long, force: Boolean = false) {
+        fun updateRange(
+            index: Int,
+            downloaded: Long,
+            force: Boolean = false,
+        ) {
             val range = checkpoint.ranges!![index]
             val rangeLength = range.end - range.start + 1
             range.downloaded = downloaded.coerceIn(0L, rangeLength)
@@ -84,7 +95,6 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             }
             lastSaveAt = now
         }
-
     }
 
     private companion object {
@@ -98,13 +108,15 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         const val CHECKPOINT_SAVE_INTERVAL_MS = 1_000L
         const val DOWNLOAD_TEMP_DIR = "download_temp"
 
-        val downloadClient: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .build()
+        val downloadClient: OkHttpClient =
+            OkHttpClient
+                .Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .build()
 
-        fun checkpointToJson(checkpoint: DownloadCheckpoint): JSONObject {
-            return JSONObject().apply {
+        fun checkpointToJson(checkpoint: DownloadCheckpoint): JSONObject =
+            JSONObject().apply {
                 put("version", checkpoint.version)
                 put("mode", checkpoint.mode)
                 put("identity", checkpoint.identity)
@@ -120,24 +132,24 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                                     put("start", range.start)
                                     put("end", range.end)
                                     put("downloaded", range.downloaded)
-                                }
+                                },
                             )
                         }
-                    }
+                    },
                 )
             }
-        }
 
         fun checkpointFromJson(json: JSONObject): DownloadCheckpoint? {
             val rangesJson = json.optJSONArray("ranges") ?: return null
             val ranges = mutableListOf<DownloadCheckpointRange>()
             for (index in 0 until rangesJson.length()) {
                 val range = rangesJson.optJSONObject(index) ?: return null
-                ranges += DownloadCheckpointRange(
-                    start = range.optLong("start", -1L),
-                    end = range.optLong("end", -1L),
-                    downloaded = range.optLong("downloaded", -1L)
-                )
+                ranges +=
+                    DownloadCheckpointRange(
+                        start = range.optLong("start", -1L),
+                        end = range.optLong("end", -1L),
+                        downloaded = range.optLong("downloaded", -1L),
+                    )
             }
 
             return DownloadCheckpoint(
@@ -147,7 +159,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 contentLength = json.optLong("contentLength", -1L),
                 eTag = json.optNullableString("eTag"),
                 lastModified = json.optNullableString("lastModified"),
-                ranges = ranges
+                ranges = ranges,
             )
         }
 
@@ -157,13 +169,11 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
-    fun deleteDownloadArtifacts(context: Context, musicId: Long) {
-        val cacheDir = context.externalCacheDir ?: context.cacheDir
-        val downloadTempDir = File(cacheDir, DOWNLOAD_TEMP_DIR)
-        File(downloadTempDir, musicId.toString()).delete()
-        File(downloadTempDir, "${musicId}.download.json").delete()
-        File(downloadTempDir, "${musicId}.download.json.tmp").delete()
-        File(downloadTempDir, "${musicId}.jpg").delete()
+    fun deleteDownloadArtifacts(
+        context: Context,
+        musicId: Long,
+    ) {
+        clearDownloadArtifacts(context.externalCacheDir ?: context.cacheDir, musicId)
     }
 
     suspend fun downloadMusic(
@@ -173,12 +183,15 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         level: String,
         cookie: String,
         targetDir: DocumentFile,
-        onProgress: (Music, Int, DownloadStage) -> Unit
+        onBytes: (Long, Long?) -> Unit = { _, _ -> },
+        onSaved: (SavedAudio?) -> Unit = {},
+        onProgress: (Music, Int, DownloadStage) -> Unit,
     ): SavedAudio? {
         val cacheDir = context.externalCacheDir ?: context.cacheDir
         val downloadTempDir = File(cacheDir, DOWNLOAD_TEMP_DIR).apply { mkdirs() }
         migrateLegacyDownloadArtifacts(cacheDir, downloadTempDir, music.id)
         val tmpFile = File(downloadTempDir, music.id.toString())
+        val processingDir = File(downloadTempDir, "${music.id}.processing").apply { mkdirs() }
         var tmpWithExt: File? = null
         var outputAudioFile: File? = null
         var tmpCover: File? = null
@@ -188,60 +201,66 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         try {
             // 1. 获取音乐 URL 和文件信息
             val musicUrl = MusicNetwork.getMusicUrl(music.id.toString(), level, cookie)
-            val quality = when (musicUrl.level) {
-                "standard" -> ""
-                "exhigh" -> "[HQ]"
-                "lossless" -> "[SQ]"
-                "hires" -> "[HR]"
-                else -> ""
-            }
-            val baseFileName = rules.fileName.replace("\${level}", quality)
-                .replace("\${name}", music.name)
-                .replace("\${id}", music.id.toString())
-                .replace("\${artists}", music.artists.joinToString(rules.delimiter) { it.name })
-                .replace("\${album}", music.album.name)
-                .replace("\${albumId}", music.album.id.toString())
-                .replace(Regex("[\\\\/:*?\"<>|]"), " ")
+            val quality =
+                when (musicUrl.level) {
+                    "standard" -> ""
+                    "exhigh" -> "[HQ]"
+                    "lossless" -> "[SQ]"
+                    "hires" -> "[HR]"
+                    else -> ""
+                }
+            val baseFileName =
+                rules.fileName
+                    .replace("\${level}", quality)
+                    .replace("\${name}", music.name)
+                    .replace("\${id}", music.id.toString())
+                    .replace("\${artists}", music.artists.joinToString(rules.delimiter) { it.name })
+                    .replace("\${album}", music.album.name)
+                    .replace("\${albumId}", music.album.id.toString())
+                    .replace(Regex("[\\\\/:*?\"<>|]"), " ")
 
             tmpCover = File(downloadTempDir, "${music.id}.jpg")
             val coverFile = tmpCover!!
 
             coroutineScope {
-                val coverDeferred = async(Dispatchers.IO) {
-                    try {
-                        downloadFile(url = music.album.picUrl, file = coverFile)
-                        coverFile.takeIf { it.exists() && it.length() > 0 }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        null
+                val coverDeferred =
+                    async(Dispatchers.IO) {
+                        try {
+                            downloadFile(url = music.album.picUrl, file = coverFile)
+                            coverFile.takeIf { it.exists() && it.length() > 0 }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            null
+                        }
                     }
-                }
-                val lyricDeferred = async {
-                    try {
-                        MusicNetwork.getLyrics(music.id.toString(), cookie)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        null
+                val lyricDeferred =
+                    async {
+                        try {
+                            MusicNetwork.getLyrics(music.id.toString(), cookie)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            null
+                        }
                     }
-                }
 
                 // 2. 执行可续传下载
                 downloadAudioFile(
                     url = musicUrl.url,
                     outputFile = tmpFile,
                     checkpointIdentity = "${music.id}:${musicUrl.level}",
-                    parts = rules.concurrentDownloads
+                    parts = rules.concurrentDownloads,
+                    onBytes = onBytes,
                 ) { progress ->
-                    onProgress(music, scaleProgress(progress, 0, 80), DownloadStage.DOWNLOADING)
+                    onProgress(music, progress, DownloadStage.DOWNLOADING)
                 }
                 audioDownloaded = true
-                onProgress(music, 80, DownloadStage.PROCESSING)
+                onProgress(music, 0, DownloadStage.PROCESSING)
 
                 // 3. 检测类型并重命名
                 val ext = detectFileTypeFromFile(tmpFile)
-                val downloadedAudioFile = File(downloadTempDir, "$baseFileName.$ext")
+                val downloadedAudioFile = File(processingDir, "source.$ext")
                 tmpWithExt = downloadedAudioFile
                 if (downloadedAudioFile.exists()) downloadedAudioFile.delete()
                 if (!tmpFile.renameTo(downloadedAudioFile)) {
@@ -252,16 +271,18 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 var finalAudioFile = downloadedAudioFile
 
                 if (rules.convertM4aToMp3 && ext == "m4a") {
-                    val tmpMp3 = File(downloadTempDir, "$baseFileName.mp3")
+                    val tmpMp3 = File(processingDir, "transcoded.mp3")
+                    outputAudioFile = tmpMp3
+                    onProgress(music, 0, DownloadStage.TRANSCODING)
                     Mp3Transcoder.transcodeM4aToMp3(downloadedAudioFile, tmpMp3) { progress ->
-                        onProgress(music, scaleProgress(progress, 80, 95), DownloadStage.TRANSCODING)
+                        onProgress(music, progress, DownloadStage.TRANSCODING)
                     }
                     downloadedAudioFile.delete()
                     finalAudioFile = tmpMp3
                     finalExt = "mp3"
                 }
                 outputAudioFile = finalAudioFile
-                onProgress(music, 95, DownloadStage.WRITING_TAGS)
+                onProgress(music, 0, DownloadStage.WRITING_TAGS)
 
                 // 4. 等待预取结果
                 val coverForTags = coverDeferred.await()
@@ -276,43 +297,56 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                         artist = music.artists.joinToString(rules.delimiter) { it.name },
                         album = music.album.name,
                         coverFile = coverForTags,
-                        lyrics = lrcText
-                    )
+                        lyrics = lrcText,
+                    ),
                 )
                 coverFile.delete()
-                onProgress(music, 98, DownloadStage.SAVING)
+                currentCoroutineContext().ensureActive()
+                onProgress(music, 0, DownloadStage.SAVING)
 
                 // 6. 保存实际 URI；独立索引不随下载任务记录删除。
                 LocalMusicRepository.fileMutex.withLock {
                     // Finish the short save/index commit even if pause arrives during SAF I/O.
                     withContext(Dispatchers.IO + NonCancellable) {
-                        val document = copyToSaf(
-                            context, finalAudioFile, targetDir, "$baseFileName.$finalExt", rules.fileConflictStrategy
-                        )
+                        val document =
+                            copyToSaf(
+                                context,
+                                finalAudioFile,
+                                targetDir,
+                                "$baseFileName.$finalExt",
+                                rules.fileConflictStrategy,
+                            )
                         if (document != null) {
                             val name = document.name ?: "$baseFileName.$finalExt"
                             val localDao = AppDatabase.getDatabase(context).localMusicDao()
-                            var localFile = LocalMusicFile(
-                                uri = document.uri.toString(),
-                                musicId = music.id,
-                                treeUri = targetDir.uri.toString(),
-                                displayName = name,
-                                downloadLevel = musicUrl.level,
-                                downloadedAt = System.currentTimeMillis()
-                            )
+                            var localFile =
+                                LocalMusicFile(
+                                    uri = document.uri.toString(),
+                                    musicId = music.id,
+                                    treeUri = targetDir.uri.toString(),
+                                    displayName = name,
+                                    downloadLevel = musicUrl.level,
+                                    downloadedAt = System.currentTimeMillis(),
+                                )
                             localDao.upsert(localFile)
                             savedAudio = SavedAudio(name, document.uri.toString())
+                            onSaved(savedAudio)
                             if (rules.isSaveLrc && lrcText != null) {
-                                val lyricDocument = writeLrcToSaf(
-                                    context, lrcText, targetDir,
-                                    "${name.substringBeforeLast('.')}.lrc", rules.encoding
-                                )
+                                val lyricDocument =
+                                    writeLrcToSaf(
+                                        context,
+                                        lrcText,
+                                        targetDir,
+                                        "${name.substringBeforeLast('.')}.lrc",
+                                        rules.encoding,
+                                    )
                                 // The sidecar may have overwritten a previous song's same-name lyric.
                                 localDao.clearLyric(lyricDocument.uri.toString())
                                 localFile = localFile.copy(lyricUri = lyricDocument.uri.toString())
                                 localDao.upsert(localFile)
                             }
                         }
+                        onSaved(savedAudio)
                         // A same-name skip is not evidence that the existing file is this song.
                     }
                 }
@@ -321,7 +355,6 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 finalAudioFile.delete()
                 onProgress(music, 100, DownloadStage.COMPLETED)
             }
-
         } catch (e: Exception) {
             if (audioDownloaded) {
                 resetDownloadState(tmpFile)
@@ -330,6 +363,9 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             outputAudioFile?.delete()
             tmpCover?.delete()
             throw e
+        } finally {
+            processingDir.deleteRecursively()
+            tmpCover?.delete()
         }
         return savedAudio
     }
@@ -339,7 +375,8 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         outputFile: File,
         checkpointIdentity: String,
         parts: Int,
-        onProgress: (Int) -> Unit
+        onBytes: (Long, Long?) -> Unit,
+        onProgress: (Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val remoteFileInfo = getRemoteFileInfo(url)
         val contentLength = remoteFileInfo.contentLength
@@ -348,7 +385,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         try {
             if (!remoteFileInfo.supportsRange || contentLength <= 0) {
                 resetDownloadState(outputFile)
-                downloadFile(url = url, file = outputFile, progressCallback = onProgress)
+                downloadFile(url = url, file = outputFile, bytesCallback = onBytes, progressCallback = onProgress)
                 deleteCheckpoint(outputFile)
                 return@withContext
             }
@@ -360,7 +397,8 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     checkpointIdentity = checkpointIdentity,
                     remoteFileInfo = remoteFileInfo,
                     partCount = partCount,
-                    onProgress = onProgress
+                    onBytes = onBytes,
+                    onProgress = onProgress,
                 )
             } else {
                 downloadWithResume(
@@ -368,7 +406,8 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                     outputFile = outputFile,
                     checkpointIdentity = checkpointIdentity,
                     remoteFileInfo = remoteFileInfo,
-                    onProgress = onProgress
+                    onBytes = onBytes,
+                    onProgress = onProgress,
                 )
             }
 
@@ -376,7 +415,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             onProgress(100)
         } catch (e: RangeNotSupportedException) {
             resetDownloadState(outputFile)
-            downloadFile(url = url, file = outputFile, progressCallback = onProgress)
+            downloadFile(url = url, file = outputFile, bytesCallback = onBytes, progressCallback = onProgress)
             deleteCheckpoint(outputFile)
         } catch (e: Exception) {
             throw e
@@ -388,29 +427,38 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         outputFile: File,
         checkpointIdentity: String,
         remoteFileInfo: RemoteFileInfo,
-        onProgress: (Int) -> Unit
+        onBytes: (Long, Long?) -> Unit,
+        onProgress: (Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val contentLength = remoteFileInfo.contentLength
         val checkpointRanges = buildRanges(contentLength, 1)
-        val checkpointStore = prepareCheckpoint(
-            outputFile = outputFile,
-            mode = CHECKPOINT_MODE_SINGLE,
-            identity = checkpointIdentity,
-            remoteFileInfo = remoteFileInfo,
-            expectedRanges = checkpointRanges
-        )
+        val checkpointStore =
+            prepareCheckpoint(
+                outputFile = outputFile,
+                mode = CHECKPOINT_MODE_SINGLE,
+                identity = checkpointIdentity,
+                remoteFileInfo = remoteFileInfo,
+                expectedRanges = checkpointRanges,
+            )
         val range = checkpointStore.checkpoint.ranges!![0]
 
-        val downloadedFromFile = when {
-            !outputFile.exists() -> 0L
-            outputFile.length() > contentLength -> {
-                resetDownloadState(outputFile)
-                0L
-            }
+        val downloadedFromFile =
+            when {
+                !outputFile.exists() -> {
+                    0L
+                }
 
-            else -> outputFile.length()
-        }
+                outputFile.length() > contentLength -> {
+                    resetDownloadState(outputFile)
+                    0L
+                }
+
+                else -> {
+                    outputFile.length()
+                }
+            }
         checkpointStore.updateRange(0, downloadedFromFile, force = true)
+        onBytes(downloadedFromFile, contentLength)
 
         if (downloadedFromFile >= contentLength) {
             onProgress(100)
@@ -426,6 +474,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             downloadChunk(url, outputFile, range.start + downloadedFromFile, range.end) { downloaded ->
                 val totalDownloaded = downloadedFromFile + downloaded
                 checkpointStore.updateRange(0, totalDownloaded)
+                onBytes(totalDownloaded, contentLength)
                 onProgress(((totalDownloaded * 100) / contentLength).toInt().coerceIn(0, 100))
             }
         } finally {
@@ -440,17 +489,19 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         checkpointIdentity: String,
         remoteFileInfo: RemoteFileInfo,
         partCount: Int,
-        onProgress: (Int) -> Unit
+        onBytes: (Long, Long?) -> Unit,
+        onProgress: (Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val contentLength = remoteFileInfo.contentLength
         val checkpointRanges = buildRanges(contentLength, partCount)
-        val checkpointStore = prepareCheckpoint(
-            outputFile = outputFile,
-            mode = CHECKPOINT_MODE_MULTI,
-            identity = checkpointIdentity,
-            remoteFileInfo = remoteFileInfo,
-            expectedRanges = checkpointRanges
-        )
+        val checkpointStore =
+            prepareCheckpoint(
+                outputFile = outputFile,
+                mode = CHECKPOINT_MODE_MULTI,
+                identity = checkpointIdentity,
+                remoteFileInfo = remoteFileInfo,
+                expectedRanges = checkpointRanges,
+            )
         val ranges = checkpointStore.checkpoint.ranges!!
 
         outputFile.parentFile?.mkdirs()
@@ -462,28 +513,33 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         for (index in 0 until partCount) {
             progressArray.set(index, ranges[index].downloaded)
         }
+        onBytes((0 until partCount).sumOf { progressArray.get(it) }, contentLength)
         onProgress(calculateProgress(progressArray, contentLength))
 
         try {
             coroutineScope {
-                (0 until partCount).map { partIndex ->
-                    async {
-                        val range = ranges[partIndex]
-                        val rangeLength = range.end - range.start + 1
-                        val alreadyDownloaded = range.downloaded.coerceIn(0L, rangeLength)
-                        if (alreadyDownloaded >= rangeLength) return@async
+                (0 until partCount)
+                    .map { partIndex ->
+                        async {
+                            val range = ranges[partIndex]
+                            val rangeLength = range.end - range.start + 1
+                            val alreadyDownloaded = range.downloaded.coerceIn(0L, rangeLength)
+                            if (alreadyDownloaded >= rangeLength) return@async
 
-                        val resumeStart = range.start + alreadyDownloaded
-                        downloadChunk(url, outputFile, resumeStart, range.end) { downloaded ->
-                            val totalForRange = alreadyDownloaded + downloaded
-                            progressArray.set(partIndex, totalForRange)
-                            checkpointStore.updateRange(partIndex, totalForRange)
-                            onProgress(calculateProgress(progressArray, contentLength))
+                            val resumeStart = range.start + alreadyDownloaded
+                            downloadChunk(url, outputFile, resumeStart, range.end) { downloaded ->
+                                val totalForRange = alreadyDownloaded + downloaded
+                                synchronized(progressArray) {
+                                    progressArray.set(partIndex, totalForRange)
+                                    checkpointStore.updateRange(partIndex, totalForRange)
+                                    onBytes((0 until partCount).sumOf { progressArray.get(it) }, contentLength)
+                                    onProgress(calculateProgress(progressArray, contentLength))
+                                }
+                            }
+                            progressArray.set(partIndex, rangeLength)
+                            checkpointStore.updateRange(partIndex, rangeLength, force = true)
                         }
-                        progressArray.set(partIndex, rangeLength)
-                        checkpointStore.updateRange(partIndex, rangeLength, force = true)
-                    }
-                }.awaitAll()
+                    }.awaitAll()
             }
         } finally {
             checkpointStore.save(force = true)
@@ -494,20 +550,39 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
+    /** Cancel the underlying socket as well as the coroutine, including blocking stream reads. */
+    private suspend fun <T> withDownloadResponse(request: Request, block: (okhttp3.Response) -> T): T = coroutineScope {
+        ensureActive()
+        val call = downloadClient.newCall(request)
+        val cancellation = launch(start = CoroutineStart.UNDISPATCHED) {
+            try { awaitCancellation() } finally { call.cancel() }
+        }
+        try {
+            call.execute().use(block)
+        } catch (e: Exception) {
+            ensureActive() // Socket closure caused by cancellation is not a download failure.
+            throw e
+        } finally {
+            cancellation.cancel()
+        }
+    }
+
     private suspend fun downloadChunk(
         url: String,
         outputFile: File,
         start: Long,
         end: Long,
-        onProgress: (Long) -> Unit
+        onProgress: (Long) -> Unit,
     ) = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url(url)
-            .header("Range", "bytes=$start-$end")
-            .header("Accept-Encoding", "identity")
-            .build()
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .header("Range", "bytes=$start-$end")
+                .header("Accept-Encoding", "identity")
+                .build()
 
-        downloadClient.newCall(request).execute().use { response ->
+        withDownloadResponse(request) { response ->
             if (response.code == HttpURLConnection.HTTP_OK) {
                 throw RangeNotSupportedException("服务器不支持分块下载")
             }
@@ -537,11 +612,10 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
-    private fun scaleProgress(progress: Int, start: Int, end: Int): Int {
-        return (start + (progress.coerceIn(0, 100) * (end - start) / 100)).coerceIn(start, end)
-    }
-
-    private fun choosePartCount(contentLength: Long, requestedParts: Int): Int {
+    private fun choosePartCount(
+        contentLength: Long,
+        requestedParts: Int,
+    ): Int {
         if (contentLength < MIN_PARALLEL_DOWNLOAD_BYTES) return 1
 
         val cappedRequest = requestedParts.coerceIn(1, MAX_CONCURRENT_PARTS)
@@ -549,7 +623,10 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         return minOf(cappedRequest, partsBySize)
     }
 
-    private fun calculateProgress(progressArray: AtomicLongArray, total: Long): Int {
+    private fun calculateProgress(
+        progressArray: AtomicLongArray,
+        total: Long,
+    ): Int {
         var downloaded = 0L
         for (i in 0 until progressArray.length()) {
             downloaded += progressArray.get(i)
@@ -558,20 +635,25 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
     }
 
     private fun parseTotalLength(contentRange: String?): Long {
-        val total = contentRange
-            ?.substringAfter('/', missingDelimiterValue = "")
-            ?.takeUnless { it == "*" }
+        val total =
+            contentRange
+                ?.substringAfter('/', missingDelimiterValue = "")
+                ?.takeUnless { it == "*" }
 
         return total?.toLongOrNull() ?: -1L
     }
 
-    private fun buildRanges(contentLength: Long, partCount: Int): MutableList<DownloadCheckpointRange> {
+    private fun buildRanges(
+        contentLength: Long,
+        partCount: Int,
+    ): MutableList<DownloadCheckpointRange> {
         val partSize = contentLength / partCount
-        return (0 until partCount).map { partIndex ->
-            val start = partIndex * partSize
-            val end = if (partIndex == partCount - 1) contentLength - 1 else start + partSize - 1
-            DownloadCheckpointRange(start = start, end = end, downloaded = 0L)
-        }.toMutableList()
+        return (0 until partCount)
+            .map { partIndex ->
+                val start = partIndex * partSize
+                val end = if (partIndex == partCount - 1) contentLength - 1 else start + partSize - 1
+                DownloadCheckpointRange(start = start, end = end, downloaded = 0L)
+            }.toMutableList()
     }
 
     private fun prepareCheckpoint(
@@ -579,7 +661,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         mode: String,
         identity: String,
         remoteFileInfo: RemoteFileInfo,
-        expectedRanges: MutableList<DownloadCheckpointRange>
+        expectedRanges: MutableList<DownloadCheckpointRange>,
     ): CheckpointStore {
         val checkpointFile = checkpointFile(outputFile)
         val existingCheckpoint = readCheckpoint(checkpointFile)
@@ -590,7 +672,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         ) {
             val multiCheckpointNeedsFile =
                 mode == CHECKPOINT_MODE_MULTI &&
-                        (!outputFile.exists() || outputFile.length() != remoteFileInfo.contentLength)
+                    (!outputFile.exists() || outputFile.length() != remoteFileInfo.contentLength)
             if (!multiCheckpointNeedsFile) {
                 val store = CheckpointStore(checkpointFile, existingCheckpoint)
                 store.save(force = true)
@@ -599,15 +681,16 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
 
         resetDownloadState(outputFile)
-        val checkpoint = DownloadCheckpoint(
-            version = CHECKPOINT_VERSION,
-            mode = mode,
-            identity = identity,
-            contentLength = remoteFileInfo.contentLength,
-            eTag = remoteFileInfo.eTag,
-            lastModified = remoteFileInfo.lastModified,
-            ranges = expectedRanges
-        )
+        val checkpoint =
+            DownloadCheckpoint(
+                version = CHECKPOINT_VERSION,
+                mode = mode,
+                identity = identity,
+                contentLength = remoteFileInfo.contentLength,
+                eTag = remoteFileInfo.eTag,
+                lastModified = remoteFileInfo.lastModified,
+                ranges = expectedRanges,
+            )
         return CheckpointStore(checkpointFile, checkpoint).also { it.save(force = true) }
     }
 
@@ -616,7 +699,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         mode: String,
         identity: String,
         remoteFileInfo: RemoteFileInfo,
-        expectedRanges: List<DownloadCheckpointRange>
+        expectedRanges: List<DownloadCheckpointRange>,
     ): Boolean {
         val ranges = checkpoint.ranges ?: return false
         if (checkpoint.version != CHECKPOINT_VERSION) return false
@@ -632,15 +715,16 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             val expected = expectedRanges[index]
             val length = saved.end - saved.start + 1
             saved.start == expected.start &&
-                    saved.end == expected.end &&
-                    length > 0 &&
-                    saved.downloaded in 0..length
+                saved.end == expected.end &&
+                length > 0 &&
+                saved.downloaded in 0..length
         }
     }
 
-    private fun validatorMatches(saved: String?, current: String?): Boolean {
-        return saved.isNullOrBlank() || current.isNullOrBlank() || saved == current
-    }
+    private fun validatorMatches(
+        saved: String?,
+        current: String?,
+    ): Boolean = saved.isNullOrBlank() || current.isNullOrBlank() || saved == current
 
     private fun readCheckpoint(file: File): DownloadCheckpoint? {
         if (!file.isFile) return null
@@ -658,9 +742,13 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
-    private fun migrateLegacyDownloadArtifacts(cacheDir: File, downloadTempDir: File, musicId: Long) {
+    private fun migrateLegacyDownloadArtifacts(
+        cacheDir: File,
+        downloadTempDir: File,
+        musicId: Long,
+    ) {
         val legacyFile = File(cacheDir, musicId.toString())
-        val legacyCheckpoint = File(cacheDir, "${musicId}.download.json")
+        val legacyCheckpoint = File(cacheDir, "$musicId.download.json")
         val legacyCheckpointTemp = File(cacheDir, "${legacyCheckpoint.name}.tmp")
         val hasLegacyArtifacts = legacyFile.exists() || legacyCheckpoint.exists() || legacyCheckpointTemp.exists()
         if (!hasLegacyArtifacts) return
@@ -690,58 +778,67 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         deleteCheckpoint(outputFile)
     }
 
-    private suspend fun getRemoteFileInfo(url: String): RemoteFileInfo = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url(url)
-            .header("Range", "bytes=0-0")
-            .header("Accept-Encoding", "identity")
-            .build()
+    private suspend fun getRemoteFileInfo(url: String): RemoteFileInfo =
+        withContext(Dispatchers.IO) {
+            val request =
+                Request
+                    .Builder()
+                    .url(url)
+                    .header("Range", "bytes=0-0")
+                    .header("Accept-Encoding", "identity")
+                    .build()
 
-        return@withContext runCatching {
-            downloadClient.newCall(request).execute().use { response ->
-                when (response.code) {
-                    HttpURLConnection.HTTP_PARTIAL -> {
-                        val totalLength = parseTotalLength(response.header("Content-Range"))
-                        RemoteFileInfo(
-                            contentLength = totalLength,
-                            supportsRange = totalLength > 0,
-                            eTag = response.header("ETag"),
-                            lastModified = response.header("Last-Modified")
-                        )
+            return@withContext runCatching {
+                withDownloadResponse(request) { response ->
+                    when (response.code) {
+                        HttpURLConnection.HTTP_PARTIAL -> {
+                            val totalLength = parseTotalLength(response.header("Content-Range"))
+                            RemoteFileInfo(
+                                contentLength = totalLength,
+                                supportsRange = totalLength > 0,
+                                eTag = response.header("ETag"),
+                                lastModified = response.header("Last-Modified"),
+                            )
+                        }
+
+                        HttpURLConnection.HTTP_OK -> {
+                            RemoteFileInfo(
+                                contentLength = response.body.contentLength(),
+                                supportsRange = false,
+                                eTag = response.header("ETag"),
+                                lastModified = response.header("Last-Modified"),
+                            )
+                        }
+
+                        else -> {
+                            RemoteFileInfo(-1L, false)
+                        }
                     }
-
-                    HttpURLConnection.HTTP_OK -> {
-                        RemoteFileInfo(
-                            contentLength = response.body.contentLength(),
-                            supportsRange = false,
-                            eTag = response.header("ETag"),
-                            lastModified = response.header("Last-Modified")
-                        )
-                    }
-
-                    else -> RemoteFileInfo(-1L, false)
                 }
+            }.getOrElse {
+                currentCoroutineContext().ensureActive()
+                RemoteFileInfo(-1L, false)
             }
-        }.getOrElse {
-            RemoteFileInfo(-1L, false)
         }
-    }
 
     suspend fun downloadFile(
         context: Context? = null,
         url: String,
         file: File? = null,
         documentFile: DocumentFile? = null,
-        progressCallback: (Int) -> Unit = {}
+        bytesCallback: (Long, Long?) -> Unit = { _, _ -> },
+        progressCallback: (Int) -> Unit = {},
     ) = withContext(Dispatchers.IO) {
         require(file != null || documentFile != null) { "必须提供 file 或 documentFile" }
 
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept-Encoding", "identity")
-            .build()
+        val request =
+            Request
+                .Builder()
+                .url(url)
+                .header("Accept-Encoding", "identity")
+                .build()
 
-        downloadClient.newCall(request).execute().use { response ->
+        withDownloadResponse(request) { response ->
             if (!response.isSuccessful) {
                 throw Exception("HTTP error: ${response.code}")
             }
@@ -749,17 +846,24 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             val body = response.body
             val total: Long = body.contentLength()
             var downloaded: Long = 0
+            bytesCallback(0, total.takeIf { it > 0 })
             val buffer = ByteArray(BUFFER_SIZE)
 
-            val output: OutputStream = when {
-                file != null -> file.outputStream()
-                documentFile != null -> {
-                    context!!.contentResolver.openOutputStream(documentFile.uri)
-                        ?: throw Exception("无法打开 OutputStream")
-                }
+            val output: OutputStream =
+                when {
+                    file != null -> {
+                        file.outputStream()
+                    }
 
-                else -> throw IllegalStateException()
-            }
+                    documentFile != null -> {
+                        context!!.contentResolver.openOutputStream(documentFile.uri)
+                            ?: throw Exception("无法打开 OutputStream")
+                    }
+
+                    else -> {
+                        throw IllegalStateException()
+                    }
+                }
 
             body.byteStream().use { input: InputStream ->
                 output.use { out ->
@@ -768,6 +872,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                         ensureActive()
                         out.write(buffer, 0, bytes)
                         downloaded += bytes
+                        bytesCallback(downloaded, total.takeIf { it > 0 })
                         if (total > 0) {
                             progressCallback(((downloaded * 100) / total).toInt())
                         }
@@ -787,34 +892,46 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         sourceFile: File,
         targetDir: DocumentFile,
         finalFileName: String,
-        conflictStrategy: String
-    ): DocumentFile? = withContext(Dispatchers.IO) {
-        val targetFileName = when (conflictStrategy) {
-            "跳过" -> {
-                if (targetDir.findFile(finalFileName) != null) return@withContext null
-                finalFileName
-            }
-            "自动重命名" -> findAvailableFileName(targetDir, finalFileName)
-            else -> finalFileName
-        }
-        val existing = targetDir.findFile(targetFileName)
-        val document = existing ?: targetDir.createFile("audio/*", targetFileName)
-            ?: throw Exception("无法创建音乐文件")
-        val localDao = AppDatabase.getDatabase(context).localMusicDao()
-        try {
-            // 'wt' truncates old content; never delete an existing file as a write-error fallback.
-            context.contentResolver.openOutputStream(document.uri, "wt")?.use { out ->
-                if (existing != null) localDao.setState(document.uri.toString(), LocalMusicFile.MISSING)
-                sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
-            } ?: throw Exception("无法打开目标输出流")
-        } catch (e: Exception) {
-            if (existing == null) document.delete()
-            throw e
-        }
-        document
-    }
+        conflictStrategy: String,
+    ): DocumentFile? =
+        withContext(Dispatchers.IO) {
+            val targetFileName =
+                when (conflictStrategy) {
+                    "跳过" -> {
+                        if (targetDir.findFile(finalFileName) != null) return@withContext null
+                        finalFileName
+                    }
 
-    private fun findAvailableFileName(targetDir: DocumentFile, originalName: String): String {
+                    "自动重命名" -> {
+                        findAvailableFileName(targetDir, finalFileName)
+                    }
+
+                    else -> {
+                        finalFileName
+                    }
+                }
+            val existing = targetDir.findFile(targetFileName)
+            val document =
+                existing ?: targetDir.createFile("audio/*", targetFileName)
+                    ?: throw Exception("无法创建音乐文件")
+            val localDao = AppDatabase.getDatabase(context).localMusicDao()
+            try {
+                // 'wt' truncates old content; never delete an existing file as a write-error fallback.
+                context.contentResolver.openOutputStream(document.uri, "wt")?.use { out ->
+                    if (existing != null) localDao.setState(document.uri.toString(), LocalMusicFile.MISSING)
+                    sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
+                } ?: throw Exception("无法打开目标输出流")
+            } catch (e: Exception) {
+                if (existing == null) document.delete()
+                throw e
+            }
+            document
+        }
+
+    private fun findAvailableFileName(
+        targetDir: DocumentFile,
+        originalName: String,
+    ): String {
         if (targetDir.findFile(originalName) == null) return originalName
 
         val extensionIndex = originalName.lastIndexOf('.')
@@ -830,32 +947,34 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         lrcText: String,
         targetDir: DocumentFile,
         lrcName: String,
-        encoding: String
-    ): DocumentFile = withContext(Dispatchers.IO) {
-        val bytes = lrcText.toByteArray(Charset.forName(encoding))
-        val existing = targetDir.findFile(lrcName)
-        val document = existing ?: targetDir.createFile("application/octet-stream", lrcName)
-            ?: throw Exception("无法创建歌词文件")
-        try {
-            context.contentResolver.openOutputStream(document.uri, "wt")?.use { it.write(bytes) }
-                ?: throw Exception("无法打开歌词输出流")
-        } catch (e: Exception) {
-            if (existing == null) document.delete()
-            throw e
+        encoding: String,
+    ): DocumentFile =
+        withContext(Dispatchers.IO) {
+            val bytes = lrcText.toByteArray(Charset.forName(encoding))
+            val existing = targetDir.findFile(lrcName)
+            val document =
+                existing ?: targetDir.createFile("application/octet-stream", lrcName)
+                    ?: throw Exception("无法创建歌词文件")
+            try {
+                context.contentResolver.openOutputStream(document.uri, "wt")?.use { it.write(bytes) }
+                    ?: throw Exception("无法打开歌词输出流")
+            } catch (e: Exception) {
+                if (existing == null) document.delete()
+                throw e
+            }
+            document
         }
-        document
-    }
 
     suspend fun cacheMusic(
         music: Music,
         parent: File,
-        cookie: String
+        cookie: String,
     ): File {
         val file = File(parent, music.id.toString())
         if (!file.exists()) {
             downloadFile(
                 url = MusicNetwork.getMusicUrl(music.id.toString(), "standard", cookie).url,
-                file = file
+                file = file,
             )
             file.createNewFile()
         }
@@ -877,12 +996,32 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         }
     }
 
-    private fun createLyrics(lyric: Lyric, music: Music, rules: MusicDownloadRules): String {
+    private fun createLyrics(
+        lyric: Lyric,
+        music: Music,
+        rules: MusicDownloadRules,
+    ): String {
         val lrc = if (rules.isSaveYrc && lyric.yrc != "") lyric.yrc else lyric.lrc
         val tlLrc =
-            if (rules.isSaveTlLrc) if (rules.isSaveYrc && lyric.ytlrc != "") lyric.ytlrc else lyric.tlyric else ""
+            if (rules.isSaveTlLrc) {
+                if (rules.isSaveYrc && lyric.ytlrc != "") {
+                    lyric.ytlrc
+                } else {
+                    lyric.tlyric
+                }
+            } else {
+                ""
+            }
         val romaLrc =
-            if (rules.isSaveRomaLrc) if (rules.isSaveYrc && lyric.yromalrc != "") lyric.yromalrc else lyric.romalrc else ""
+            if (rules.isSaveRomaLrc) {
+                if (rules.isSaveYrc && lyric.yromalrc != "") {
+                    lyric.yromalrc
+                } else {
+                    lyric.romalrc
+                }
+            } else {
+                ""
+            }
         return """
 [ti:${music.name}]
 [ar:${music.artists.joinToString("、") { it.name }}]
@@ -893,6 +1032,6 @@ $lrc
 $tlLrc
 
 $romaLrc
-""".trimIndent().trimEnd()
+            """.trimIndent().trimEnd()
     }
 }
