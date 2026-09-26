@@ -15,9 +15,9 @@ import com.guang.cloudx.logic.database.DownloadInfo
 import com.guang.cloudx.logic.model.*
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
-import com.guang.cloudx.ui.downloadManager.TaskStatus
 import com.guang.cloudx.ui.downloadManager.DownloadNotificationSummary
 import com.guang.cloudx.ui.downloadManager.NotificationDownload
+import com.guang.cloudx.ui.downloadManager.TaskStatus
 import com.guang.cloudx.ui.downloadManager.buildDownloadNotificationSummary
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -48,11 +48,12 @@ class DownloadService : Service() {
     private var foregroundActive = false
     private var lastNotification: DownloadNotificationSummary? = null
     private val prefs by lazy { SharedPreferencesUtils(this) }
-    private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == null || key == SharedPreferencesUtils.SIMULTANEOUS_SONGS_KEY) {
-            commands.trySend(Command(ACTION_CONFIG_CHANGED, emptyList()))
+    private val preferenceListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == SharedPreferencesUtils.SIMULTANEOUS_SONGS_KEY) {
+                commands.trySend(Command(ACTION_CONFIG_CHANGED, emptyList()))
+            }
         }
-    }
     private var lastStartId = 0
     private val repository = MusicDownloadRepository()
     private val dao by lazy { AppDatabase.getDatabase(this).downloadDao() }
@@ -127,8 +128,13 @@ class DownloadService : Service() {
                         enqueue(command.ids)
                     }
 
-                    ACTION_ENQUEUE -> enqueue(command.ids, queuedOnly = true)
-                    ACTION_CONFIG_CHANGED -> Unit // Refill below using the new limit, without cancelling workers.
+                    ACTION_ENQUEUE -> {
+                        enqueue(command.ids, queuedOnly = true)
+                    }
+
+                    ACTION_CONFIG_CHANGED -> {
+                        Unit
+                    } // Refill below using the new limit, without cancelling workers.
                 }
                 if (commands.isEmpty) fillAvailableSlots()
                 // A start received while a DAO call suspends is already in the channel.
@@ -169,7 +175,10 @@ class DownloadService : Service() {
         enqueue(resumable)
     }
 
-    private suspend fun enqueue(ids: List<Long>, queuedOnly: Boolean = false) {
+    private suspend fun enqueue(
+        ids: List<Long>,
+        queuedOnly: Boolean = false,
+    ) {
         val targets = mutableMapOf<String, DocumentFile>()
         for (id in ids) {
             if (queue.contains(id)) continue

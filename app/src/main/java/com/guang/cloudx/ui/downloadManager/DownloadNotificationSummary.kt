@@ -29,11 +29,22 @@ fun buildDownloadNotificationSummary(
     val measuredSpeed = rates.fold(0L) { sum, rate -> sum + rate.coerceIn(0, Long.MAX_VALUE - sum) }
     val speed =
         when {
-            active.isEmpty() -> "正在准备任务…"
-            network.isEmpty() -> "正在准备或处理音频"
-            rates.isEmpty() -> "总下载速度：测速中"
-            else -> "总下载速度：${formatTransferBytes(measuredSpeed)}/s" +
-                if (rates.size < network.size) "（部分任务测速中）" else ""
+            active.isEmpty() -> {
+                "正在准备任务…"
+            }
+
+            network.isEmpty() -> {
+                "正在准备或处理音频"
+            }
+
+            rates.isEmpty() -> {
+                "总下载速度：测速中"
+            }
+
+            else -> {
+                "总下载速度：${formatTransferBytes(measuredSpeed)}/s" +
+                    if (rates.size < network.size) "（部分任务测速中）" else ""
+            }
         }
     val rows =
         active.sortedBy { it.id }.map { task ->

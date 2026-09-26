@@ -48,49 +48,60 @@ class DownloadNetworkProgressTest {
         }
     }
 
-    @Test fun twoTransfersRunTogetherAndCancellingOneDoesNotCancelTheOther() = runBlocking {
-        val release = CountDownLatch(1)
-        fun server(value: Byte) = LocalServer { output ->
-            output.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n".toByteArray())
-            output.write(byteArrayOf(value))
-            output.flush()
-            release.await(8, TimeUnit.SECONDS)
-            output.write(byteArrayOf(value))
-        }
-        val firstServer = server(1)
-        val secondServer = server(2)
-        try {
-            val firstStarted = CompletableDeferred<Unit>()
-            val secondStarted = CompletableDeferred<Unit>()
-            val firstFile = temporary.newFile()
-            val secondFile = temporary.newFile()
-            val repository = MusicDownloadRepository() // Same repository/client as the real service.
-            withTimeout(5000) {
-                val first = launch(Dispatchers.IO) {
-                    repository.downloadFile(url = firstServer.url, file = firstFile,
-                        bytesCallback = { bytes, _ -> if (bytes > 0) firstStarted.complete(Unit) })
+    @Test fun twoTransfersRunTogetherAndCancellingOneDoesNotCancelTheOther() =
+        runBlocking {
+            val release = CountDownLatch(1)
+
+            fun server(value: Byte) =
+                LocalServer { output ->
+                    output.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n".toByteArray())
+                    output.write(byteArrayOf(value))
+                    output.flush()
+                    release.await(8, TimeUnit.SECONDS)
+                    output.write(byteArrayOf(value))
                 }
-                val second = launch(Dispatchers.IO) {
-                    repository.downloadFile(url = secondServer.url, file = secondFile,
-                        bytesCallback = { bytes, _ -> if (bytes > 0) secondStarted.complete(Unit) })
+            val firstServer = server(1)
+            val secondServer = server(2)
+            try {
+                val firstStarted = CompletableDeferred<Unit>()
+                val secondStarted = CompletableDeferred<Unit>()
+                val firstFile = temporary.newFile()
+                val secondFile = temporary.newFile()
+                val repository = MusicDownloadRepository() // Same repository/client as the real service.
+                withTimeout(5000) {
+                    val first =
+                        launch(Dispatchers.IO) {
+                            repository.downloadFile(
+                                url = firstServer.url,
+                                file = firstFile,
+                                bytesCallback = { bytes, _ -> if (bytes > 0) firstStarted.complete(Unit) },
+                            )
+                        }
+                    val second =
+                        launch(Dispatchers.IO) {
+                            repository.downloadFile(
+                                url = secondServer.url,
+                                file = secondFile,
+                                bytesCallback = { bytes, _ -> if (bytes > 0) secondStarted.complete(Unit) },
+                            )
+                        }
+                    firstStarted.await()
+                    secondStarted.await() // Both sockets must transfer before either server is released.
+                    assertTrue(first.isActive)
+                    assertTrue(second.isActive)
+                    first.cancelAndJoin()
+                    assertTrue(second.isActive)
+                    assertTrue(firstFile.delete())
+                    release.countDown()
+                    second.join()
+                    assertArrayEquals(byteArrayOf(2, 2), secondFile.readBytes())
                 }
-                firstStarted.await()
-                secondStarted.await() // Both sockets must transfer before either server is released.
-                assertTrue(first.isActive)
-                assertTrue(second.isActive)
-                first.cancelAndJoin()
-                assertTrue(second.isActive)
-                assertTrue(firstFile.delete())
+            } finally {
                 release.countDown()
-                second.join()
-                assertArrayEquals(byteArrayOf(2, 2), secondFile.readBytes())
+                firstServer.close()
+                secondServer.close()
             }
-        } finally {
-            release.countDown()
-            firstServer.close()
-            secondServer.close()
         }
-    }
 
     @Test fun knownLengthReportsRealByteTotals() =
         runBlocking {

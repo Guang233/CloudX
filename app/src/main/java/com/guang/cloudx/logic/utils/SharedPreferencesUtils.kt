@@ -65,13 +65,16 @@ class SharedPreferencesUtils(
 
     fun getIsPreviewMusic() = sharedPreferences.getBoolean("is_preview_music", false)
 
-    fun getConcurrentDownloads() = sharedPreferences.getInt("concurrent_downloads", DownloadConcurrency.DEFAULT_PARTS).coerceIn(1, DownloadConcurrency.MAX_PARTS)
+    fun getConcurrentDownloads() =
+        sharedPreferences.getInt("concurrent_downloads", DownloadConcurrency.DEFAULT_PARTS).coerceIn(1, DownloadConcurrency.MAX_PARTS)
 
-    fun getSimultaneousSongs() = sharedPreferences.getInt(SIMULTANEOUS_SONGS_KEY, DownloadConcurrency.DEFAULT_SONGS).coerceIn(1, DownloadConcurrency.MAX_SONGS)
+    fun getSimultaneousSongs() =
+        sharedPreferences.getInt(SIMULTANEOUS_SONGS_KEY, DownloadConcurrency.DEFAULT_SONGS).coerceIn(1, DownloadConcurrency.MAX_SONGS)
 
-    fun putSimultaneousSongs(value: Int) = sharedPreferences.edit {
-        putInt(SIMULTANEOUS_SONGS_KEY, value.coerceIn(1, DownloadConcurrency.MAX_SONGS))
-    }
+    fun putSimultaneousSongs(value: Int) =
+        sharedPreferences.edit {
+            putInt(SIMULTANEOUS_SONGS_KEY, value.coerceIn(1, DownloadConcurrency.MAX_SONGS))
+        }
 
     fun getIsConvertM4aToMp3() = sharedPreferences.getBoolean("is_convert_m4a_to_mp3", false)
 
@@ -127,7 +130,10 @@ class SharedPreferencesUtils(
 
     fun putIsPreviewMusic(value: Boolean) = sharedPreferences.edit { putBoolean("is_preview_music", value) }
 
-    fun putConcurrentDownloads(value: Int) = sharedPreferences.edit { putInt("concurrent_downloads", value.coerceIn(1, DownloadConcurrency.MAX_PARTS)) }
+    fun putConcurrentDownloads(value: Int) =
+        sharedPreferences.edit {
+            putInt("concurrent_downloads", value.coerceIn(1, DownloadConcurrency.MAX_PARTS))
+        }
 
     fun putIsConvertM4aToMp3(value: Boolean) = sharedPreferences.edit { putBoolean("is_convert_m4a_to_mp3", value) }
 
