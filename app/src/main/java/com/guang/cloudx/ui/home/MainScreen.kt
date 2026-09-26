@@ -162,7 +162,8 @@ data class MainScreenState(
     val userInfo: User? = null,
     val userId: String = "",
     val cookie: String = "",
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val downloadedIds: Set<Long> = emptySet()
 )
 
 @SuppressLint("ContextCastToActivity")
@@ -186,7 +187,8 @@ fun MainScreen(
     onDownloadSelected: () -> Unit,
     onToggleSelection: (Music) -> Unit,
     onNavItemClick: (NavItem) -> Unit,
-    onHeadImageClick: () -> Unit
+    onHeadImageClick: () -> Unit,
+    onDeselectDownloaded: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -226,23 +228,31 @@ fun MainScreen(
     ) {
         Scaffold(
             topBar = {
-                MainTopBar(
-                    isSearchMode = state.isSearchMode,
-                    isMultiSelectMode = state.isMultiSelectMode,
-                    inputText = state.inputText,
-                    selectedCount = state.selectedItems.size,
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    onSearchClick = onEnterSearchMode,
-                    onSearchTextChange = onSearchTextChange,
-                    onSearch = onSearch,
-                    onBackClick = {
-                        if (state.isMultiSelectMode) onExitMultiSelectMode()
-                        else if (state.isSearchMode) onExitSearchMode()
-                    },
-                    onSelectAll = onSelectAll,
-                    onInvertSelection = onInvertSelection,
-                    onDownloadSelected = onDownloadSelected
-                )
+                Column {
+                    MainTopBar(
+                        isSearchMode = state.isSearchMode,
+                        isMultiSelectMode = state.isMultiSelectMode,
+                        inputText = state.inputText,
+                        selectedCount = state.selectedItems.size,
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onSearchClick = onEnterSearchMode,
+                        onSearchTextChange = onSearchTextChange,
+                        onSearch = onSearch,
+                        onBackClick = {
+                            if (state.isMultiSelectMode) onExitMultiSelectMode()
+                            else if (state.isSearchMode) onExitSearchMode()
+                        },
+                        onSelectAll = onSelectAll,
+                        onInvertSelection = onInvertSelection,
+                        onDownloadSelected = onDownloadSelected
+                    )
+                    if (state.isMultiSelectMode) {
+                        DeselectDownloadedButton(
+                            enabled = state.selectedItems.any { it.id in state.downloadedIds },
+                            onClick = onDeselectDownloaded
+                        )
+                    }
+                }
             }
         ) { paddingValues ->
             Box(
@@ -261,6 +271,7 @@ fun MainScreen(
                 } else {
                     MusicList(
                         musicList = state.searchMusicList,
+                        downloadedIds = state.downloadedIds,
                         isRefreshing = state.isRefreshing,
                         isLastPage = state.isLastPage,
                         isMultiSelectMode = state.isMultiSelectMode,
@@ -440,6 +451,15 @@ fun MainTopBar(
     }
 }
 
+@Composable
+fun DeselectDownloadedButton(enabled: Boolean, onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        TextButton(onClick = onClick, enabled = enabled) {
+            Text("取消选择已下载")
+        }
+    }
+}
+
 private enum class TopBarState {
     Normal, Search, MultiSelect
 }
@@ -584,6 +604,7 @@ fun DrawerContent(
 @Composable
 fun MusicList(
     musicList: List<Music>,
+    downloadedIds: Set<Long>,
     isRefreshing: Boolean,
     isLastPage: Boolean,
     isMultiSelectMode: Boolean,
@@ -629,6 +650,7 @@ fun MusicList(
             items(musicList, key = { it.id }) { music ->
                 MusicItem(
                     music = music,
+                    isDownloaded = music.id in downloadedIds,
                     modifier = Modifier.animateItem(),
                     isMultiSelectMode = isMultiSelectMode,
                     isSelected = selectedItems.contains(music),
@@ -647,6 +669,7 @@ fun MusicItem(
     music: Music,
     modifier: Modifier = Modifier,
     displayIndex: Int? = null,
+    isDownloaded: Boolean = false,
     isMultiSelectMode: Boolean,
     isSelected: Boolean,
     onDownloadClick: () -> Unit,
@@ -727,6 +750,13 @@ fun MusicItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (isDownloaded) {
+                    Text(
+                        text = "已下载",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             // 下载按钮

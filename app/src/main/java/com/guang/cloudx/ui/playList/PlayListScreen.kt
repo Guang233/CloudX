@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.model.downloadedMusicIds
+import com.guang.cloudx.ui.downloadManager.rememberLocalMusicViewModel
+import com.guang.cloudx.ui.home.DeselectDownloadedButton
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.ui.home.MusicBottomSheetContent
 import com.guang.cloudx.ui.home.MusicItem
@@ -57,6 +60,8 @@ fun PlayListScreen(
 ) {
     val viewModel: PlayListViewModel = viewModel()
     val state by viewModel.uiState.collectAsState()
+    val localFiles by rememberLocalMusicViewModel().files.collectAsState()
+    val downloadedIds = remember(localFiles) { localFiles.downloadedMusicIds() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -97,22 +102,32 @@ fun PlayListScreen(
 
     Scaffold(
         topBar = {
-            PlayListTopBar(
-                title = state.playList?.name ?: "歌单",
-                isMultiSelectMode = state.isMultiSelectMode,
-                selectedCount = state.selectedItems.size,
-                alpha = alpha,
-                onBackClick = {
-                    if (state.isMultiSelectMode) viewModel.exitMultiSelectMode()
-                    else onBackClick()
-                },
-                onSelectAll = { viewModel.selectAll() },
-                onInvertSelection = { viewModel.invertSelection() },
-                onDownloadSelected = {
-                    onDownloadSelected(state.selectedItems.toList())
-                    viewModel.exitMultiSelectMode()
+            Column {
+                PlayListTopBar(
+                    title = state.playList?.name ?: "歌单",
+                    isMultiSelectMode = state.isMultiSelectMode,
+                    selectedCount = state.selectedItems.size,
+                    alpha = alpha,
+                    onBackClick = {
+                        if (state.isMultiSelectMode) viewModel.exitMultiSelectMode()
+                        else onBackClick()
+                    },
+                    onSelectAll = { viewModel.selectAll() },
+                    onInvertSelection = { viewModel.invertSelection() },
+                    onDownloadSelected = {
+                        onDownloadSelected(state.selectedItems.toList())
+                        viewModel.exitMultiSelectMode()
+                    }
+                )
+                if (state.isMultiSelectMode) {
+                    Surface {
+                        DeselectDownloadedButton(
+                            enabled = state.selectedItems.any { it.id in downloadedIds },
+                            onClick = { viewModel.deselectDownloaded(downloadedIds) }
+                        )
+                    }
                 }
-            )
+            }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -136,6 +151,7 @@ fun PlayListScreen(
                         itemsIndexed(state.musicList, key = { _, music -> music.id }) { index, music ->
                             MusicItem(
                                 music = music,
+                                isDownloaded = music.id in downloadedIds,
                                 displayIndex = if (type == "album") index + 1 else null,
                                 isMultiSelectMode = state.isMultiSelectMode,
                                 isSelected = state.selectedItems.contains(music),

@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.google.gson.Gson
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.ui.downloadManager.TaskStatus
+import kotlinx.coroutines.flow.Flow
 
 @Entity
 data class DownloadInfo(
@@ -19,7 +20,8 @@ data class DownloadInfo(
     @ColumnInfo(defaultValue = "'standard'") val downloadLevel: String = "standard",
     @ColumnInfo(defaultValue = "''") val rulesJson: String = "",
     @ColumnInfo(defaultValue = "''") val targetUri: String = "",
-    @ColumnInfo(defaultValue = "NULL") val savedFileName: String? = null
+    @ColumnInfo(defaultValue = "NULL") val savedFileName: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val savedFileUri: String? = null
 )
 
 class Converters {
@@ -61,7 +63,7 @@ interface DownloadDao {
 
     @Query(
         "UPDATE DownloadInfo SET progress = :progress, status = :status, failureReason = NULL " +
-                "WHERE id = :id"
+                "WHERE id = :id AND status = 'DOWNLOADING'"
     )
     suspend fun updateProgress(id: Long, progress: Int, status: TaskStatus)
 
@@ -70,12 +72,28 @@ interface DownloadDao {
 
     @Query("SELECT * FROM DownloadInfo")
     suspend fun getAllDownloads(): List<DownloadInfo>
+
+    @Query("SELECT * FROM DownloadInfo ORDER BY timeStamp, id")
+    fun observeAll(): Flow<List<DownloadInfo>>
+
+    @Query("SELECT * FROM DownloadInfo WHERE status = 'COMPLETED' AND savedFileUri IS NULL AND savedFileName IS NOT NULL ORDER BY timeStamp DESC, id DESC")
+    suspend fun getLegacyCompleted(): List<DownloadInfo>
+
+    @Query("UPDATE DownloadInfo SET savedFileUri = :uri WHERE id = :id")
+    suspend fun setSavedFileUri(id: Long, uri: String)
+
+    @Query("UPDATE DownloadInfo SET status = :status, failureReason = :reason WHERE id = :id")
+    suspend fun setStatus(id: Long, status: TaskStatus, reason: String? = null)
+
+    @Query("UPDATE DownloadInfo SET status = 'COMPLETED', progress = 100, failureReason = NULL, savedFileName = :name, savedFileUri = :uri WHERE id = :id")
+    suspend fun complete(id: Long, name: String?, uri: String?)
 }
 
-@Database(entities = [DownloadInfo::class], version = 3, exportSchema = false)
+@Database(entities = [DownloadInfo::class, LocalMusicFile::class], version = 4, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
+    abstract fun localMusicDao(): LocalMusicDao
 
     companion object {
         @Volatile
@@ -87,7 +105,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "download_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
                 INSTANCE = instance
                 instance
             }
@@ -104,6 +122,25 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL(
                     "ALTER TABLE DownloadInfo ADD COLUMN targetUri TEXT NOT NULL DEFAULT ''"
                 )
+            }
+        }
+
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE DownloadInfo ADD COLUMN savedFileUri TEXT DEFAULT NULL")
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS LocalMusicFile (
+                        uri TEXT NOT NULL PRIMARY KEY,
+                        musicId INTEGER NOT NULL,
+                        treeUri TEXT NOT NULL,
+                        displayName TEXT NOT NULL,
+                        lyricUri TEXT,
+                        downloadLevel TEXT NOT NULL,
+                        downloadedAt INTEGER NOT NULL,
+                        state TEXT NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_LocalMusicFile_musicId ON LocalMusicFile (musicId)")
             }
         }
 

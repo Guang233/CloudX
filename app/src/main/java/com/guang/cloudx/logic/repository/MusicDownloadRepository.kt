@@ -3,6 +3,8 @@ package com.guang.cloudx.logic.repository
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModelProvider
+import com.guang.cloudx.logic.database.AppDatabase
+import com.guang.cloudx.logic.database.LocalMusicFile
 import com.guang.cloudx.logic.model.DownloadStage
 import com.guang.cloudx.logic.model.Lyric
 import com.guang.cloudx.logic.model.Music
@@ -11,12 +13,12 @@ import com.guang.cloudx.logic.network.MusicNetwork
 import com.guang.cloudx.logic.utils.AudioTagWriter
 import com.guang.cloudx.logic.utils.Mp3Transcoder
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.RandomAccessFile
@@ -26,6 +28,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLongArray
 
 class MusicDownloadRepository : ViewModelProvider.Factory {
+    data class SavedAudio(val fileName: String, val uri: String)
+
     private class RangeNotSupportedException(message: String) : Exception(message)
     private data class RemoteFileInfo(
         val contentLength: Long,
@@ -170,7 +174,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         cookie: String,
         targetDir: DocumentFile,
         onProgress: (Music, Int, DownloadStage) -> Unit
-    ): String? {
+    ): SavedAudio? {
         val cacheDir = context.externalCacheDir ?: context.cacheDir
         val downloadTempDir = File(cacheDir, DOWNLOAD_TEMP_DIR).apply { mkdirs() }
         migrateLegacyDownloadArtifacts(cacheDir, downloadTempDir, music.id)
@@ -179,7 +183,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         var outputAudioFile: File? = null
         var tmpCover: File? = null
         var audioDownloaded = false
-        var savedAudioFileName: String? = null
+        var savedAudio: SavedAudio? = null
 
         try {
             // 1. 获取音乐 URL 和文件信息
@@ -278,24 +282,39 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
                 coverFile.delete()
                 onProgress(music, 98, DownloadStage.SAVING)
 
-                // 6. 移动到最终位置
-                savedAudioFileName = copyToSaf(
-                    context,
-                    finalAudioFile,
-                    targetDir,
-                    "$baseFileName.$finalExt",
-                    rules.fileConflictStrategy
-                )
-
-                // 7. 写入歌词文件
-                if (savedAudioFileName != null && rules.isSaveLrc && lrcText != null) {
-                    writeLrcToSaf(
-                        context,
-                        lrcText,
-                        targetDir,
-                        "${savedAudioFileName!!.substringBeforeLast('.')}.lrc",
-                        rules.encoding
-                    )
+                // 6. 保存实际 URI；独立索引不随下载任务记录删除。
+                LocalMusicRepository.fileMutex.withLock {
+                    // Finish the short save/index commit even if pause arrives during SAF I/O.
+                    withContext(Dispatchers.IO + NonCancellable) {
+                        val document = copyToSaf(
+                            context, finalAudioFile, targetDir, "$baseFileName.$finalExt", rules.fileConflictStrategy
+                        )
+                        if (document != null) {
+                            val name = document.name ?: "$baseFileName.$finalExt"
+                            val localDao = AppDatabase.getDatabase(context).localMusicDao()
+                            var localFile = LocalMusicFile(
+                                uri = document.uri.toString(),
+                                musicId = music.id,
+                                treeUri = targetDir.uri.toString(),
+                                displayName = name,
+                                downloadLevel = musicUrl.level,
+                                downloadedAt = System.currentTimeMillis()
+                            )
+                            localDao.upsert(localFile)
+                            savedAudio = SavedAudio(name, document.uri.toString())
+                            if (rules.isSaveLrc && lrcText != null) {
+                                val lyricDocument = writeLrcToSaf(
+                                    context, lrcText, targetDir,
+                                    "${name.substringBeforeLast('.')}.lrc", rules.encoding
+                                )
+                                // The sidecar may have overwritten a previous song's same-name lyric.
+                                localDao.clearLyric(lyricDocument.uri.toString())
+                                localFile = localFile.copy(lyricUri = lyricDocument.uri.toString())
+                                localDao.upsert(localFile)
+                            }
+                        }
+                        // A same-name skip is not evidence that the existing file is this song.
+                    }
                 }
 
                 // 8. 清理临时文件
@@ -312,7 +331,7 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
             tmpCover?.delete()
             throw e
         }
-        return savedAudioFileName
+        return savedAudio
     }
 
     private suspend fun downloadAudioFile(
@@ -769,39 +788,31 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         targetDir: DocumentFile,
         finalFileName: String,
         conflictStrategy: String
-    ): String? = withContext(Dispatchers.IO) {
-            val targetFileName = when (conflictStrategy) {
-                "跳过" -> {
-                    if (targetDir.findFile(finalFileName) != null) return@withContext null
-                    finalFileName
-                }
-
-                "自动重命名" -> findAvailableFileName(targetDir, finalFileName)
-                else -> finalFileName
+    ): DocumentFile? = withContext(Dispatchers.IO) {
+        val targetFileName = when (conflictStrategy) {
+            "跳过" -> {
+                if (targetDir.findFile(finalFileName) != null) return@withContext null
+                finalFileName
             }
-            val existing = targetDir.findFile(targetFileName)
-            if (existing != null) {
-                try {
-                    context.contentResolver.openFileDescriptor(existing.uri, "w")?.use { pfd ->
-                        FileOutputStream(pfd.fileDescriptor).use { out ->
-                            sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
-                        }
-                    } ?: throw Exception("无法打开现有文件")
-                } catch (e: Exception) {
-                    context.contentResolver.delete(existing.uri, null, null)
-                    val newDoc = targetDir.createFile("audio/*", targetFileName) ?: throw Exception("无法创建音乐文件")
-                    context.contentResolver.openOutputStream(newDoc.uri)?.use { out ->
-                        sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
-                    } ?: throw Exception("无法打开新文件")
-                }
-            } else {
-                val musicDoc = targetDir.createFile("audio/*", targetFileName) ?: throw Exception("无法创建音乐文件")
-                context.contentResolver.openOutputStream(musicDoc.uri)?.use { out ->
-                    sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
-                } ?: throw Exception("无法打开目标输出流")
-            }
-            targetFileName
+            "自动重命名" -> findAvailableFileName(targetDir, finalFileName)
+            else -> finalFileName
         }
+        val existing = targetDir.findFile(targetFileName)
+        val document = existing ?: targetDir.createFile("audio/*", targetFileName)
+            ?: throw Exception("无法创建音乐文件")
+        val localDao = AppDatabase.getDatabase(context).localMusicDao()
+        try {
+            // 'wt' truncates old content; never delete an existing file as a write-error fallback.
+            context.contentResolver.openOutputStream(document.uri, "wt")?.use { out ->
+                if (existing != null) localDao.setState(document.uri.toString(), LocalMusicFile.MISSING)
+                sourceFile.inputStream().use { input -> input.copyTo(out, BUFFER_SIZE) }
+            } ?: throw Exception("无法打开目标输出流")
+        } catch (e: Exception) {
+            if (existing == null) document.delete()
+            throw e
+        }
+        document
+    }
 
     private fun findAvailableFileName(targetDir: DocumentFile, originalName: String): String {
         if (targetDir.findFile(originalName) == null) return originalName
@@ -820,30 +831,19 @@ class MusicDownloadRepository : ViewModelProvider.Factory {
         targetDir: DocumentFile,
         lrcName: String,
         encoding: String
-    ) = withContext(Dispatchers.IO) {
-        val existingLrc = targetDir.findFile(lrcName)
-        if (existingLrc != null) {
-            try {
-                context.contentResolver.openFileDescriptor(existingLrc.uri, "w")?.use { pfd ->
-                    FileOutputStream(pfd.fileDescriptor).use { out ->
-                        out.write(lrcText.toByteArray(Charset.forName(encoding)))
-                    }
-                } ?: throw Exception("无法打开已存在的 lrc 输出流")
-            } catch (e: Exception) {
-                context.contentResolver.delete(existingLrc.uri, null, null)
-                targetDir.createFile("application/octet-stream", lrcName)?.let {
-                    context.contentResolver.openOutputStream(it.uri)?.use { out ->
-                        out.write(lrcText.toByteArray(Charset.forName(encoding)))
-                    }
-                }
-            }
-        } else {
-            targetDir.createFile("application/octet-stream", lrcName)?.let {
-                context.contentResolver.openOutputStream(it.uri)?.use { out ->
-                    out.write(lrcText.toByteArray(Charset.forName(encoding)))
-                }
-            }
+    ): DocumentFile = withContext(Dispatchers.IO) {
+        val bytes = lrcText.toByteArray(Charset.forName(encoding))
+        val existing = targetDir.findFile(lrcName)
+        val document = existing ?: targetDir.createFile("application/octet-stream", lrcName)
+            ?: throw Exception("无法创建歌词文件")
+        try {
+            context.contentResolver.openOutputStream(document.uri, "wt")?.use { it.write(bytes) }
+                ?: throw Exception("无法打开歌词输出流")
+        } catch (e: Exception) {
+            if (existing == null) document.delete()
+            throw e
         }
+        document
     }
 
     suspend fun cacheMusic(

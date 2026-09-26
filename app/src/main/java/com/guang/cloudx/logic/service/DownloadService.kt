@@ -17,6 +17,7 @@ import com.guang.cloudx.logic.model.DownloadStage
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.MusicDownloadRules
 import com.guang.cloudx.logic.repository.MusicDownloadRepository
+import com.guang.cloudx.ui.downloadManager.TaskStatus
 import kotlinx.coroutines.*
 import java.util.*
 
@@ -140,7 +141,7 @@ class DownloadService : Service() {
                     }
 
                     var downloadJob: Job? = null
-                    var completedFileName: String? = null
+                    var completedFile: MusicDownloadRepository.SavedAudio? = null
                     try {
                         supervisorScope {
                             val job = async {
@@ -164,6 +165,9 @@ class DownloadService : Service() {
                                     stageMap[task.dbId] = stage
 
                                     if (shouldPublishProgress) {
+                                        scope.launch {
+                                            downloadDao.updateProgress(task.dbId, progress, TaskStatus.DOWNLOADING)
+                                        }
                                         progressUpdateAtMap[task.dbId] = now
                                         val avgProgress =
                                             if (progressMap.isNotEmpty()) progressMap.values.sum() / progressMap.size else 0
@@ -193,9 +197,10 @@ class DownloadService : Service() {
                             if (shouldCancelImmediately) {
                                 job.cancel(CancellationException("下载已暂停"))
                             }
-                            completedFileName = job.await()
+                            completedFile = job.await()
                         }
 
+                        downloadDao.complete(task.dbId, completedFile?.fileName, completedFile?.uri)
                         totalCompleted++
                         progressUpdateAtMap.remove(task.dbId)
                         stageMap.remove(task.dbId)
@@ -205,7 +210,8 @@ class DownloadService : Service() {
                                 .setPackage(packageName)
                                 .apply {
                                     putExtra(EXTRA_DB_ID, task.dbId)
-                                    putExtra("fileName", completedFileName)
+                                    putExtra("fileName", completedFile?.fileName)
+                                    putExtra("fileUri", completedFile?.uri)
                                 }
                         )
 
@@ -222,6 +228,7 @@ class DownloadService : Service() {
                             throw e
                         }
                     } catch (e: Exception) {
+                        downloadDao.setStatus(task.dbId, TaskStatus.FAILED, classifyFailure(e))
                         progressUpdateAtMap.remove(task.dbId)
                         stageMap.remove(task.dbId)
                         sendBroadcast(
@@ -277,6 +284,7 @@ class DownloadService : Service() {
     }
 
     private fun sendPausedBroadcast(dbId: Long) {
+        // The pause command is persisted before dispatch; a late write here could undo a resume.
         sendBroadcast(
             Intent(BROADCAST_PAUSED)
                 .setPackage(packageName)

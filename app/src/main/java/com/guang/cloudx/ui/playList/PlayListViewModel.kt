@@ -5,6 +5,7 @@ import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import com.guang.cloudx.logic.model.Music
 import com.guang.cloudx.logic.model.PlayList
+import com.guang.cloudx.logic.model.withoutDownloaded
 import com.guang.cloudx.logic.repository.Repository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,6 +98,12 @@ class PlayListViewModel : ViewModel() {
     fun selectAll() {
         _uiState.update { state ->
             state.copy(selectedItems = state.musicList.toSet())
+        }
+    }
+
+    fun deselectDownloaded(downloadedIds: Set<Long>) {
+        _uiState.update { state ->
+            state.copy(selectedItems = state.selectedItems.withoutDownloaded(downloadedIds))
         }
     }
 

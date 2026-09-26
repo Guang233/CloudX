@@ -1,11 +1,9 @@
 package com.guang.cloudx.ui.downloadManager
 
-import android.content.BroadcastReceiver
+import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
-import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -30,15 +28,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.guang.cloudx.R
 import com.guang.cloudx.logic.model.MusicDownloadRules
-import com.guang.cloudx.logic.service.DownloadService
+import com.guang.cloudx.logic.database.LocalMusicFile
 import com.guang.cloudx.logic.utils.SharedPreferencesUtils
 import com.guang.cloudx.logic.utils.SystemUtils
+import com.guang.cloudx.logic.utils.applicationViewModels
 import com.guang.cloudx.ui.home.TooltipIconButton
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -50,9 +47,14 @@ fun DownloadManagerScreen(
     onBackClick: () -> Unit,
     downloadDir: DocumentFile?
 ) {
-    val viewModel: DownloadViewModel = viewModel()
+    val application = LocalContext.current.applicationContext as Application
+    val viewModel = remember(application) { applicationViewModels<DownloadViewModel>(application).value }
     val downloadingList by viewModel.downloading.collectAsState()
     val completedList by viewModel.completed.collectAsState()
+    val localMusic = rememberLocalMusicViewModel()
+    val localFiles by localMusic.files.collectAsState()
+    val filesByUri = remember(localFiles) { localFiles.associateBy { it.uri } }
+    val snackbar = remember { SnackbarHostState() }
 
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -62,38 +64,14 @@ fun DownloadManagerScreen(
     var showDeleteAllCompletedDialog by remember { mutableStateOf(false) }
     var showDeleteAllFailedDialog by remember { mutableStateOf(false) }
     var showDetailDialog by remember { mutableStateOf<DownloadItemUi?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<DownloadItemUi?>(null) }
+    var deleting by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val prefs = remember { SharedPreferencesUtils(context) }
 
-    // 注册广播接收器以更新进度
-    DisposableEffect(context) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                viewModel.updateProgressById(intent) {
-                    // 下载完成时的回调，如果需要可以在这里处理
-                }
-            }
-        }
-        val filter = IntentFilter().apply {
-            addAction("DOWNLOAD_PROGRESS")
-            addAction("DOWNLOAD_COMPLETED")
-            addAction("DOWNLOAD_FAILED")
-            addAction("DOWNLOAD_FINISHED")
-            addAction(DownloadService.BROADCAST_PAUSED)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        }
-
-        onDispose {
-            context.unregisterReceiver(receiver)
-        }
-    }
-
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("下载管理") },
@@ -147,12 +125,19 @@ fun DownloadManagerScreen(
                         }
                     }
 
-                    // 已完成页：如果有已完成任务，显示全部删除
+                    if (pagerState.currentPage == 1) {
+                        TooltipIconButton(
+                            onClick = { localMusic.refresh() },
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "刷新本地文件状态"
+                        )
+                    }
+                    // 批量清理仅移除记录，绝不顺带删除文件。
                     if (pagerState.currentPage == 1 && completedList.isNotEmpty()) {
                         TooltipIconButton(
                             onClick = { showDeleteAllCompletedDialog = true },
                             imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "全部删除"
+                            contentDescription = "清空已完成记录"
                         )
                     }
                 }
@@ -185,7 +170,8 @@ fun DownloadManagerScreen(
                 } else {
                     CompletedList(
                         list = completedList,
-                        onDelete = { item -> viewModel.deleteCompleted(item) {} },
+                        filesByUri = filesByUri,
+                        onDelete = { item -> showDeleteDialog = item },
                         onClick = { item -> showDetailDialog = item }
                     )
                 }
@@ -198,7 +184,7 @@ fun DownloadManagerScreen(
         AlertDialog(
             onDismissRequest = { showDeleteAllCompletedDialog = false },
             title = { Text("提示") },
-            text = { Text("真的要删除全部已完成记录吗？") },
+            text = { Text("清空全部已完成记录？本地歌曲文件和已下载标记都会保留。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -241,9 +227,76 @@ fun DownloadManagerScreen(
         )
     }
 
+    showDeleteDialog?.let { selected ->
+        val item = completedList.find { it.id == selected.id } ?: selected
+        val file = filesByUri[item.savedFileUri]?.takeIf { it.musicId == item.music.id }
+        var deleteSource by remember(item.id) { mutableStateOf(false) }
+        var deleteLyrics by remember(item.id) { mutableStateOf(false) }
+        val canDeleteFile = file != null &&
+            (file.state != LocalMusicFile.MISSING || file.lyricUri != null)
+        AlertDialog(
+            onDismissRequest = { if (!deleting) showDeleteDialog = null },
+            title = { Text("删除歌曲") },
+            text = {
+                Column {
+                    Text(item.savedFileName ?: item.music.name)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = deleteSource,
+                            onCheckedChange = { deleteSource = it },
+                            enabled = canDeleteFile && !deleting
+                        )
+                        Text("删除本地歌曲文件（不可恢复）")
+                    }
+                    if (deleteSource && file?.lyricUri != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = deleteLyrics,
+                                onCheckedChange = { deleteLyrics = it },
+                                enabled = !deleting
+                            )
+                            Text("同时删除关联歌词")
+                        }
+                    }
+                    Text(if (deleteSource) "保留下载记录；其他副本不会删除。"
+                        else "仅移除这条记录，保留本地文件和已下载标记。")
+                    if (!canDeleteFile) Text("${completedFileStatus(item, filesByUri)}，只能移除记录。")
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleting && (!deleteSource || canDeleteFile),
+                    onClick = {
+                        if (!deleteSource) {
+                            viewModel.deleteCompleted(item) {}
+                            showDeleteDialog = null
+                        } else {
+                            deleting = true
+                            scope.launch {
+                                try {
+                                    val message = localMusic.deleteFile(item, deleteLyrics)
+                                    showDeleteDialog = null
+                                    snackbar.showSnackbar(message)
+                                } finally {
+                                    deleting = false
+                                }
+                            }
+                        }
+                    }
+                ) { Text(if (deleting) "正在删除…" else if (deleteSource) "删除文件" else "移除记录") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = null }, enabled = !deleting) { Text("取消") }
+            }
+        )
+    }
+
     // 详情弹窗
     if (showDetailDialog != null) {
-        val item = showDetailDialog!!
+        val item = completedList.find { it.id == showDetailDialog!!.id } ?: showDetailDialog!!
+        val canOpen = filesByUri[item.savedFileUri]?.let {
+            it.musicId == item.music.id && it.state == LocalMusicFile.PRESENT
+        } == true
         val message = remember(item) {
             with(item) {
                 """
@@ -267,13 +320,13 @@ fun DownloadManagerScreen(
                 Row {
                     TextButton(
                         onClick = { openCompletedFile(context, item) },
-                        enabled = item.savedFileName != null
+                        enabled = canOpen
                     ) {
                         Text("打开")
                     }
                     TextButton(
                         onClick = { shareCompletedFile(context, item) },
-                        enabled = item.savedFileName != null
+                        enabled = canOpen
                     ) {
                         Text("分享")
                     }
@@ -295,10 +348,19 @@ fun DownloadManagerScreen(
     }
 }
 
+private fun completedFileStatus(item: DownloadItemUi, files: Map<String, LocalMusicFile>): String {
+    val file = files[item.savedFileUri] ?: return "文件未确认"
+    if (file.musicId != item.music.id) return "文件已被覆盖"
+    return when (file.state) {
+        LocalMusicFile.PRESENT -> "已下载"
+        LocalMusicFile.MISSING -> "文件已删除"
+        else -> "目录不可访问，请检查授权"
+    }
+}
+
 private fun findCompletedDocument(context: Context, item: DownloadItemUi): DocumentFile? {
-    val fileName = item.savedFileName ?: return null
-    val targetUri = item.targetUri.takeIf { it.isNotBlank() } ?: return null
-    return DocumentFile.fromTreeUri(context, Uri.parse(targetUri))?.findFile(fileName)
+    val uri = item.savedFileUri ?: return null
+    return DocumentFile.fromSingleUri(context, Uri.parse(uri))
 }
 
 private fun openCompletedFile(context: Context, item: DownloadItemUi) {
@@ -542,6 +604,7 @@ fun DownloadingItem(
 @Composable
 fun CompletedList(
     list: List<DownloadItemUi>,
+    filesByUri: Map<String, LocalMusicFile>,
     onDelete: (DownloadItemUi) -> Unit,
     onClick: (DownloadItemUi) -> Unit
 ) {
@@ -555,6 +618,7 @@ fun CompletedList(
         items(reversedList, key = { it.id }) { item ->
             CompletedItem(
                 item = item,
+                fileStatus = completedFileStatus(item, filesByUri),
                 modifier = Modifier.animateItem(),
                 onClick = { onClick(item) },
                 onDelete = { onDelete(item) }
@@ -566,6 +630,7 @@ fun CompletedList(
 @Composable
 fun CompletedItem(
     item: DownloadItemUi,
+    fileStatus: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onDelete: () -> Unit
@@ -628,7 +693,7 @@ fun CompletedItem(
                 Spacer(modifier = Modifier.weight(1f))
 
                 Text(
-                    text = "已完成",
+                    text = fileStatus,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )

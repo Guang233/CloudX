@@ -40,6 +40,9 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.guang.cloudx.BaseActivity
 import com.guang.cloudx.logic.model.Music
+import com.guang.cloudx.logic.model.downloadedMusicIds
+import com.guang.cloudx.logic.model.withoutDownloaded
+import com.guang.cloudx.ui.downloadManager.rememberLocalMusicViewModel
 import com.guang.cloudx.logic.utils.SystemUtils
 import com.guang.cloudx.logic.utils.toast
 import com.guang.cloudx.ui.Screen
@@ -296,6 +299,8 @@ class MainActivity : BaseActivity() {
 
         val isRefreshing by viewModel.isRefreshing.collectAsState()
         val userDetail by viewModel.userDetailFlow.collectAsState()
+        val localFiles by rememberLocalMusicViewModel().files.collectAsState()
+        val downloadedIds = remember(localFiles) { localFiles.downloadedMusicIds() }
 
         var isSearchMode by remember { mutableStateOf(viewModel.isSearchMode) }
         var isMultiSelectMode by remember { mutableStateOf(viewModel.isMultiSelectionMode) }
@@ -335,7 +340,8 @@ class MainActivity : BaseActivity() {
             userInfo = userDetail?.getOrNull(),
             userId = prefs.getUserId(),
             cookie = prefs.getCookie(),
-            isLoggedIn = prefs.getCookie().isNotEmpty()
+            isLoggedIn = prefs.getCookie().isNotEmpty(),
+            downloadedIds = downloadedIds
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -428,6 +434,9 @@ class MainActivity : BaseActivity() {
                 onInvertSelection = {
                     val newSelection = searchMusicList.filter { !selectedItems.contains(it) }.toSet()
                     selectedItems = newSelection
+                },
+                onDeselectDownloaded = {
+                    selectedItems = selectedItems.withoutDownloaded(downloadedIds)
                 },
                 onDownloadSelected = {
                     if (selectedItems.isNotEmpty()) {
